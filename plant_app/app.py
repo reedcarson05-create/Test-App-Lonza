@@ -23,6 +23,8 @@ machines = [
     {"MachineID": 3, "Name": "Evaporation"},
 ]
 
+
+
 # Create the local DB if it doesn't exist
 init_db()
 
