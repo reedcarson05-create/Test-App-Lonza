@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <img src="/static/logo.png" alt="Logo" class="logo">
+        Operator Entry
+      </div>
+      <div class="navlinks">
+        <a class="pill" href="/machines">Stages</a>
+        <a class="pill" href="/dashboard">Dashboard</a>
+        <a class="pill" href="/plant">Plant Status</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">{{ machine.Name }} — Data Entry</h2>
+      <div class="footer">Tap a field, then use the keypad. Batch number is required.</div>
+
+      <form method="post" action="/submit" style="margin-top:14px;" id="entryForm">
+        <input type="hidden" name="machine_id" value="{{ machine.MachineID }}">
+
+        <div class="operator-layout">
+
+          <!-- LEFT: fields -->
+          <div>
+
+            <div class="field-card">
+              <label>Batch Number</label>
+              <input class="big-input" id="batch_number" name="batch_number" placeholder="e.g., 24-017" required autocomplete="off">
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="field-card">
+              <label>Blow Back Pressure</label>
+              <input class="big-input" id="blowback" name="blowback" placeholder="e.g., 12.5" inputmode="decimal" autocomplete="off">
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="grid grid-2">
+              <div class="field-card">
+                <label>Pressate RI @ P303 (%)</label>
+                <input class="big-input" id="pressate_ri" name="pressate_ri" placeholder="e.g., 67.2" inputmode="decimal" autocomplete="off">
+              </div>
+              <div class="field-card">
+                <label>Pressate Flow FT303 (gpm)</label>
+                <input class="big-input" id="pressate_flow" name="pressate_flow" placeholder="e.g., 145.0" inputmode="decimal" autocomplete="off">
+              </div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="grid grid-2">
+              <div class="field-card">
+                <label>Chip Bin Steam FT201 (lb/hr)</label>
+                <input class="big-input" id="chip_bin_steam" name="chip_bin_steam" placeholder="e.g., 3200" inputmode="decimal" autocomplete="off">
+              </div>
+              <div class="field-card">
+                <label>Chip Chute Temp (°F)</label>
+                <input class="big-input" id="chip_chute_temp" name="chip_chute_temp" placeholder="e.g., 185" inputmode="decimal" autocomplete="off">
+              </div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-big" type="submit">Submit</button>
+              <a class="btn btn-ghost btn-big" href="/machines" style="text-decoration:none;">Cancel</a>
+            </div>
+
+          </div>
+
+          <!-- RIGHT: keypad -->
+          <div class="field-card">
+            <h2 style="margin-top:0; font-size:18px;">Keypad</h2>
+            <div class="footer">Tap a field, then enter values here.</div>
+
+            <div class="keypad">
+              <button class="key" type="button" onclick="kp('7')">7</button>
+              <button class="key" type="button" onclick="kp('8')">8</button>
+              <button class="key" type="button" onclick="kp('9')">9</button>
+
+              <button class="key" type="button" onclick="kp('4')">4</button>
+              <button class="key" type="button" onclick="kp('5')">5</button>
+              <button class="key" type="button" onclick="kp('6')">6</button>
+
+              <button class="key" type="button" onclick="kp('1')">1</button>
+              <button class="key" type="button" onclick="kp('2')">2</button>
+              <button class="key" type="button" onclick="kp('3')">3</button>
+
+              <button class="key" type="button" onclick="kp('-')">-</button>
+              <button class="key" type="button" onclick="kp('0')">0</button>
+              <button class="key" type="button" onclick="kp('.')">.</button>
+
+              <button class="key key-wide" type="button" onclick="backspace()">⌫ Backspace</button>
+              <button class="key key-danger" type="button" onclick="clearField()">Clear</button>
+            </div>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  let activeInput = null;
+  const inputIds = ["batch_number","blowback","pressate_ri","pressate_flow","chip_bin_steam","chip_chute_temp"];
+
+  function setActive(el){
+    activeInput = el;
+    el.focus();
+  }
+
+  window.addEventListener("load", () => {
+    inputIds.forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener("focus", () => setActive(el));
+      el.addEventListener("click", () => setActive(el));
+    });
+    const bn = document.getElementById("batch_number");
+    if(bn) setActive(bn);
+  });
+
+  function kp(ch){
+    if(!activeInput) return;
+    activeInput.value = (activeInput.value || "") + ch;
+  }
+
+  function backspace(){
+    if(!activeInput) return;
+    const v = activeInput.value || "";
+    activeInput.value = v.slice(0, -1);
+  }
+
+  function clearField(){
+    if(!activeInput) return;
+    activeInput.value = "";
+    activeInput.focus();
+  }
+</script>
+
+</body>
+</html>
