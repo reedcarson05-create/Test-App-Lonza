@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evaporation</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <img src="/static/logo.png" alt="Logo" class="logo">
+        Evaporation
+      </div>
+      <div class="navlinks">
+        <a class="pill" href="/stages">Stages</a>
+        <a class="pill" href="/dashboard">Dashboard</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Evaporation Data Entry</h2>
+      <div class="footer">Batch and blend numbers belong here.</div>
+
+      <form method="post" action="/submit/evaporation" style="margin-top:14px;">
+        <div class="grid grid-2">
+          <div class="field-card">
+            <label>Batch Number</label>
+            <input class="big-input" name="batch_number" placeholder="e.g., 26-001">
+          </div>
+
+          <div class="field-card">
+            <label>Blend Number</label>
+            <input class="big-input" name="blend_number" placeholder="e.g., b26-080-01">
+          </div>
+
+          <div class="field-card">
+            <label>Run Number</label>
+            <input class="big-input" name="run_number" placeholder="Enter run number">
+          </div>
+
+          <div class="field-card">
+            <label>Operator Initials</label>
+            <input class="big-input" name="operator_initials" placeholder="e.g., CR">
+          </div>
+
+          <div class="field-card" style="grid-column:1 / -1;">
+            <label>Comments / Notes</label>
+            <input class="big-input" name="notes" placeholder="Notes">
+          </div>
+        </div>
+
+        <div style="height:14px;"></div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-big" type="submit">Submit Evaporation</button>
+          <a class="btn btn-ghost btn-big" href="/stages">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

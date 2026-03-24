@@ -14,30 +14,49 @@
         Dashboard
       </div>
       <div class="navlinks">
-        <a class="pill" href="/machines">Stages</a>
-        <a class="pill" href="/plant">Plant Status</a>
+        <a class="pill" href="/stages">Stages</a>
         <span class="pill">User: {{ user }}</span>
+        <a class="pill" href="/logout">Logout</a>
       </div>
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Batch Dashboard</h2>
-      <div class="footer">Most recent batches first.</div>
+      <h2>Recent Entries</h2>
 
-      <table class="table" style="margin-top:12px;">
+      {% if rows|length > 0 %}
+      <table class="table">
         <tr>
-          <th>Batch</th>
-          <th>Last Seen</th>
-          <th>Entries</th>
+          <th>Timestamp</th>
+          <th>Stage</th>
+          <th>Initials</th>
+          <th>Date</th>
+          <th>Main Info</th>
+          <th>Notes</th>
         </tr>
-        {% for b in batches %}
+        {% for r in rows %}
         <tr>
-          <td><a href="/batch/{{ b['batch_number'] }}">{{ b["batch_number"] }}</a></td>
-          <td>{{ b["last_seen"] }}</td>
-          <td>{{ b["entry_count"] }}</td>
+          <td>{{ r["timestamp"] }}</td>
+          <td>{{ r["stage"] }}</td>
+          <td>{{ r.get("operator_initials", "") }}</td>
+          <td>{{ r.get("entry_date", "") }}</td>
+          <td>
+            {% if r["stage"] == "Extraction" %}
+              Location: {{ r.get("location", "") }}<br>
+              Time on Pipe/Pile: {{ r.get("time_on_pipe_or_pile", "") }}<br>
+              Pressate RI: {{ r.get("pressate_ri", "") }}
+            {% elif r["stage"] == "Filtration" %}
+              Seq No: {{ r.get("clarification_sequential_no", "") }}<br>
+              Retentate Flow Set Point: {{ r.get("retentate_flow_set_point", "") }}<br>
+              Zero Refract: {{ r.get("zero_refract", "") }}
+            {% endif %}
+          </td>
+          <td>{{ r.get("notes", "") }}</td>
         </tr>
         {% endfor %}
       </table>
+      {% else %}
+      <div class="card2">No submissions yet.</div>
+      {% endif %}
     </div>
   </div>
 </body>

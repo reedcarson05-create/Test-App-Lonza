@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Sheet - Extraction</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <img src="/static/logo.png" alt="Logo" class="logo">
+        Data Sheet - Extraction
+      </div>
+      <div class="navlinks">
+        <a class="pill" href="/stages">Stages</a>
+        <a class="pill" href="/dashboard">Dashboard</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <form method="post" action="/submit/extraction">
+      <div class="card">
+        <h2>Header Information</h2>
+
+        <div class="grid grid-2">
+          <div class="field-card">
+            <label>Operator Initials</label>
+            <input class="big-input" name="operator_initials" value="{{ initials }}" placeholder="CR">
+          </div>
+
+          <div class="field-card">
+            <label>Date</label>
+            <input class="big-input" name="entry_date" type="date">
+          </div>
+
+          <div class="field-card">
+            <label>Time</label>
+            <input class="big-input" name="entry_time" type="time">
+          </div>
+
+          <div class="field-card">
+            <label>North, South, or Pile</label>
+            <select class="big-input" name="location">
+              <option value="Pile" selected>Pile</option>
+              <option value="North">North</option>
+              <option value="South">South</option>
+            </select>
+          </div>
+
+          <div class="field-card" style="grid-column:1 / -1;">
+            <label>Time on Pipe or Pile</label>
+            <input class="big-input" name="time_on_pipe_or_pile" placeholder="e.g., 45 min">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Plug Screw Feeder #1</h2>
+        <div class="grid grid-3">
+          <div class="field-card">
+            <label>Speed</label>
+            <input class="big-input" name="psf1_speed">
+          </div>
+          <div class="field-card">
+            <label>Load</label>
+            <input class="big-input" name="psf1_load">
+          </div>
+          <div class="field-card">
+            <label>Blow Back Pressure PT202</label>
+            <input class="big-input" name="psf1_blowback">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Plug Screw Feeder #2</h2>
+        <div class="grid grid-3">
+          <div class="field-card">
+            <label>Speed</label>
+            <input class="big-input" name="psf2_speed">
+          </div>
+          <div class="field-card">
+            <label>Load</label>
+            <input class="big-input" name="psf2_load">
+          </div>
+          <div class="field-card">
+            <label>Blow Back Pressure PT203</label>
+            <input class="big-input" name="psf2_blowback">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Vincent Press</h2>
+        <div class="grid grid-3">
+          <div class="field-card">
+            <label>Speed</label>
+            <input class="big-input" name="press_speed">
+          </div>
+          <div class="field-card">
+            <label>Load</label>
+            <input class="big-input" name="press_load">
+          </div>
+          <div class="field-card">
+            <label>Blow Back Pressure PT???</label>
+            <input class="big-input" name="press_blowback">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>General Data</h2>
+        <div class="grid grid-3">
+          <div class="field-card">
+            <label>Pressate RI @ P303 (%)</label>
+            <input class="big-input" name="pressate_ri">
+          </div>
+          <div class="field-card">
+            <label>Chip Bin Steam FT201 (lb/hr)</label>
+            <input class="big-input" name="chip_bin_steam">
+          </div>
+          <div class="field-card">
+            <label>Chip Chute Temp (°F)</label>
+            <input class="big-input" name="chip_chute_temp">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Comments / Notes</h2>
+        <div class="field-card">
+          <label>Notes</label>
+          <textarea name="notes" class="big-textarea" placeholder="Enter notes here"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;">
+        <button class="btn btn-big" type="submit">Submit Extraction</button>
+        <a class="btn btn-ghost btn-big" href="/stages">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

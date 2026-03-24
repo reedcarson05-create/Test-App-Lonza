@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Sheet - Clarifier</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <img src="/static/logo.png" alt="Logo" class="logo">
+        Data Sheet - Clarifier
+      </div>
+      <div class="navlinks">
+        <a class="pill" href="/stages">Stages</a>
+        <a class="pill" href="/dashboard">Dashboard</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <form method="post" action="/submit/filtration">
+      <div class="card">
+        <h2>Header Information</h2>
+        <div class="grid grid-2">
+          <div class="field-card">
+            <label>Date</label>
+            <input class="big-input" type="date" name="entry_date">
+          </div>
+
+          <div class="field-card">
+            <label>Clarification Sequential No.</label>
+            <input class="big-input" name="clarification_sequential_no">
+          </div>
+
+          <div class="field-card">
+            <label>Retentate Flow Set Point</label>
+            <input class="big-input" name="retentate_flow_set_point">
+          </div>
+
+          <div class="field-card">
+            <label>Zero Refract</label>
+            <select class="big-input" name="zero_refract">
+              <option value=""></option>
+              <option value="Y">Y</option>
+              <option value="N">N</option>
+            </select>
+          </div>
+
+          <div class="field-card">
+            <label>Start-up Time</label>
+            <input class="big-input" name="startup_time" type="time">
+          </div>
+
+          <div class="field-card">
+            <label>Shut-down Time</label>
+            <input class="big-input" name="shutdown_time" type="time">
+          </div>
+
+          <div class="field-card" style="grid-column:1 / -1;">
+            <label>Operator Initials</label>
+            <input class="big-input" name="operator_initials" value="{{ initials }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Filtration</h2>
+        <div class="footer">Top section of the filtration sheet.</div>
+
+        <table class="table">
+          <tr>
+            <th>Time</th>
+            <th>Feed RI</th>
+            <th>Retentate RI</th>
+            <th>Permeate RI (C)</th>
+            <th>Permeate RI (D)</th>
+            <th>Permeate Flow Rate C</th>
+            <th>Permeate Flow Rate D</th>
+          </tr>
+          <tr>
+            <td><input name="row1_time"></td>
+            <td><input name="row1_feed_ri"></td>
+            <td><input name="row1_retentate_ri"></td>
+            <td><input name="row1_permeate_ri"></td>
+            <td><input></td>
+            <td><input name="row1_perm_flow_c"></td>
+            <td><input name="row1_perm_flow_d"></td>
+          </tr>
+          <tr>
+            <td><input name="row2_time"></td>
+            <td><input name="row2_feed_ri"></td>
+            <td><input name="row2_retentate_ri"></td>
+            <td><input name="row2_permeate_ri"></td>
+            <td><input></td>
+            <td><input name="row2_perm_flow_c"></td>
+            <td><input name="row2_perm_flow_d"></td>
+          </tr>
+          <tr>
+            <td><input name="row3_time"></td>
+            <td><input name="row3_feed_ri"></td>
+            <td><input name="row3_retentate_ri"></td>
+            <td><input name="row3_permeate_ri"></td>
+            <td><input></td>
+            <td><input name="row3_perm_flow_c"></td>
+            <td><input name="row3_perm_flow_d"></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Diafiltration (Record @ Start & every hour)</h2>
+
+        <table class="table">
+          <tr>
+            <th>Time</th>
+            <th>Feed RI</th>
+            <th>Retentate RI</th>
+            <th>Permeate RI</th>
+          </tr>
+          <tr>
+            <td><input name="dia_row1_time"></td>
+            <td><input name="dia_row1_feed_ri"></td>
+            <td><input name="dia_row1_retentate_ri"></td>
+            <td><input name="dia_row1_permeate_ri"></td>
+          </tr>
+          <tr>
+            <td><input name="dia_row2_time"></td>
+            <td><input name="dia_row2_feed_ri"></td>
+            <td><input name="dia_row2_retentate_ri"></td>
+            <td><input name="dia_row2_permeate_ri"></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Comments / Notes</h2>
+        <div class="field-card">
+          <label>Notes</label>
+          <textarea name="notes" class="big-textarea" placeholder="Enter notes here"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;">
+        <button class="btn btn-big" type="submit">Submit Filtration</button>
+        <a class="btn btn-ghost btn-big" href="/stages">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
