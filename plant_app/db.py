@@ -222,6 +222,28 @@ def get_user(employee: str):
     return row
 
 
+def get_user_initials(employee: str) -> str:
+    user = get_user(employee)
+    if not user:
+        employee = (employee or "").strip()
+        return employee[:2].upper() if employee else ""
+
+    full_name = (user["full_name"] or "").strip()
+    if full_name:
+        words = []
+        for part in full_name.replace("-", " ").split():
+            letters = "".join(char for char in part if char.isalpha())
+            if letters:
+                words.append(letters)
+        if len(words) >= 2:
+            return "".join(word[0] for word in words[:3]).upper()
+        if len(words) == 1:
+            return words[0][:2].upper()
+
+    employee = (employee or "").strip()
+    return employee[:2].upper() if employee else ""
+
+
 def upsert_batch(
     batch_number: str,
     product_name: str,
