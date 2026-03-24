@@ -7,57 +7,40 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="wrap">
-    <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Dashboard
-      </div>
-      <div class="navlinks">
-        <a class="pill" href="/stages">Stages</a>
-        <span class="pill">User: {{ user }}</span>
-        <a class="pill" href="/logout">Logout</a>
-      </div>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Dashboard</div>
+    <div class="navlinks">
+      <a class="pill" href="/batch/select">Batches</a>
+      <a class="pill" href="/stages">Stages</a>
+      <a class="pill" href="/plant">Plant Status</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
     </div>
+  </div>
 
-    <div class="card">
-      <h2>Recent Entries</h2>
+  {% if batch %}<div class="banner">Current batch: <strong>{{ batch['batch_number'] }}</strong></div>{% endif %}
 
-      {% if rows|length > 0 %}
+  <div class="card">
+    <h2>Last 12 Hours</h2>
+    <p class="muted">This view stays focused on the most recent 12 hours of saved data.</p>
+    <div class="table-wrap">
       <table class="table">
-        <tr>
-          <th>Timestamp</th>
-          <th>Stage</th>
-          <th>Initials</th>
-          <th>Date</th>
-          <th>Main Info</th>
-          <th>Notes</th>
-        </tr>
+        <tr><th>Saved</th><th>Batch</th><th>Stage</th><th>Operator</th><th>Entry Date</th><th>Summary</th><th>Notes</th></tr>
         {% for r in rows %}
         <tr>
-          <td>{{ r["timestamp"] }}</td>
-          <td>{{ r["stage"] }}</td>
-          <td>{{ r.get("operator_initials", "") }}</td>
-          <td>{{ r.get("entry_date", "") }}</td>
-          <td>
-            {% if r["stage"] == "Extraction" %}
-              Location: {{ r.get("location", "") }}<br>
-              Time on Pipe/Pile: {{ r.get("time_on_pipe_or_pile", "") }}<br>
-              Pressate RI: {{ r.get("pressate_ri", "") }}
-            {% elif r["stage"] == "Filtration" %}
-              Seq No: {{ r.get("clarification_sequential_no", "") }}<br>
-              Retentate Flow Set Point: {{ r.get("retentate_flow_set_point", "") }}<br>
-              Zero Refract: {{ r.get("zero_refract", "") }}
-            {% endif %}
-          </td>
-          <td>{{ r.get("notes", "") }}</td>
+          <td>{{ r['created_at'] }}</td>
+          <td>{% if r['batch_number'] %}<a href="/batch/{{ r['batch_number'] }}">{{ r['batch_number'] }}</a>{% else %}No batch{% endif %}</td>
+          <td>{{ r['stage'] }}</td>
+          <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
+          <td>{{ r['entry_date'] }}</td>
+          <td>{{ r['summary'] }}</td>
+          <td>{{ r['notes'] }}</td>
         </tr>
         {% endfor %}
       </table>
-      {% else %}
-      <div class="card2">No submissions yet.</div>
-      {% endif %}
     </div>
   </div>
+</div>
 </body>
 </html>

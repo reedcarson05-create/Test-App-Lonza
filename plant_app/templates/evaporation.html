@@ -7,59 +7,64 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="wrap">
-    <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Evaporation
-      </div>
-      <div class="navlinks">
-        <a class="pill" href="/stages">Stages</a>
-        <a class="pill" href="/dashboard">Dashboard</a>
-        <span class="pill">User: {{ user }}</span>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Evaporation Data Entry</div>
+    <div class="navlinks">
+      <a class="pill" href="/stages">Stages</a>
+      <a class="pill" href="/dashboard">Dashboard</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">Batch: {{ batch['batch_number'] }}</span>
+    </div>
+  </div>
+
+  <form method="post" action="/submit/evaporation" class="stack-gap">
+    <div class="card">
+      <h2>Header Information</h2>
+      <div class="grid three-up">
+        <div><label>Batch Number</label><input value="{{ batch['batch_number'] }}" disabled></div>
+        <div><label>Date</label><input type="date" name="entry_date" value="{{ today }}"></div>
+        <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ initials }}"></div>
+        <div><label>Evaporator No.</label><input name="evaporator_no"></div>
+        <div><label>Start-up Time</label><input type="time" name="startup_time"></div>
+        <div><label>Shut-down Time</label><input type="time" name="shutdown_time"></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Evaporation Data Entry</h2>
-      <div class="footer">Batch and blend numbers belong here.</div>
-
-      <form method="post" action="/submit/evaporation" style="margin-top:14px;">
-        <div class="grid grid-2">
-          <div class="field-card">
-            <label>Batch Number</label>
-            <input class="big-input" name="batch_number" placeholder="e.g., 26-001">
-          </div>
-
-          <div class="field-card">
-            <label>Blend Number</label>
-            <input class="big-input" name="blend_number" placeholder="e.g., b26-080-01">
-          </div>
-
-          <div class="field-card">
-            <label>Run Number</label>
-            <input class="big-input" name="run_number" placeholder="Enter run number">
-          </div>
-
-          <div class="field-card">
-            <label>Operator Initials</label>
-            <input class="big-input" name="operator_initials" placeholder="e.g., CR">
-          </div>
-
-          <div class="field-card" style="grid-column:1 / -1;">
-            <label>Comments / Notes</label>
-            <input class="big-input" name="notes" placeholder="Notes">
-          </div>
-        </div>
-
-        <div style="height:14px;"></div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-big" type="submit">Submit Evaporation</button>
-          <a class="btn btn-ghost btn-big" href="/stages">Cancel</a>
-        </div>
-      </form>
+      <h2>Process Readings</h2>
+      <div class="grid three-up">
+        <div><label>Feed RI</label><input name="feed_ri"></div>
+        <div><label>Concentrate RI</label><input name="concentrate_ri"></div>
+        <div><label>Steam Pressure</label><input name="steam_pressure"></div>
+        <div><label>Vacuum</label><input name="vacuum"></div>
+        <div><label>Sump Level</label><input name="sump_level"></div>
+        <div><label>Product Temp</label><input name="product_temp"></div>
+      </div>
     </div>
-  </div>
+
+    <div class="card">
+      <h2>Hourly Readings</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr><th>Time</th><th>Feed Rate</th><th>Evap Temp</th><th>Vacuum</th><th>Concentrate RI</th></tr>
+          <tr><td><input name="row1_time"></td><td><input name="row1_feed_rate"></td><td><input name="row1_evap_temp"></td><td><input name="row1_vacuum"></td><td><input name="row1_concentrate_ri"></td></tr>
+          <tr><td><input name="row2_time"></td><td><input name="row2_feed_rate"></td><td><input name="row2_evap_temp"></td><td><input name="row2_vacuum"></td><td><input name="row2_concentrate_ri"></td></tr>
+          <tr><td><input name="row3_time"></td><td><input name="row3_feed_rate"></td><td><input name="row3_evap_temp"></td><td><input name="row3_vacuum"></td><td><input name="row3_concentrate_ri"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Notes</label>
+      <textarea name="notes" rows="4"></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">Save Evaporation</button>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
 </body>
 </html>

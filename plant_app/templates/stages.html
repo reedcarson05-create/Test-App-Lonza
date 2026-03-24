@@ -9,28 +9,59 @@
 <body>
   <div class="wrap">
     <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Stage Selection
-      </div>
+      <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Stage Selection</div>
       <div class="navlinks">
+        <a class="pill" href="/batch/select">Batch Setup</a>
         <a class="pill" href="/dashboard">Dashboard</a>
-        <span class="pill">User: {{ user }}</span>
         <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    {% if notice %}
+    <div class="banner">{{ notice }}</div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Batch Context</h2>
+      {% if batch %}
+      <div class="banner">
+        Active Batch: <strong>{{ batch['batch_number'] }}</strong>
+        {% if batch['run_number'] %}| Run {{ batch['run_number'] }}{% endif %}
+        {% if batch['blend_number'] %}| Blend {{ batch['blend_number'] }}{% endif %}
+        {% if batch['split_batch_number'] %}| Split {{ batch['split_batch_number'] }}{% endif %}
+        {% if batch['product_name'] %}| {{ batch['product_name'] }}{% endif %}
+        {% if batch['shift_name'] %}| {{ batch['shift_name'] }} shift{% endif %}
+      </div>
+      {% else %}
+      <div class="banner">No batch is active. Extraction and filtration can still be entered without one.</div>
+      {% endif %}
+      <p class="muted">Batch numbers now live here at stage selection so operators do not have to add them on every submission.</p>
+      <div class="actions">
+        <a class="btn" href="/batch/select">{% if batch %}Change Batch Context{% else %}Set Batch Context{% endif %}</a>
       </div>
     </div>
 
     <div class="card">
-      <h2>Select Data Sheet</h2>
-      <div class="footer">Start with Extraction. Filtration and Evaporation will be built next.</div>
+      <h2>No Batch Number Required</h2>
+      <p class="muted">Use these sections for work that does not depend on a batch number.</p>
+      <div class="grid two-up stage-buttons">
+        <a class="btn large" href="/stage/extraction">Extraction</a>
+        <a class="btn large" href="/stage/filtration">Filtration</a>
+      </div>
+    </div>
 
-      <div class="grid grid-3" style="margin-top:14px;">
-        <a class="btn btn-big" href="/stage/extraction">Extraction</a>
-        <a class="btn btn-big" href="/stage/filtration">Filtration</a>
-        <a class="btn btn-big" href="/stage/evaporation">Evaporation</a>
+    <div class="card">
+      <h2>Batch-Based Stages</h2>
+      <p class="muted">These stages use the active batch context, including run and blend information.</p>
+      <div class="grid two-up stage-buttons">
+        {% if batch %}
+        <a class="btn large" href="/stage/evaporation">Evaporation</a>
+        {% else %}
+        <a class="btn large ghost" href="/batch/select">Set Batch For Evaporation</a>
+        {% endif %}
       </div>
     </div>
   </div>
 </body>
 </html>
-

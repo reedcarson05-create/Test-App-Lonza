@@ -7,38 +7,32 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="wrap">
+<div class="wrap">
     <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Plant Status
-      </div>
+      <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Plant Status</div>
       <div class="navlinks">
-        <a class="pill" href="/machines">Stages</a>
+        <a class="pill" href="/batch/select">Batches</a>
         <a class="pill" href="/dashboard">Dashboard</a>
+        <a class="pill" href="/logout">Logout</a>
         <span class="pill">User: {{ user }}</span>
       </div>
     </div>
 
-    <div class="card">
-      <h2 style="margin-top:0;">Plant Batch Status</h2>
-      <div class="footer">Current stage is the last stage that logged that batch.</div>
-
-      <table class="table" style="margin-top:12px;">
-        <tr>
-          <th>Batch</th>
-          <th>Current Stage</th>
-          <th>Last Entry</th>
-        </tr>
+  <div class="card">
+    <h2>Batch Status</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <tr><th>Batch</th><th>Status</th><th>Last Updated</th></tr>
         {% for r in rows %}
         <tr>
-          <td><a href="/batch/{{ r['batch_number'] }}">{{ r["batch_number"] }}</a></td>
-          <td>{{ r["current_stage"] }}</td>
-          <td>{{ r["last_seen"] }}</td>
+          <td><a href="/batch/{{ r['batch_number'] }}">{{ r['batch_number'] }}</a></td>
+          <td>{{ r['status'] }}</td>
+          <td>{{ r['last_seen'] }}</td>
         </tr>
         {% endfor %}
       </table>
     </div>
   </div>
+</div>
 </body>
 </html>
