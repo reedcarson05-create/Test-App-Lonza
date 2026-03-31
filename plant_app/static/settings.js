@@ -53,6 +53,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const refreshPreferences = async () => {
+    if (!shouldPersist || !settingsEndpoint) return;
+    try {
+      const response = await fetch(settingsEndpoint, { method: "GET" });
+      if (!response.ok) return;
+      const saved = await response.json();
+      applyTheme(saved.theme || "light");
+      applyFontScale(saved.font_scale || "1");
+    } catch (error) {
+      console.error("Unable to refresh user settings", error);
+    }
+  };
+
   const closePanel = () => {
     panel.hidden = true;
     toggle.setAttribute("aria-expanded", "false");
@@ -99,4 +112,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   applyTheme(initialTheme);
   applyFontScale(initialFontScale);
+  refreshPreferences();
 });
