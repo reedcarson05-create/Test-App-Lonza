@@ -6,7 +6,29 @@
   <title>Review Batch Pack</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings">
+  <div class="settings-root">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Final review screen that summarizes the active batch pack before completion. -->
   <div class="wrap">
   <div class="nav">
@@ -140,5 +162,6 @@
     {% endif %}
   </div>
 </div>
+<script src="/static/settings.js"></script>
 </body>
 </html>

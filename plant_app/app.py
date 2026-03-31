@@ -7,7 +7,7 @@ import json
 
 # FastAPI framework imports used for route declarations, form parsing, and HTML responses.
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -17,6 +17,8 @@ from db import (
     init_db,  # Builds tables and applies lightweight schema migrations at startup.
     validate_user,  # Authenticates an employee number and password pair.
     get_user_initials,  # Loads the initials displayed and reused in forms.
+    get_user_preferences,  # Loads persisted per-user UI preferences.
+    update_user_preferences,  # Saves persisted per-user UI preferences.
     create_run,  # Creates a new batch/run record.
     get_run,  # Fetches a single batch/run record by id.
     list_runs,  # Lists recent runs for the batch selection screen.
@@ -77,6 +79,16 @@ def current_initials(request: Request) -> str:
     return request.session.get("initials", "")
 
 
+def current_theme(request: Request) -> str:
+    """Return the saved theme stored in the current session."""
+    return request.session.get("theme", "light")
+
+
+def current_font_scale(request: Request) -> str:
+    """Return the saved font scale stored in the current session."""
+    return request.session.get("font_scale", "1")
+
+
 def current_run_id(request: Request):
     """Return the active production run id from the current session, if one exists."""
     return request.session.get("run_id")
@@ -119,6 +131,9 @@ def render_page(request: Request, template_name: str, **context):
         "request": request,
         "user": current_user(request),
         "initials": current_initials(request),
+        "settings_theme": current_theme(request),
+        "settings_font_scale": current_font_scale(request),
+        "settings_persist": logged_in(request),
         "today": today_str(),
         "run": active_run(request),
     }
@@ -467,6 +482,9 @@ def login_page(request: Request):
         {
             "request": request,
             "error": "",
+            "settings_theme": "light",
+            "settings_font_scale": "1",
+            "settings_persist": False,
         },
     )
 
@@ -481,9 +499,12 @@ def login(
     employee = employee.strip()
 
     if validate_user(employee, password):
+        preferences = get_user_preferences(employee)
         # Session values power nav badges, default initials, and route guards.
         request.session["user"] = employee
         request.session["initials"] = get_user_initials(employee)
+        request.session["theme"] = preferences["theme"]
+        request.session["font_scale"] = preferences["font_scale"]
         return RedirectResponse("/home", status_code=303)
 
     return templates.TemplateResponse(
@@ -491,6 +512,9 @@ def login(
         {
             "request": request,
             "error": "Invalid employee number or password.",
+            "settings_theme": "light",
+            "settings_font_scale": "1",
+            "settings_persist": False,
         },
         status_code=400,
     )
@@ -501,6 +525,23 @@ def logout(request: Request):
     """Clear the session and return the operator to the login page."""
     request.session.clear()
     return RedirectResponse("/", status_code=303)
+
+
+@app.post("/settings")
+def save_settings(
+    request: Request,
+    theme: str = Form(...),
+    font_scale: str = Form(...),
+):
+    """Persist the current user's display preferences and refresh the session copy."""
+    redirect = require_login(request)
+    if redirect:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    preferences = update_user_preferences(current_user(request), theme, font_scale)
+    request.session["theme"] = preferences["theme"]
+    request.session["font_scale"] = preferences["font_scale"]
+    return JSONResponse(preferences)
 
 
 # ------------------------

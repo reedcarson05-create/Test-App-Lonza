@@ -428,6 +428,8 @@ def init_db() -> None:
     # against an existing plant.db instead of only on a fresh file.
     # Lightweight additive migrations for installations that already had a database file.
     ensure_column(cur, "users", "initials", "TEXT")
+    ensure_column(cur, "users", "theme_preference", "TEXT DEFAULT 'light'")
+    ensure_column(cur, "users", "font_scale_preference", "TEXT DEFAULT '1'")
 
     ensure_column(cur, "extraction_entries", "run_id", "INTEGER")
     ensure_column(cur, "extraction_entries", "time_on_pile", "TEXT")
@@ -518,6 +520,42 @@ def get_user_initials(employee: str) -> str:
     if row and row["initials"]:
         return row["initials"]
     return (employee[:2] if employee else "").upper()
+
+
+def get_user_preferences(employee: str) -> dict[str, str]:
+    """Return the saved display settings for a user, falling back to app defaults."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT theme_preference, font_scale_preference
+        FROM users
+        WHERE employee_number = ?
+    """, (employee.strip(),))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return {"theme": "light", "font_scale": "1"}
+    return {
+        "theme": row["theme_preference"] or "light",
+        "font_scale": row["font_scale_preference"] or "1",
+    }
+
+
+def update_user_preferences(employee: str, theme: str, font_scale: str) -> dict[str, str]:
+    """Persist validated display settings for a user and return the saved values."""
+    safe_theme = theme if theme in {"light", "dark"} else "light"
+    safe_font_scale = font_scale if font_scale in {"1", "1.15", "1.3"} else "1"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE users
+        SET theme_preference = ?, font_scale_preference = ?
+        WHERE employee_number = ?
+    """, (safe_theme, safe_font_scale, employee.strip()))
+    conn.commit()
+    conn.close()
+    return {"theme": safe_theme, "font_scale": safe_font_scale}
 
 
 def create_run(
