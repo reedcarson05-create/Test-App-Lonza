@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Change History</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Change History</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/change-history">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
+    </div>
+  </div>
+
+  <div class="card page-intro">
+    <div class="section-title">
+      <h2>Supervisor Change Log</h2>
+      <span class="info-chip">{{ changes|length }} Total Corrections</span>
+    </div>
+    <p class="muted">Use this page to review field-level corrections, including the original value, corrected value, initials, employee number, and time of change.</p>
+    {% if run %}
+    <div class="banner">
+      Active Batch:
+      <strong>{{ run['batch_number'] or 'No batch' }}</strong>
+      {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
+      {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if run %}
+  <div class="card">
+    <div class="section-title">
+      <h2>Active Batch Changes</h2>
+      <span class="info-chip">{{ active_changes|length }} Active Corrections</span>
+    </div>
+    <p class="muted table-note">These are the most recent field corrections tied to the batch that is currently open.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <tr><th>Changed</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
+        {% for c in active_changes %}
+        <tr>
+          <td>{{ c['created_at'] }}</td>
+          <td>{{ c['display_sheet'] }}</td>
+          <td>{{ c['field_name'] }}</td>
+          <td>{{ c['original_value'] or '' }}</td>
+          <td>{{ c['corrected_value'] or c['field_value'] or '' }}</td>
+          <td>{{ c['change_initials'] }}</td>
+          <td>{{ c['changed_by_employee'] }}</td>
+        </tr>
+        {% endfor %}
+        {% if not active_changes %}
+        <tr><td colspan="7" class="muted center">No field corrections have been logged for the active batch yet.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Recent Change History</h2>
+      <span class="info-chip">All Sheets</span>
+    </div>
+    <p class="muted table-note">Latest corrections across all entries.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <tr><th>Changed</th><th>Batch</th><th>Run</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
+        {% for c in changes %}
+        <tr>
+          <td>{{ c['created_at'] }}</td>
+          <td>{{ c['batch_number'] or 'No batch' }}</td>
+          <td>{{ c['run_number'] or '' }}</td>
+          <td>{{ c['display_sheet'] }}</td>
+          <td>{{ c['field_name'] }}</td>
+          <td>{{ c['original_value'] or '' }}</td>
+          <td>{{ c['corrected_value'] or c['field_value'] or '' }}</td>
+          <td>{{ c['change_initials'] }}</td>
+          <td>{{ c['changed_by_employee'] }}</td>
+        </tr>
+        {% endfor %}
+        {% if not changes %}
+        <tr><td colspan="9" class="muted center">No field corrections have been logged yet.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

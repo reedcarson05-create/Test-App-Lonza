@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lonza Plant App</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Plant App</div>
+    <div class="navlinks">
+      <a class="pill" href="/process-dashboard">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
+    </div>
+  </div>
+
+  <div class="hero-card">
+    <div>
+      <p class="eyebrow">Home</p>
+      <h1>Choose what you want to do</h1>
+      <p class="muted">Start a new batch, open extraction and filtration, or jump back into the batch you already have open.</p>
+    </div>
+    <div class="hero-status">
+      {% if run %}
+      <span class="pill">Active Batch: {{ run['batch_number'] or 'No batch' }}</span>
+      {% else %}
+      <span class="pill">No active batch selected</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section-grid">
+    <div class="entry-panel entry-setup">
+      <div class="entry-kicker">Step 1</div>
+      <h2>Start New Batch</h2>
+      <p>Enter the batch number and setup details first, then move into the batch data sheets.</p>
+      <a class="btn home-btn" href="/run/select">Start New Batch</a>
+    </div>
+
+    <div class="entry-panel entry-process">
+      <div class="entry-kicker">No Batch Needed</div>
+      <h2>Extraction & Filtration</h2>
+      <p>Open the process sheets that stand alone and do not need a batch number.</p>
+      <a class="btn home-btn process-btn" href="/process-dashboard">Open Process Sheets</a>
+    </div>
+  </div>
+
+  {% if run %}
+  <div class="card">
+    <div class="section-title">
+      <h2>Current Batch</h2>
+      <span class="info-chip">Ready For Batch Sheets</span>
+    </div>
+    <div class="banner">
+      {% if run['batch_number'] %}Batch: <strong>{{ run['batch_number'] }}</strong>{% else %}<strong>No batch</strong>{% endif %}
+      {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
+      {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+      {% if run['product_name'] %}| {{ run['product_name'] }}{% endif %}
+    </div>
+    <div class="action-grid">
+      <a class="btn" href="/stages">Open Data Point Sheets</a>
+      <a class="btn ghost" href="/run/select">Change Batch</a>
+      <a class="btn ghost" href="/batch/edit">Edit Batch Details</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Review Or Fix Saved Data</h2>
+      <span class="info-chip">Corrections And History</span>
+    </div>
+    <p class="muted">Use the dashboards below to open saved entries and edit them without re-entering everything.</p>
+    <div class="action-grid">
+      <a class="btn ghost" href="/process-dashboard">Edit Extraction or Filtration</a>
+      <a class="btn ghost" href="/dashboard">Edit Batch Pack Sheets</a>
+      <a class="btn ghost" href="/change-history">View Change History</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

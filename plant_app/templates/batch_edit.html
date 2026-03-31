@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Edit Batch</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Edit Batch</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/batch/edit">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
+    </div>
+  </div>
+
+  <form method="post" action="/batch/edit" class="stack-gap">
+    <div class="card">
+      <h2>Batch Details</h2>
+      <div class="grid two-up">
+        <div><label>Batch Number</label><input name="batch_number" value="{{ run['batch_number'] or '' }}"></div>
+        <div><label>Split Batch Number</label><input name="split_batch_number" value="{{ run['split_batch_number'] or '' }}"></div>
+        <div><label>Blend Number</label><input name="blend_number" value="{{ run['blend_number'] or '' }}"></div>
+        <div><label>Run Number</label><input name="run_number" value="{{ run['run_number'] or '' }}"></div>
+        <div>
+          <label>Batch Type</label>
+          <select name="batch_type">
+            <option value="standard" {% if run['batch_type'] == 'standard' %}selected{% endif %}>Standard</option>
+            <option value="blend" {% if run['batch_type'] == 'blend' %}selected{% endif %}>Blend</option>
+            <option value="split" {% if run['batch_type'] == 'split' %}selected{% endif %}>Split Batch</option>
+            <option value="no-batch" {% if run['batch_type'] == 'no-batch' %}selected{% endif %}>No Batch</option>
+          </select>
+        </div>
+        <div>
+          <label>Reused Batch?</label>
+          <select name="reused_batch">
+            <option value="0" {% if not run['reused_batch'] %}selected{% endif %}>No</option>
+            <option value="1" {% if run['reused_batch'] %}selected{% endif %}>Yes</option>
+          </select>
+        </div>
+        <div><label>Product</label><input name="product_name" value="{{ run['product_name'] or '' }}"></div>
+        <div><label>Shift</label><input name="shift_name" value="{{ run['shift_name'] or '' }}"></div>
+      </div>
+      <div>
+        <label>Batch Notes</label>
+        <textarea name="notes" rows="4">{{ run['notes'] or '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>End Of Batch Initial</h2>
+      <p class="muted">Use this section instead of initialing each data point. Make your final batch edits here, then initial the batch at the end.</p>
+      <div class="grid two-up">
+        <div><label>Final Edit Initials</label><input name="final_edit_initials" value="{{ run['final_edit_initials'] or '' }}"></div>
+        <div><label>What Changed</label><input name="final_edit_notes" value="{{ run['final_edit_notes'] or '' }}"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">Save Batch Changes</button>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
+</body>
+</html>

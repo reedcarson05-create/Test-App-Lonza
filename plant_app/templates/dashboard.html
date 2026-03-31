@@ -11,33 +11,99 @@
   <div class="nav">
     <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Dashboard</div>
     <div class="navlinks">
-      <a class="pill" href="/batch/select">Batches</a>
-      <a class="pill" href="/stages">Stages</a>
-      <a class="pill" href="/plant">Plant Status</a>
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/dashboard">Current Work</a>
       <a class="pill" href="/logout">Logout</a>
       <span class="pill">User: {{ user }}</span>
     </div>
   </div>
 
-  {% if batch %}<div class="banner">Current batch: <strong>{{ batch['batch_number'] }}</strong></div>{% endif %}
+  <div class="card page-intro">
+    <div class="section-title">
+      <h2>Batch Pack Dashboard</h2>
+      <span class="info-chip">{{ batch_packs|length }} Batch Packs</span>
+    </div>
+    <p class="muted">Everything saved with the same batch number stays grouped together here. Open a correction from this page instead of creating another copy of the same sheet.</p>
+  </div>
 
   <div class="card">
-    <h2>Last 12 Hours</h2>
-    <p class="muted">This view stays focused on the most recent 12 hours of saved data.</p>
+    <div class="section-title">
+      <h2>Grouped Batch Packs</h2>
+      <span class="info-chip">Organized By Batch</span>
+    </div>
+    <div class="stack-gap">
+      {% for pack in batch_packs %}
+      <div class="batch-pack">
+        <div class="batch-pack-head">
+          <div>
+            <h3>Batch {{ pack['batch_number'] }}</h3>
+            <p class="muted">
+              {% if pack['run_numbers'] %}Run: {{ pack['run_numbers'] }}{% else %}No run{% endif %}
+              {% if pack['blend_numbers'] %} | Blend: {{ pack['blend_numbers'] }}{% endif %}
+            </p>
+          </div>
+          <div class="summary-line">
+            <span class="info-chip">{{ pack['entry_count'] }} Entries</span>
+            <span class="pill">Last Saved: {{ pack['latest_time'] }}</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <tr><th>Saved</th><th>Stage</th><th>Operator</th><th>Start</th><th>End</th><th>Comments</th><th>Open</th></tr>
+            {% for r in pack['entries'] %}
+            <tr>
+              <td>{{ r['activity_time'] }}</td>
+              <td>{{ r['display_section'] }}</td>
+              <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
+              <td>{{ r['start_label'] or '' }}</td>
+              <td>{{ r['end_label'] or '' }}</td>
+              <td>{{ r['comments'] or '' }}</td>
+              <td>{% if r['edit_href'] %}<a class="table-action" href="{{ r['edit_href'] }}">Correct Entry</a>{% else %}<span class="muted">Open from process dashboard</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Last 12 Hours</h2>
+      <span class="info-chip">{{ rows|length }} Total Entries</span>
+    </div>
+    <p class="muted table-note">Flat recent-activity view across all stages.</p>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Saved</th><th>Batch</th><th>Stage</th><th>Operator</th><th>Entry Date</th><th>Summary</th><th>Notes</th></tr>
+        <tr><th>Saved</th><th>Stage</th><th>Operator</th><th>Run</th><th>Batch</th><th>Blend</th><th>Start</th><th>End</th><th>Comments</th><th>Open</th></tr>
         {% for r in rows %}
         <tr>
-          <td>{{ r['created_at'] }}</td>
-          <td>{% if r['batch_number'] %}<a href="/batch/{{ r['batch_number'] }}">{{ r['batch_number'] }}</a>{% else %}No batch{% endif %}</td>
-          <td>{{ r['stage'] }}</td>
+          <td>{{ r['activity_time'] }}</td>
+          <td>{{ r['display_section'] if r['display_section'] is defined else r['section'] }}</td>
           <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
-          <td>{{ r['entry_date'] }}</td>
-          <td>{{ r['summary'] }}</td>
-          <td>{{ r['notes'] }}</td>
+          <td>{{ r['run_number'] or '' }}</td>
+          <td>{{ r['batch_number'] or 'No batch' }}</td>
+          <td>{{ r['blend_number'] or '' }}</td>
+          <td>{{ r['start_label'] or '' }}</td>
+          <td>{{ r['end_label'] or '' }}</td>
+          <td>{{ r['comments'] or '' }}</td>
+          <td>
+            {% if r['section'] == 'Extraction' or r['section'] == 'Filtration' %}
+            <a class="table-action" href="/process-dashboard">Correct From Process Dashboard</a>
+            {% elif r['section'] == 'Evaporation' %}
+            <a class="table-action" href="/edit/evaporation/{{ r['record_id'] }}">Correct Entry</a>
+            {% elif r['entry_table'] == 'sheet_entries' %}
+            <a class="table-action" href="/edit/generic/{{ r['record_id'] }}">Correct Entry</a>
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
+        {% if not rows %}
+        <tr><td colspan="10" class="muted center">No activity has been saved in the last 12 hours.</td></tr>
+        {% endif %}
       </table>
     </div>
   </div>
