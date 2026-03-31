@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit Filtration{% else %}Filtration{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+    <div class="nav">
+      <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">{% if is_edit %}Edit Filtration Entry{% else %}Filtration Data Entry{% endif %}</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/process-dashboard">Current Work</a>
+        <a class="pill" href="/logout">Logout</a>
+      <span class="pill">No Batch</span>
+      </div>
+    </div>
+
+  <form method="post" action="{{ form_action or '/submit/filtration' }}" class="stack-gap">
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved Filtration Data{% else %}Enter Filtration Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the form below and save when the record is ready.{% endif %}</p>
+    </div>
+    <div class="card">
+      <h2>Header Information</h2>
+      <div class="grid three-up">
+        <div><label>Process Area</label><input value="Filtration" disabled></div>
+        <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
+        <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ entry['operator_initials'] if entry and entry['operator_initials'] else initials }}"></div>
+        <div><label>Clarification Sequential No.</label><input name="clarification_sequential_no" value="{{ entry['clarification_sequential_no'] if entry else '' }}"></div>
+        <div><label>Retentate Flow Set Point (gpm)</label><input name="retentate_flow_set_point" value="{{ entry['retentate_flow_set_point'] if entry else '' }}"></div>
+        <div><label>Zero Refract</label><select name="zero_refract"><option value=""></option><option {% if entry and entry['zero_refract'] == 'Y' %}selected{% endif %}>Y</option><option {% if entry and entry['zero_refract'] == 'N' %}selected{% endif %}>N</option></select></div>
+        <div><label>Start-up Time</label><input type="time" name="startup_time" value="{{ entry['startup_time'] if entry else '' }}"></div>
+        <div><label>Shut-down Time</label><input type="time" name="shutdown_time" value="{{ entry['shutdown_time'] if entry else '' }}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Filtration Readings</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr><th>Time</th><th>Feed RI (%)</th><th>Retentate RI (%)</th><th>Permeate RI (%)</th><th>Perm Flow C (gpm)</th><th>Perm Flow D (gpm)</th></tr>
+          <tr><td><input name="row1_time" value="{{ row_map['main_1']['row_time'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_feed_ri" value="{{ row_map['main_1']['feed_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_retentate_ri" value="{{ row_map['main_1']['retentate_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_permeate_ri" value="{{ row_map['main_1']['permeate_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_perm_flow_c" value="{{ row_map['main_1']['perm_flow_c'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_perm_flow_d" value="{{ row_map['main_1']['perm_flow_d'] if row_map and row_map.get('main_1') else '' }}"></td></tr>
+          <tr><td><input name="row2_time" value="{{ row_map['main_2']['row_time'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_feed_ri" value="{{ row_map['main_2']['feed_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_retentate_ri" value="{{ row_map['main_2']['retentate_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_permeate_ri" value="{{ row_map['main_2']['permeate_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_perm_flow_c" value="{{ row_map['main_2']['perm_flow_c'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_perm_flow_d" value="{{ row_map['main_2']['perm_flow_d'] if row_map and row_map.get('main_2') else '' }}"></td></tr>
+          <tr><td><input name="row3_time" value="{{ row_map['main_3']['row_time'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_feed_ri" value="{{ row_map['main_3']['feed_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_retentate_ri" value="{{ row_map['main_3']['retentate_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_permeate_ri" value="{{ row_map['main_3']['permeate_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_perm_flow_c" value="{{ row_map['main_3']['perm_flow_c'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_perm_flow_d" value="{{ row_map['main_3']['perm_flow_d'] if row_map and row_map.get('main_3') else '' }}"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Diafiltration</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr><th>Time</th><th>Feed RI (%)</th><th>Retentate RI (%)</th><th>Permeate RI (%)</th></tr>
+          <tr><td><input name="dia_row1_time" value="{{ row_map['dia_1']['row_time'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_feed_ri" value="{{ row_map['dia_1']['feed_ri'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_retentate_ri" value="{{ row_map['dia_1']['retentate_ri'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_permeate_ri" value="{{ row_map['dia_1']['permeate_ri'] if row_map and row_map.get('dia_1') else '' }}"></td></tr>
+          <tr><td><input name="dia_row2_time" value="{{ row_map['dia_2']['row_time'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_feed_ri" value="{{ row_map['dia_2']['feed_ri'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_retentate_ri" value="{{ row_map['dia_2']['retentate_ri'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_permeate_ri" value="{{ row_map['dia_2']['permeate_ri'] if row_map and row_map.get('dia_2') else '' }}"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid two-up">
+        <div>
+          <label>Notes</label>
+          <textarea name="notes" rows="4">{{ entry['comments'] if entry else '' }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <textarea name="photo_path" rows="4" placeholder="Paste image file paths or links here">{{ entry['photo_path'] if entry else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save Filtration') }}</button>
+      <a class="btn ghost" href="/process-dashboard">Back</a>
+    </div>
+  </form>
+</div>
+{% if is_edit %}<script src="/static/form_corrections.js?v=5"></script>{% endif %}
+</body>
+</html>

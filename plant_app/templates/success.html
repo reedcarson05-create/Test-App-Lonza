@@ -7,26 +7,16 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="wrap">
-    <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Saved
-      </div>
-      <div class="navlinks">
-        <a class="pill" href="/machines">Stages</a>
-        <a class="pill" href="/dashboard">Dashboard</a>
-        <a class="pill" href="/plant">Plant Status</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2 style="margin-top:0;">Saved ✅</h2>
-      <div class="footer">Your entry has been recorded.</div>
-      <div style="margin-top:14px;">
-        <a class="btn btn-big" href="/machines" style="text-decoration:none;">Back to Stages</a>
-      </div>
+<div class="wrap narrow">
+  <div class="card center-card">
+    <div class="success-check">&#10003;</div>
+    <h1>{{ stage }} Saved</h1>
+    <p class="muted">The entry has been recorded.</p>
+    <div class="actions center-actions">
+      <a class="btn" href="/stages">Back to Stages</a>
+      <a class="btn ghost" href="/dashboard">View Dashboard</a>
     </div>
   </div>
+</div>
 </body>
 </html>

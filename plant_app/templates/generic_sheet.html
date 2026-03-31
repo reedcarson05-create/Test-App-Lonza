@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/stages">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">Batch: {% if run and run['batch_number'] %}{{ run['batch_number'] }}{% else %}No batch{% endif %}</span>
+    </div>
+  </div>
+
+  <form method="post" action="{{ form_action or ('/submit/generic/' ~ stage_key) }}" class="stack-gap">
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved {{ stage['title'] }} Data{% elif view_only %}Saved {{ stage['title'] }} Data{% else %}Enter {{ stage['title'] }} Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Use this correction page to fix saved batch-pack data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is already saved to the active batch pack. The saved values stay here and can only be changed from the correction tab.{% else %}Fill in the sheet below and save it when you are done.{% endif %}</p>
+    </div>
+    {% if view_only and not is_edit %}
+    <div class="banner">This {{ stage['title'] }} entry is already saved to the active batch pack.</div>
+    {% endif %}
+    <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
+    <div class="card">
+      <h2>{{ stage['sheet_name'] }}</h2>
+      <div class="grid three-up">
+        {% for field in stage['headers'] %}
+        <div>
+          <label>{{ field[1] }}</label>
+          {% if field[2] == 'select' %}
+          <select name="{{ field[0] }}">
+            <option value=""></option>
+            {% if 'zero_refract' in field[0] or field[0] == 'cooler_isolated' %}
+            <option value="Y" {% if entry_values and entry_values.get(field[0]) == 'Y' %}selected{% endif %}>Y</option>
+            <option value="N" {% if entry_values and entry_values.get(field[0]) == 'N' %}selected{% endif %}>N</option>
+            {% elif field[0] == 'bed' %}
+            <option value="A" {% if entry_values and entry_values.get(field[0]) == 'A' %}selected{% endif %}>A</option>
+            <option value="B" {% if entry_values and entry_values.get(field[0]) == 'B' %}selected{% endif %}>B</option>
+            {% else %}
+            <option value="Yes" {% if entry_values and entry_values.get(field[0]) == 'Yes' %}selected{% endif %}>Yes</option>
+            <option value="No" {% if entry_values and entry_values.get(field[0]) == 'No' %}selected{% endif %}>No</option>
+            {% endif %}
+          </select>
+          {% else %}
+          <input
+            name="{{ field[0] }}"
+            type="{{ field[2] }}"
+            value="{% if entry_values and entry_values.get(field[0]) is not none %}{{ entry_values.get(field[0]) }}{% elif field[0] == 'entry_date' or field[0] == 'startup_date' %}{{ today }}{% elif field[0] == 'operator_initials' %}{{ initials }}{% endif %}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% for table in stage['tables'] %}
+    <div class="card">
+      <h2>{{ table['title'] }}</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr>
+            {% for column in table['columns'] %}
+            <th>{{ column[1] }}</th>
+            {% endfor %}
+          </tr>
+          {% for row in range(table['rows']) %}
+          <tr>
+            {% for column in table['columns'] %}
+            <td><input name="{{ table['prefix'] }}_{{ row + 1 }}_{{ column[0] }}" value="{{ entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '') if entry_values else '' }}"></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <div class="grid two-up">
+        <div>
+          <label>Comments</label>
+          <textarea name="comments" rows="4">{{ entry_values.get('comments', entry['comments']) if entry_values else (entry['comments'] if entry else '') }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <textarea name="photo_path" rows="4" placeholder="Paste image file paths or links here">{{ entry_values.get('photo_path', '') if entry_values else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+    </fieldset>
+
+    <div class="actions">
+      {% if not view_only or is_edit %}
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save ' ~ stage['title']) }}</button>
+      {% endif %}
+      {% if view_only and not is_edit and edit_href %}
+      <a class="btn" href="{{ edit_href }}">Correct Saved Entry</a>
+      {% endif %}
+      <a class="btn ghost" href="/batch/edit">Edit Batch</a>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
+{% if is_edit %}<script src="/static/form_corrections.js?v=5"></script>{% endif %}
+</body>
+</html>

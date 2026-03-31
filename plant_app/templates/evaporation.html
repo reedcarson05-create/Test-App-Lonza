@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit Evaporation{% else %}Evaporation{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">{% if is_edit %}Edit Evaporation Entry{% else %}Evaporation Data Entry{% endif %}</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/stages">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">Batch: {% if run and run['batch_number'] %}{{ run['batch_number'] }}{% else %}No batch{% endif %}</span>
+    </div>
+  </div>
+
+  <form method="post" action="{{ form_action or '/submit/evaporation' }}" class="stack-gap">
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved Evaporation Data{% elif view_only %}Saved Evaporation Data{% else %}Enter Evaporation Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Use this correction page to fix saved batch-pack data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This batch already has a saved evaporation entry. The values stay locked here and can only be changed from the correction tab.{% else %}Enter the batch readings below and save when the sheet is complete.{% endif %}</p>
+    </div>
+    {% if view_only and not is_edit %}
+    <div class="banner">This evaporation entry is already saved to the active batch pack.</div>
+    {% endif %}
+    <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
+    <div class="card">
+      <h2>Header Information</h2>
+      <div class="grid three-up">
+        <div><label>Batch Number</label><input value="{% if run and run['batch_number'] %}{{ run['batch_number'] }}{% else %}No batch{% endif %}" disabled></div>
+        <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
+        <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ entry['operator_initials'] if entry and entry['operator_initials'] else initials }}"></div>
+        <div><label>Evaporator No.</label><input name="evaporator_no" value="{{ entry['evaporator_no'] if entry else '' }}"></div>
+        <div><label>Start-up Time</label><input type="time" name="startup_time" value="{{ entry['startup_time'] if entry else '' }}"></div>
+        <div><label>Shut-down Time</label><input type="time" name="shutdown_time" value="{{ entry['shutdown_time'] if entry else '' }}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Process Readings</h2>
+      <div class="grid three-up">
+        <div><label>Feed RI (%)</label><input name="feed_ri" value="{{ entry['feed_ri'] if entry else '' }}"></div>
+        <div><label>Concentrate RI (%)</label><input name="concentrate_ri" value="{{ entry['concentrate_ri'] if entry else '' }}"></div>
+        <div><label>Steam Pressure (psig)</label><input name="steam_pressure" value="{{ entry['steam_pressure'] if entry else '' }}"></div>
+        <div><label>Vacuum (in Hg)</label><input name="vacuum" value="{{ entry['vacuum'] if entry else '' }}"></div>
+        <div><label>Sump Level (%)</label><input name="sump_level" value="{{ entry['sump_level'] if entry else '' }}"></div>
+        <div><label>Product Temp (°F)</label><input name="product_temp" value="{{ entry['product_temp'] if entry else '' }}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Hourly Readings</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr><th>Time</th><th>Feed Rate (gpm)</th><th>Evap Temp (°F)</th><th>Vacuum (in Hg)</th><th>Concentrate RI (%)</th></tr>
+          <tr><td><input name="row1_time" value="{{ row_map['row1']['row_time'] if row_map and row_map.get('row1') else '' }}"></td><td><input name="row1_feed_rate" value="{{ row_map['row1']['feed_rate'] if row_map and row_map.get('row1') else '' }}"></td><td><input name="row1_evap_temp" value="{{ row_map['row1']['evap_temp'] if row_map and row_map.get('row1') else '' }}"></td><td><input name="row1_vacuum" value="{{ row_map['row1']['row_vacuum'] if row_map and row_map.get('row1') else '' }}"></td><td><input name="row1_concentrate_ri" value="{{ row_map['row1']['row_concentrate_ri'] if row_map and row_map.get('row1') else '' }}"></td></tr>
+          <tr><td><input name="row2_time" value="{{ row_map['row2']['row_time'] if row_map and row_map.get('row2') else '' }}"></td><td><input name="row2_feed_rate" value="{{ row_map['row2']['feed_rate'] if row_map and row_map.get('row2') else '' }}"></td><td><input name="row2_evap_temp" value="{{ row_map['row2']['evap_temp'] if row_map and row_map.get('row2') else '' }}"></td><td><input name="row2_vacuum" value="{{ row_map['row2']['row_vacuum'] if row_map and row_map.get('row2') else '' }}"></td><td><input name="row2_concentrate_ri" value="{{ row_map['row2']['row_concentrate_ri'] if row_map and row_map.get('row2') else '' }}"></td></tr>
+          <tr><td><input name="row3_time" value="{{ row_map['row3']['row_time'] if row_map and row_map.get('row3') else '' }}"></td><td><input name="row3_feed_rate" value="{{ row_map['row3']['feed_rate'] if row_map and row_map.get('row3') else '' }}"></td><td><input name="row3_evap_temp" value="{{ row_map['row3']['evap_temp'] if row_map and row_map.get('row3') else '' }}"></td><td><input name="row3_vacuum" value="{{ row_map['row3']['row_vacuum'] if row_map and row_map.get('row3') else '' }}"></td><td><input name="row3_concentrate_ri" value="{{ row_map['row3']['row_concentrate_ri'] if row_map and row_map.get('row3') else '' }}"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid two-up">
+        <div>
+          <label>Notes</label>
+          <textarea name="notes" rows="4">{{ entry['comments'] if entry else '' }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <textarea name="photo_path" rows="4" placeholder="Paste image file paths or links here">{{ entry['photo_path'] if entry else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+    </fieldset>
+
+    <div class="actions">
+      {% if not view_only or is_edit %}
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save Evaporation') }}</button>
+      {% endif %}
+      {% if view_only and not is_edit and edit_href %}
+      <a class="btn" href="{{ edit_href }}">Correct Saved Entry</a>
+      {% endif %}
+      <a class="btn ghost" href="/batch/edit">Edit Batch</a>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
+{% if is_edit %}<script src="/static/form_corrections.js?v=5"></script>{% endif %}
+</body>
+</html>

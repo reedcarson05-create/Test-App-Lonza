@@ -7,38 +7,21 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="wrap">
-    <div class="nav">
-      <div class="brand">
-        <img src="/static/logo.png" alt="Logo" class="logo">
-        Plant Status
-      </div>
-      <div class="navlinks">
-        <a class="pill" href="/machines">Stages</a>
-        <a class="pill" href="/dashboard">Dashboard</a>
-        <span class="pill">User: {{ user }}</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2 style="margin-top:0;">Plant Batch Status</h2>
-      <div class="footer">Current stage is the last stage that logged that batch.</div>
-
-      <table class="table" style="margin-top:12px;">
-        <tr>
-          <th>Batch</th>
-          <th>Current Stage</th>
-          <th>Last Entry</th>
-        </tr>
-        {% for r in rows %}
-        <tr>
-          <td><a href="/batch/{{ r['batch_number'] }}">{{ r["batch_number"] }}</a></td>
-          <td>{{ r["current_stage"] }}</td>
-          <td>{{ r["last_seen"] }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Plant Status</div>
+    <div class="navlinks">
+      <a class="pill" href="/run/select">Runs</a>
+      <a class="pill" href="/dashboard">Dashboard</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
     </div>
   </div>
+
+  <div class="card">
+    <h2>Run Status</h2>
+    <p class="muted">This screen needs a matching run-status route/query if you want a dedicated plant overview in the run-based app.</p>
+  </div>
+</div>
 </body>
 </html>

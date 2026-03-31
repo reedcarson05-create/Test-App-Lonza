@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Point Sheets</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Data Point Sheets</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/dashboard">Current Work</a>
+        <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <div class="card page-intro">
+      <div class="section-title">
+        <h2>Batch Work Area</h2>
+        <span class="info-chip">Batch-Linked Sheets</span>
+      </div>
+      {% if run %}
+      <div class="banner">
+        {% if run['batch_number'] %}Batch: <strong>{{ run['batch_number'] }}</strong>{% else %}<strong>No batch</strong>{% endif %}
+        {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
+        {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+        {% if run['split_batch_number'] %}| Split {{ run['split_batch_number'] }}{% endif %}
+        {% if run['product_name'] %}| {{ run['product_name'] }}{% endif %}
+        {% if run['shift_name'] %}| {{ run['shift_name'] }} shift{% endif %}
+      </div>
+      {% else %}
+      <div class="banner">No run is active yet.</div>
+      {% endif %}
+      <p class="muted">Follow the steps below: make sure the batch is right, open the sheet you need, then review the pack when you are done.</p>
+      <div class="action-grid">
+        <a class="btn" href="/run/select">{% if run %}Change Batch{% else %}Set Batch{% endif %}</a>
+        {% if run %}<a class="btn ghost" href="/batch/edit">Edit Batch</a>{% endif %}
+        <a class="btn ghost" href="/dashboard">Open Batch Pack Dashboard</a>
+        <a class="btn ghost" href="/batch/review">Review Batch Pack</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2>Select A Sheet</h2>
+        <span class="info-chip">{{ stage_links|length }} Sheets</span>
+      </div>
+      <p class="muted">Each sheet below saves into the active batch pack.</p>
+      <div class="action-grid stage-buttons">
+        {% for stage in stage_links %}
+        <a class="btn" href="{{ stage['href'] }}">{{ stage['title'] }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review Batch Pack</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Review Batch Pack</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/batch/review">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
+    </div>
+  </div>
+
+  <div class="card page-intro">
+    <h2>Review Before Final Save</h2>
+    <p class="muted">Review the full batch pack below. When everything looks right, finalize the batch pack to mark it complete in the database.</p>
+  </div>
+
+  <div class="card">
+    <h2>Batch Details</h2>
+    <div class="banner">
+      Batch: <strong>{{ run['batch_number'] or 'No batch' }}</strong>
+      {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
+      {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+      {% if run['product_name'] %}| {{ run['product_name'] }}{% endif %}
+      {% if run['status'] %}| Status: {{ run['status'] }}{% endif %}
+    </div>
+    {% if run['notes'] %}
+    <p><strong>Notes:</strong> {{ run['notes'] }}</p>
+    {% endif %}
+  </div>
+
+  {% if evaporation_entry %}
+  <div class="card">
+    <h2>Evaporation</h2>
+    <div class="grid three-up">
+      <div><label>Date</label><input value="{{ evaporation_entry['entry_date'] or '' }}" disabled></div>
+      <div><label>Operator</label><input value="{{ evaporation_entry['operator_initials'] or evaporation_entry['employee'] or '' }}" disabled></div>
+      <div><label>Evaporator No.</label><input value="{{ evaporation_entry['evaporator_no'] or '' }}" disabled></div>
+      <div><label>Start-up Time</label><input value="{{ evaporation_entry['startup_time'] or '' }}" disabled></div>
+      <div><label>Shut-down Time</label><input value="{{ evaporation_entry['shutdown_time'] or '' }}" disabled></div>
+      <div><label>Feed RI (%)</label><input value="{{ evaporation_entry['feed_ri'] or '' }}" disabled></div>
+      <div><label>Concentrate RI (%)</label><input value="{{ evaporation_entry['concentrate_ri'] or '' }}" disabled></div>
+      <div><label>Steam Pressure (psig)</label><input value="{{ evaporation_entry['steam_pressure'] or '' }}" disabled></div>
+      <div><label>Vacuum (in Hg)</label><input value="{{ evaporation_entry['vacuum'] or '' }}" disabled></div>
+      <div><label>Sump Level (%)</label><input value="{{ evaporation_entry['sump_level'] or '' }}" disabled></div>
+      <div><label>Product Temp (°F)</label><input value="{{ evaporation_entry['product_temp'] or '' }}" disabled></div>
+    </div>
+    {% if evaporation_rows %}
+    <div class="table-wrap review-table">
+      <table class="table">
+        <tr><th>Time</th><th>Feed Rate (gpm)</th><th>Evap Temp (°F)</th><th>Vacuum (in Hg)</th><th>Concentrate RI (%)</th></tr>
+        {% for row in evaporation_rows %}
+        <tr>
+          <td>{{ row['row_time'] or '' }}</td>
+          <td>{{ row['feed_rate'] or '' }}</td>
+          <td>{{ row['evap_temp'] or '' }}</td>
+          <td>{{ row['row_vacuum'] or '' }}</td>
+          <td>{{ row['row_concentrate_ri'] or '' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% if evaporation_entry['comments'] %}
+    <p><strong>Comments:</strong> {{ evaporation_entry['comments'] }}</p>
+    {% endif %}
+    {% if evaporation_entry['photo_path'] %}
+    <p><strong>Pictures:</strong> {{ evaporation_entry['photo_path'] }}</p>
+    {% endif %}
+    <div class="actions">
+      <a class="btn ghost" href="/edit/evaporation/{{ evaporation_entry['id'] }}">Correct Evaporation</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% for item in generic_entries %}
+  <div class="card">
+    <h2>{{ item['title'] }}</h2>
+    <div class="grid three-up">
+      {% for field in item['stage']['headers'] %}
+      <div>
+        <label>{{ field[1] }}</label>
+        <input value="{{ item['payload'].get(field[0], '') }}" disabled>
+      </div>
+      {% endfor %}
+    </div>
+    {% for table in item['stage']['tables'] %}
+    <div class="table-wrap review-table">
+      <table class="table">
+        <tr>
+          {% for column in table['columns'] %}
+          <th>{{ column[1] }}</th>
+          {% endfor %}
+        </tr>
+        {% for row_no in range(table['rows']) %}
+        <tr>
+          {% for column in table['columns'] %}
+          <td>{{ item['payload'].get(table['prefix'] ~ '_' ~ (row_no + 1) ~ '_' ~ column[0], '') }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endfor %}
+    {% if item['entry']['comments'] %}
+    <p><strong>Comments:</strong> {{ item['entry']['comments'] }}</p>
+    {% endif %}
+    {% if item['payload'].get('photo_path') %}
+    <p><strong>Pictures:</strong> {{ item['payload'].get('photo_path') }}</p>
+    {% endif %}
+    <div class="actions">
+      <a class="btn ghost" href="/edit/generic/{{ item['entry']['id'] }}">Correct {{ item['title'] }}</a>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not has_entries %}
+  <div class="card">
+    <p class="muted center">No batch-pack entries have been saved yet. Add at least one sheet before finalizing.</p>
+  </div>
+  {% endif %}
+
+  <div class="actions">
+    <a class="btn ghost" href="/stages">Back To Batch Sheets</a>
+    {% if has_entries and run['status'] != 'Complete' %}
+    <form method="post" action="/batch/review/finalize">
+      <button class="btn" type="submit">Finalize Batch Pack</button>
+    </form>
+    {% elif run['status'] == 'Complete' %}
+    <span class="pill">Batch Pack Finalized</span>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

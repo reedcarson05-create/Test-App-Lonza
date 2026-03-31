@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Process Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Extraction & Filtration</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/process-dashboard">Current Work</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">User: {{ user }}</span>
+    </div>
+  </div>
+
+  <div class="card page-intro">
+    <div class="section-title">
+      <h2>Process Work Area</h2>
+      <span class="info-chip">No Batch Number Required</span>
+    </div>
+    <p class="muted">Use this area for extraction and filtration only. Start a new entry from the buttons below, or open a saved entry from the history table to correct it.</p>
+    <div class="section-grid stage-buttons">
+      {% for stage in stage_links %}
+      <div class="summary-card">
+        <h3>{{ stage['title'] }}</h3>
+        <p>Create a new {{ stage['title'].lower() }} entry.</p>
+        <a class="btn" href="{{ stage['href'] }}">Open {{ stage['title'] }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Recent Extraction & Filtration Entries</h2>
+      <span class="info-chip">{{ items|length }} Saved Entries</span>
+    </div>
+    <p class="muted table-note">Use `Correct Saved Entry` to update something that was already saved.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <tr><th>Saved</th><th>Stage</th><th>Operator</th><th>Start</th><th>End</th><th>Comments</th><th>Open</th></tr>
+        {% for r in items %}
+        <tr>
+          <td>{{ r['activity_time'] }}</td>
+          <td>{{ r['display_section'] }}</td>
+          <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
+          <td>{{ r['start_label'] or '' }}</td>
+          <td>{{ r['end_label'] or '' }}</td>
+          <td>{{ r['comments'] or '' }}</td>
+          <td><a class="table-action" href="{{ r['edit_href'] }}">Correct Saved Entry</a></td>
+        </tr>
+        {% endfor %}
+        {% if not items %}
+        <tr><td colspan="7" class="muted center">No extraction or filtration entries have been saved yet.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>
