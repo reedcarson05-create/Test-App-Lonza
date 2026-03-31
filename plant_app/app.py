@@ -4,9 +4,10 @@
 from pathlib import Path
 from datetime import datetime
 import json
+from uuid import uuid4
 
 # FastAPI framework imports used for route declarations, form parsing, and HTML responses.
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -53,6 +54,8 @@ app.add_middleware(SessionMiddleware, secret_key="lonza-secret-key-change-me")
 
 # Base directory used to resolve the bundled static assets and Jinja templates.
 BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "static" / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -146,6 +149,11 @@ def clean_value(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def image_upload_response(status_code: int, message: str):
+    """Return a small JSON error payload for image upload failures."""
+    return JSONResponse({"error": message}, status_code=status_code)
 
 
 def collect_field_changes(form, old_values: dict, changed_by: str, correction_reason: str):
@@ -542,6 +550,47 @@ def save_settings(
     request.session["theme"] = preferences["theme"]
     request.session["font_scale"] = preferences["font_scale"]
     return JSONResponse(preferences)
+
+
+@app.post("/upload-image")
+async def upload_image(request: Request, files: list[UploadFile] = File(...)):
+    """Save uploaded device images into the app's static folder and return their URLs."""
+    redirect = require_login(request)
+    if redirect:
+        return image_upload_response(401, "Not authenticated")
+
+    saved_files = []
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+    allowed_suffixes = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+    user_folder = UPLOAD_DIR / current_user(request)
+    user_folder.mkdir(parents=True, exist_ok=True)
+
+    for upload in files:
+        if not upload.filename:
+            continue
+
+        suffix = Path(upload.filename).suffix.lower() or ".jpg"
+        if suffix not in allowed_suffixes and upload.content_type not in allowed_types:
+            return image_upload_response(400, f"Unsupported image type for {upload.filename}")
+
+        safe_suffix = suffix if suffix in allowed_suffixes else ".jpg"
+        file_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid4().hex}{safe_suffix}"
+        destination = user_folder / file_name
+        file_bytes = await upload.read()
+        if not file_bytes:
+            continue
+        destination.write_bytes(file_bytes)
+        saved_files.append(
+            {
+                "name": upload.filename,
+                "url": f"/static/uploads/{current_user(request)}/{file_name}",
+            }
+        )
+
+    if not saved_files:
+        return image_upload_response(400, "No image files were uploaded")
+
+    return JSONResponse({"files": saved_files})
 
 
 # ------------------------
