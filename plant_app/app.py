@@ -82,6 +82,21 @@ def current_initials(request: Request) -> str:
     return request.session.get("initials", "")
 
 
+def current_signature_initials(request: Request) -> str:
+    """Return the initials most recently signed in this login session, if any."""
+    return request.session.get("signature_initials", "")
+
+
+def current_signature_signed_at(request: Request) -> str:
+    """Return the timestamp for the active initials signature in this session."""
+    return request.session.get("signature_signed_at", "")
+
+
+def current_signature_data(request: Request) -> str:
+    """Return the captured initials-stroke image for the current session, if any."""
+    return request.session.get("signature_data", "")
+
+
 def current_theme(request: Request) -> str:
     """Return the saved theme stored in the current session."""
     return request.session.get("theme", "light")
@@ -100,6 +115,35 @@ def current_run_id(request: Request):
 def today_str() -> str:
     """Return today's date in the same format used by the HTML forms."""
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def blank_stamp(entry_date: str = "", initials: str = "") -> str:
+    """Build the stamp text shown when a saved cell was intentionally left blank."""
+    parts = [clean_value(entry_date) or today_str(), clean_value(initials).upper()]
+    return " | ".join(part for part in parts if part)
+
+
+def is_blank_value(value) -> bool:
+    """Return True when a saved value should render as an intentional blank."""
+    return clean_value(value) == ""
+
+
+def blank_display(value, entry_date: str = "", initials: str = "") -> str:
+    """Return either the saved value or a slash-stamped blank marker for display."""
+    return clean_value(value) if not is_blank_value(value) else blank_stamp(entry_date, initials)
+
+
+def save_signature_session(request: Request, form) -> None:
+    """Persist a freshly captured initials signature into the server session."""
+    signed_initials = clean_value(form.get("__session_signature_initials", "")).upper()
+    signature_data = clean_value(form.get("__session_signature_data", ""))
+    signed_at = clean_value(form.get("__session_signature_signed_at", ""))
+    if not signed_initials:
+        return
+    request.session["signature_initials"] = signed_initials
+    if signature_data:
+        request.session["signature_data"] = signature_data
+    request.session["signature_signed_at"] = signed_at or datetime.now().isoformat(timespec="seconds")
 
 
 def active_run(request: Request):
@@ -134,11 +178,18 @@ def render_page(request: Request, template_name: str, **context):
         "request": request,
         "user": current_user(request),
         "initials": current_initials(request),
+        "default_initials": current_initials(request),
+        "session_signature_initials": current_signature_initials(request),
+        "session_signature_signed_at": current_signature_signed_at(request),
+        "session_signature_data": current_signature_data(request),
         "settings_theme": current_theme(request),
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
         "today": today_str(),
         "run": active_run(request),
+        "blank_display": blank_display,
+        "blank_stamp": blank_stamp,
+        "is_blank_value": is_blank_value,
     }
     page_context.update(context)
     return templates.TemplateResponse(template_name, page_context)
@@ -509,6 +560,7 @@ def login(
     if validate_user(employee, password):
         preferences = get_user_preferences(employee)
         # Session values power nav badges, default initials, and route guards.
+        request.session.clear()
         request.session["user"] = employee
         request.session["initials"] = get_user_initials(employee)
         request.session["theme"] = preferences["theme"]
@@ -635,7 +687,7 @@ def run_select_page(request: Request):
 
 
 @app.post("/run/select")
-def run_select(
+async def run_select(
     request: Request,
     batch_number: str = Form(""),
     split_batch_number: str = Form(""),
@@ -651,6 +703,9 @@ def run_select(
     redirect = require_login(request)
     if redirect:
         return redirect
+
+    form = await request.form()
+    save_signature_session(request, form)
 
     try:
         # The run header is saved first so every later batch-pack sheet can point back to this id.
@@ -699,7 +754,7 @@ def batch_edit_page(request: Request):
 
 
 @app.post("/batch/edit")
-def batch_edit_submit(
+async def batch_edit_submit(
     request: Request,
     batch_number: str = Form(""),
     split_batch_number: str = Form(""),
@@ -721,6 +776,10 @@ def batch_edit_submit(
     redirect = require_run(request)
     if redirect:
         return redirect
+
+    form = await request.form()
+    save_signature_session(request, form)
+    final_edit_initials = (final_edit_initials or current_signature_initials(request) or current_initials(request)).strip().upper()
 
     # These fields mirror the run-setup form, with two extra final-review accountability fields.
     update_run(
@@ -798,7 +857,7 @@ def batch_review_page(request: Request):
 
 
 @app.post("/batch/review/finalize")
-def finalize_batch_review(request: Request):
+async def finalize_batch_review(request: Request):
     """Mark the active run complete once at least one batch-pack entry exists."""
     redirect = require_login(request)
     if redirect:
@@ -807,6 +866,9 @@ def finalize_batch_review(request: Request):
     redirect = require_run(request)
     if redirect:
         return redirect
+
+    form = await request.form()
+    save_signature_session(request, form)
 
     review = build_batch_review(current_run_id(request))
     if not review["has_entries"]:
@@ -846,7 +908,8 @@ async def submit_extraction(request: Request):
         return redirect
 
     form = await request.form()
-    operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+    save_signature_session(request, form)
+    operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
 
     try:
         entry_id = insert_extraction(current_user(request), build_extraction_payload(form, operator_initials))
@@ -887,9 +950,10 @@ async def submit_filtration(request: Request):
         return redirect
 
     form = await request.form()
+    save_signature_session(request, form)
 
     try:
-        operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+        operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
         entry_id = insert_filtration(current_user(request), build_filtration_payload(form, operator_initials))
 
         insert_audit(
@@ -945,8 +1009,9 @@ async def submit_evaporation(request: Request):
         return redirect
 
     form = await request.form()
+    save_signature_session(request, form)
     try:
-        operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+        operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
         entry_id = insert_evaporation(
             current_user(request),
             build_evaporation_payload(form, current_run_id(request), operator_initials),
@@ -1015,6 +1080,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/stages", status_code=303)
 
     form = await request.form()
+    save_signature_session(request, form)
     # Generic sheets store their dynamic cells as JSON because each stage has different fields.
     payload = {key: value for key, value in form.multi_items()}
 
@@ -1024,7 +1090,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
             "run_id": current_run_id(request),
             "stage_key": stage_key,
             "stage_title": stage["title"],
-            "operator_initials": (form.get("operator_initials") or current_initials(request)).strip().upper(),
+            "operator_initials": (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper(),
             "entry_date": form.get("entry_date", ""),
             "comments": form.get("comments", ""),
             "payload_json": json.dumps(payload),
@@ -1074,6 +1140,7 @@ async def edit_extraction_submit(request: Request, entry_id: int):
         return redirect
     entry = get_extraction_entry(entry_id)
     form = await request.form()
+    save_signature_session(request, form)
     correction_reason = clean_value(form.get("correction_reason", ""))
     changes, missing_details, mismatched_values = collect_field_changes(
         form,
@@ -1107,7 +1174,7 @@ async def edit_extraction_submit(request: Request, entry_id: int):
         return correction_missing_response(missing_details)
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
-    operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+    operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
     update_extraction(entry_id, current_user(request), build_extraction_payload(form, operator_initials))
     insert_field_change_log(entry["run_id"], "extraction_entries", entry_id, changes)
     insert_audit(
@@ -1148,6 +1215,7 @@ async def edit_filtration_submit(request: Request, entry_id: int):
         return redirect
     entry, existing_rows = get_filtration_entry(entry_id)
     form = await request.form()
+    save_signature_session(request, form)
     correction_reason = clean_value(form.get("correction_reason", ""))
     old_values = {
         "operator_initials": entry["operator_initials"],
@@ -1177,7 +1245,7 @@ async def edit_filtration_submit(request: Request, entry_id: int):
         return correction_missing_response(missing_details)
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
-    operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+    operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
     update_filtration(entry_id, current_user(request), build_filtration_payload(form, operator_initials))
     insert_field_change_log(entry["run_id"], "filtration_entries", entry_id, changes)
     insert_audit(
@@ -1217,6 +1285,7 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
         return redirect
     entry, existing_rows = get_evaporation_entry(entry_id)
     form = await request.form()
+    save_signature_session(request, form)
     correction_reason = clean_value(form.get("correction_reason", ""))
     old_values = {
         "operator_initials": entry["operator_initials"],
@@ -1245,7 +1314,7 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
         return correction_missing_response(missing_details)
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
-    operator_initials = (form.get("operator_initials") or current_initials(request)).strip().upper()
+    operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
     update_evaporation(
         entry_id,
         current_user(request),
@@ -1294,6 +1363,7 @@ async def edit_generic_submit(request: Request, entry_id: int):
         return redirect
     entry = get_sheet_entry(entry_id)
     form = await request.form()
+    save_signature_session(request, form)
     correction_reason = clean_value(form.get("correction_reason", ""))
     # Internal correction-helper fields are stripped before the real sheet payload is re-saved.
     payload = {
@@ -1317,7 +1387,7 @@ async def edit_generic_submit(request: Request, entry_id: int):
         entry_id,
         current_user(request),
         {
-            "operator_initials": (form.get("operator_initials") or current_initials(request)).strip().upper(),
+            "operator_initials": (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper(),
             "entry_date": form.get("entry_date", ""),
             "comments": form.get("comments", ""),
             "payload_json": json.dumps(payload),

@@ -111,6 +111,10 @@ body {
   font-size: calc(16px * var(--font-scale));
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .wrap { max-width: 1280px; margin: 0 auto; padding: 20px 20px 32px; }
 .wrap.narrow { max-width: 700px; }
 
@@ -253,6 +257,11 @@ input, select, textarea {
   line-height: 1.25;
 }
 
+input.signature-trigger {
+  cursor: pointer;
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface) 72%, white 28%), var(--surface));
+}
+
 textarea {
   resize: vertical;
   min-height: 120px;
@@ -357,6 +366,19 @@ fieldset[disabled] textarea {
 }
 .table td { background: var(--surface-soft); }
 .entry-table input { min-width: 120px; }
+.blank-display {
+  position: relative;
+  color: var(--muted);
+  font-size: 14px;
+  background-image: linear-gradient(135deg, transparent 47%, color-mix(in srgb, var(--text) 40%, transparent 60%) 49%, color-mix(in srgb, var(--text) 40%, transparent 60%) 51%, transparent 53%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+td.blank-display {
+  min-width: 120px;
+  white-space: nowrap;
+}
 .field-with-change {
   display: flex;
   flex-direction: column;
@@ -751,6 +773,50 @@ fieldset[disabled] textarea {
   justify-content: center;
   padding: 18px;
   background: rgba(7, 12, 20, 0.72);
+}
+
+.signature-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(7, 12, 20, 0.72);
+}
+
+.signature-dialog {
+  width: min(760px, 100%);
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--panel-shadow);
+}
+
+.signature-dialog h3 {
+  margin: 0 0 8px;
+  font-size: calc(24px * var(--font-scale));
+}
+
+.signature-copy {
+  margin-bottom: 14px;
+}
+
+.signature-pad-wrap {
+  margin-top: 14px;
+}
+
+.signature-pad {
+  width: 100%;
+  height: 260px;
+  display: block;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-soft) 86%, white 14%);
+  touch-action: none;
 }
 
 .camera-dialog {
