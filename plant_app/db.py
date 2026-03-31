@@ -3,7 +3,7 @@
 import pyodbc
 from datetime import datetime
 
-SQL_SERVER = r"localhost\SQLEXPRESS"
+SQL_SERVER = "localhost"
 SQL_DATABASE = "LonzaPlantOpsApp"
 
 
