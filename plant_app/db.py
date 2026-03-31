@@ -37,10 +37,39 @@ def rows_to_dicts(columns: list[str], rows) -> list[dict]:
 
 
 def init_db() -> None:
-    """Validate that the SQL Server database is reachable."""
+    """Validate that the SQL Server database is reachable and seed fallback local users."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT 1")
+    cur.execute("""
+        IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE employee_number = ?)
+        BEGIN
+            INSERT INTO dbo.users (
+                employee_number, full_name, password, role, initials,
+                active, created_at, theme_preference, font_scale_preference
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        END
+    """, (
+        "1001",
+        "1001", "Operator 1", "test123", "operator", "OP",
+        1, now_stamp(), "light", "1",
+    ))
+    cur.execute("""
+        IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE employee_number = ?)
+        BEGIN
+            INSERT INTO dbo.users (
+                employee_number, full_name, password, role, initials,
+                active, created_at, theme_preference, font_scale_preference
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        END
+    """, (
+        "2001",
+        "2001", "Supervisor 1", "test123", "supervisor", "SU",
+        1, now_stamp(), "light", "1",
+    ))
+    conn.commit()
     conn.close()
 
 
