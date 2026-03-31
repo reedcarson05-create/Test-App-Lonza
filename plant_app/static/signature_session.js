@@ -11,7 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const defaultInitials = (body.dataset.defaultInitials || "").toUpperCase();
   let pendingForm = null;
   let drawing = false;
-  let hasStroke = Boolean(signatureState.data);
+  let draftSignatureData = signatureState.data;
+  let draftHasStroke = Boolean(signatureState.data);
+  let canvasRenderToken = 0;
 
   const modal = document.createElement("div");
   modal.className = "signature-modal";
@@ -47,6 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const initialsInput = modal.querySelector("#signature-initials-input");
   const signedAtInput = modal.querySelector("#signature-signed-at");
   const canvas = modal.querySelector(".signature-pad");
+  const clearButton = modal.querySelector("[data-signature-clear]");
+  const cancelButton = modal.querySelector("[data-signature-cancel]");
+  const saveButton = modal.querySelector("[data-signature-save]");
   const context = canvas.getContext("2d");
   const status = document.createElement("div");
   status.className = "pill";
@@ -54,15 +59,21 @@ document.addEventListener("DOMContentLoaded", () => {
   status.style.margin = "12px 0";
   document.body.appendChild(status);
 
-  function drawStoredSignature() {
-    if (!signatureState.data) return;
+  function renderPad(signatureData = "") {
+    const rect = canvas.getBoundingClientRect();
+    const requestedData = signatureData || "";
+    canvasRenderToken += 1;
+    const renderToken = canvasRenderToken;
+    context.clearRect(0, 0, rect.width, rect.height);
+    if (!requestedData) return;
     const image = new Image();
     image.onload = () => {
-      const rect = canvas.getBoundingClientRect();
+      if (renderToken !== canvasRenderToken || requestedData !== draftSignatureData) return;
+      const currentRect = canvas.getBoundingClientRect();
       context.clearRect(0, 0, rect.width, rect.height);
-      context.drawImage(image, 0, 0, rect.width, rect.height);
+      context.drawImage(image, 0, 0, currentRect.width, currentRect.height);
     };
-    image.src = signatureState.data;
+    image.src = requestedData;
   }
 
   function resizeCanvas() {
@@ -75,8 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     context.lineJoin = "round";
     context.lineWidth = 2.5;
     context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#17202a";
-    context.clearRect(0, 0, rect.width, rect.height);
-    drawStoredSignature();
+    renderPad(draftSignatureData);
   }
 
   function nowStamp() {
@@ -142,13 +152,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearPad() {
+    draftSignatureData = "";
+    draftHasStroke = false;
+    canvasRenderToken += 1;
     const rect = canvas.getBoundingClientRect();
     context.clearRect(0, 0, rect.width, rect.height);
-    hasStroke = false;
-    signatureState.data = "";
   }
 
   function openModal() {
+    draftSignatureData = signatureState.data;
+    draftHasStroke = Boolean(signatureState.data);
     initialsInput.value = signatureState.initials || defaultInitials;
     signedAtInput.value = signatureState.signedAt || nowStamp();
     modal.hidden = false;
@@ -174,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       signatureState.initials = initials;
       signatureState.signedAt = signedAt || new Date().toISOString();
-      signatureState.data = hasStroke ? canvas.toDataURL("image/png") : "";
+      signatureState.data = draftHasStroke ? canvas.toDataURL("image/png") : "";
       body.dataset.sessionSignatureInitials = signatureState.initials;
       body.dataset.sessionSignatureSignedAt = signatureState.signedAt;
       body.dataset.sessionSignatureData = signatureState.data;
@@ -210,7 +223,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   canvas.addEventListener("pointerdown", (event) => {
     drawing = true;
-    hasStroke = true;
+    draftHasStroke = true;
+    draftSignatureData = "";
+    canvasRenderToken += 1;
     const point = pointerPosition(event);
     context.beginPath();
     context.moveTo(point.x, point.y);
@@ -238,28 +253,27 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   modal.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-signature-clear], [data-signature-cancel], [data-signature-save]");
-    if (button) {
-      event.preventDefault();
-      event.stopPropagation();
-      if (button.hasAttribute("data-signature-clear")) {
-        clearPad();
-      } else if (button.hasAttribute("data-signature-cancel")) {
-        closeModal();
-      } else if (button.hasAttribute("data-signature-save")) {
-        saveSignature();
-      }
-      return;
-    }
     if (event.target === modal) {
       closeModal();
     }
   });
-  modal.addEventListener("pointerup", (event) => {
-    const button = event.target.closest("[data-signature-clear], [data-signature-cancel], [data-signature-save]");
-    if (!button) return;
+
+  clearButton.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    clearPad();
+  });
+
+  cancelButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeModal();
+  });
+
+  saveButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    saveSignature();
   });
   initialsInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

@@ -16,12 +16,12 @@
   --panel-shadow: 0 10px 24px rgba(9, 30, 66, 0.06);
   --font-scale: 1;
   --touch: 52px;
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 16px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
 }
 
 * { box-sizing: border-box; }

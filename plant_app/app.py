@@ -58,6 +58,7 @@ UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+ASSET_VERSION = "20260331-3"
 
 # Ensure the local SQLite schema exists before any request handlers run.
 init_db()
@@ -184,6 +185,7 @@ def render_page(request: Request, template_name: str, **context):
         "settings_theme": current_theme(request),
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
+        "asset_version": ASSET_VERSION,
         "today": today_str(),
         "run": active_run(request),
         "blank_display": blank_display,
@@ -543,6 +545,7 @@ def login_page(request: Request):
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
+            "asset_version": ASSET_VERSION,
         },
     )
 
@@ -574,6 +577,7 @@ def login(
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
+            "asset_version": ASSET_VERSION,
         },
         status_code=400,
     )
