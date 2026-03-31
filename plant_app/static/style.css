@@ -37,6 +37,69 @@ html[data-theme="dark"] {
   --panel-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
 }
 
+html[data-theme="dark"] .hero-card,
+html[data-theme="dark"] .page-intro,
+html[data-theme="dark"] .summary-card,
+html[data-theme="dark"] .batch-pack,
+html[data-theme="dark"] .entry-card {
+  border-color: var(--line);
+}
+
+html[data-theme="dark"] .hero-card {
+  background: linear-gradient(135deg, #1a2940, #132033);
+}
+
+html[data-theme="dark"] .page-intro {
+  background: linear-gradient(135deg, #1b2a40, #172334);
+}
+
+html[data-theme="dark"] .entry-setup {
+  background: linear-gradient(155deg, #2a2117, #1b1820);
+}
+
+html[data-theme="dark"] .entry-process {
+  background: linear-gradient(155deg, #152920, #172334);
+}
+
+html[data-theme="dark"] .entry-stages {
+  background: linear-gradient(155deg, #18253a, #172334);
+}
+
+html[data-theme="dark"] .entry-kicker {
+  color: #f5f7fb;
+}
+
+html[data-theme="dark"] .entry-setup .entry-kicker {
+  background: #5f421a;
+}
+
+html[data-theme="dark"] .entry-process .entry-kicker {
+  background: #1d5a3a;
+}
+
+html[data-theme="dark"] .entry-stages .entry-kicker {
+  background: #234f97;
+}
+
+html[data-theme="dark"] .entry-panel p,
+html[data-theme="dark"] .summary-card p,
+html[data-theme="dark"] .muted {
+  color: #c2d0e2;
+}
+
+html[data-theme="dark"] .info-chip {
+  background: #26364d;
+  color: #e7eef9;
+}
+
+html[data-theme="dark"] .pill {
+  background: #203047;
+}
+
+html[data-theme="dark"] .table tr:hover td {
+  background: #22334a;
+}
+
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
