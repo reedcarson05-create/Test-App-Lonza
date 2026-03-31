@@ -806,6 +806,8 @@ td.blank-display {
 
 .signature-pad-wrap {
   margin-top: 14px;
+  position: relative;
+  z-index: 1;
 }
 
 .signature-pad {
@@ -817,6 +819,11 @@ td.blank-display {
   border-radius: 18px;
   background: color-mix(in srgb, var(--surface-soft) 86%, white 14%);
   touch-action: none;
+}
+
+.signature-dialog .actions {
+  position: relative;
+  z-index: 2;
 }
 
 .camera-dialog {

@@ -27,9 +27,10 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <div>
           <label>Signed At</label>
-          <input id="signature-signed-at" type="text" readonly>
+          <input id="signature-signed-at" type="text">
         </div>
       </div>
+      <p class="muted signature-copy">You can type a signed time manually, or leave the auto-filled value. Drawing on the pad is optional.</p>
       <div class="signature-pad-wrap">
         <label>Draw Initials</label>
         <canvas class="signature-pad" width="900" height="260"></canvas>
@@ -47,6 +48,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const signedAtInput = modal.querySelector("#signature-signed-at");
   const canvas = modal.querySelector(".signature-pad");
   const context = canvas.getContext("2d");
+  const status = document.createElement("div");
+  status.className = "pill";
+  status.hidden = true;
+  status.style.margin = "12px 0";
+  document.body.appendChild(status);
 
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
@@ -148,28 +154,29 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function saveSignature() {
-    const initials = initialsInput.value.trim().toUpperCase();
-    if (!initials) {
-      initialsInput.focus();
-      return;
-    }
-    if (!hasStroke) {
-      return;
-    }
-    signatureState.initials = initials;
-    signatureState.signedAt = new Date().toISOString();
-    signatureState.data = canvas.toDataURL("image/png");
-    body.dataset.sessionSignatureInitials = signatureState.initials;
-    body.dataset.sessionSignatureSignedAt = signatureState.signedAt;
-    body.dataset.sessionSignatureData = signatureState.data;
-    decorateAllSignatureFields(document);
-    forms.forEach(applySignatureToForm);
-    modal.hidden = true;
-    body.classList.remove("modal-open");
-    if (pendingForm) {
-      const formToSubmit = pendingForm;
-      pendingForm = null;
-      formToSubmit.requestSubmit();
+    try {
+      const initials = initialsInput.value.trim().toUpperCase();
+      const signedAt = signedAtInput.value.trim();
+      if (!initials) {
+        initialsInput.focus();
+        return;
+      }
+      signatureState.initials = initials;
+      signatureState.signedAt = signedAt || new Date().toISOString();
+      signatureState.data = hasStroke ? canvas.toDataURL("image/png") : "";
+      body.dataset.sessionSignatureInitials = signatureState.initials;
+      body.dataset.sessionSignatureSignedAt = signatureState.signedAt;
+      body.dataset.sessionSignatureData = signatureState.data;
+      decorateAllSignatureFields(document);
+      forms.forEach(applySignatureToForm);
+      closeModal();
+      status.textContent = `Initials saved: ${signatureState.initials}`;
+      status.hidden = false;
+      window.setTimeout(() => {
+        status.hidden = true;
+      }, 2500);
+    } catch (error) {
+      window.alert(`Could not save initials: ${error}`);
     }
   }
 
@@ -198,26 +205,54 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
-    canvas.addEventListener(eventName, () => {
+    canvas.addEventListener(eventName, (event) => {
       drawing = false;
+      try {
+        if (event.pointerId != null && canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      } catch (_) {
+        // Some browsers may already have released capture.
+      }
     });
   });
 
-  modal.querySelector("[data-signature-clear]").addEventListener("click", () => {
-    clearPad();
-  });
-  modal.querySelector("[data-signature-cancel]").addEventListener("click", () => {
-    closeModal();
-  });
-  modal.querySelector("[data-signature-save]").addEventListener("click", () => {
-    saveSignature();
-  });
   modal.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-signature-clear], [data-signature-cancel], [data-signature-save]");
+    if (button) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (button.hasAttribute("data-signature-clear")) {
+        clearPad();
+      } else if (button.hasAttribute("data-signature-cancel")) {
+        closeModal();
+      } else if (button.hasAttribute("data-signature-save")) {
+        saveSignature();
+      }
+      return;
+    }
     if (event.target === modal) {
       closeModal();
     }
   });
-
+  modal.addEventListener("pointerup", (event) => {
+    const button = event.target.closest("[data-signature-clear], [data-signature-cancel], [data-signature-save]");
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  initialsInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveSignature();
+    }
+  });
+  signedAtInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveSignature();
+    }
+  });
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
