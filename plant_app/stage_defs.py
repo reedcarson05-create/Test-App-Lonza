@@ -1,19 +1,26 @@
-DEG_F = "°F"
+"""Central stage metadata used to build the batch-pack navigation and generic sheets."""
 
+# Shared temperature label reused across multiple stage tables.
+DEG_F = "\u00B0F"
 
 def header(field_name: str, label: str, field_type: str):
+    """Build a header tuple for a top-of-form field in a generic stage sheet."""
     return (field_name, label, field_type)
 
 
 def column(field_name: str, label: str):
+    """Build a table column tuple for a repeating row in a generic stage sheet."""
     return (field_name, label)
 
 
 def table(title: str, prefix: str, rows: int, columns: list[tuple[str, str]]):
+    """Build a table definition consumed by the generic stage template."""
     return {"title": title, "prefix": prefix, "rows": rows, "columns": columns}
 
 
+# Full configuration for every batch-pack stage rendered through `generic_sheet.html`.
 GENERIC_STAGE_DEFS = {
+    # Three repeated filtration cycle tables captured as a generic batch-pack sheet.
     "filtration_cycles": {
         "title": "Filtration Cycles",
         "sheet_name": "Filtration",
@@ -65,6 +72,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Clarifier combines a filtration section and a diafiltration section in one stage.
     "clarifier": {
         "title": "Clarifier",
         "sheet_name": "Data Sheet - Clarifier",
@@ -100,6 +108,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Concentration tracks one operating run with timed readings from a multistage evaporator.
     "concentration": {
         "title": "Concentration",
         "sheet_name": "Data Sheet - Concentration",
@@ -126,6 +135,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Reconcentration mirrors concentration with a slightly different chemistry-focused column set.
     "reconcentration": {
         "title": "Reconcentration",
         "sheet_name": "Data Sheet - Reconcentration",
@@ -152,6 +162,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # KOH decolorizing captures peroxide and caustic additions with operator checks.
     "h2o2_koh_decolorizing": {
         "title": "H2O2 - KOH Decolorizing",
         "sheet_name": "Data Sheet - H2O2 - KOH Decolorizing",
@@ -187,6 +198,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Calcium decolorizing is similar to KOH but uses different additive tables and labels.
     "h2o2_calcium_decolorizing": {
         "title": "H2O2 - Calcium Decolorizing",
         "sheet_name": "Data Sheet - H2O2 - Calcium Decolorizing",
@@ -219,6 +231,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Centrifuge is a smaller log-oriented stage with one repeated operating table.
     "centrifuge": {
         "title": "Centrifuge",
         "sheet_name": "Data Sheet - Centrifuge",
@@ -241,6 +254,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Anion exchange tracks product transfer through a selected resin bed.
     "anion_exchange": {
         "title": "Anion Exchange",
         "sheet_name": "Data Sheet - Anion Exchange",
@@ -266,6 +280,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # ResistAid exchange uses a dedicated transfer log with bed-loading totals.
     "resistaid_anion_exchange": {
         "title": "ResistAid Anion Exchange",
         "sheet_name": "Data Sheet - ResistAid Anion Exchange",
@@ -289,6 +304,7 @@ GENERIC_STAGE_DEFS = {
             ]),
         ],
     },
+    # Carbon treatment combines usage records and ongoing vessel monitoring.
     "carbon_treatment": {
         "title": "Carbon Treatment",
         "sheet_name": "Data Sheet - Carbon Treatment",
@@ -328,7 +344,9 @@ GENERIC_STAGE_DEFS = {
     },
 }
 
+# Navigation used on the batch stage selection screen.
 STAGE_LINKS = [
+    # Evaporation uses its own dedicated template instead of the generic sheet renderer.
     {"title": "Evaporation", "href": "/stage/evaporation"},
     {"title": "Filtration Cycles", "href": "/stage/generic/filtration_cycles"},
     {"title": "Clarifier", "href": "/stage/generic/clarifier"},
@@ -342,7 +360,9 @@ STAGE_LINKS = [
     {"title": "Carbon Treatment", "href": "/stage/generic/carbon_treatment"},
 ]
 
+# Navigation used on the standalone process dashboard.
 PROCESS_STAGE_LINKS = [
+    # Extraction and filtration are the only standalone process sheets in the current UI.
     {"title": "Extraction", "href": "/stage/extraction"},
     {"title": "Filtration", "href": "/stage/filtration"},
 ]

@@ -1,3 +1,4 @@
+/* Shared visual system for the operator-facing FastAPI templates. */
 :root {
   --bg: #f4f7fb;
   --card: #ffffff;

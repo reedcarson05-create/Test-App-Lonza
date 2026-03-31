@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <!-- Batch setup page for creating a new run or reopening a recent one. -->
   <div class="wrap">
     <div class="nav">
+      <!-- Shared nav for returning home or leaving the app. -->
       <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Start New Batch</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
@@ -20,6 +22,7 @@
 
     <div class="grid two-up">
       <div class="card">
+        <!-- Main batch header form saved into `production_runs`. -->
         <h2>Batch Information</h2>
         <p class="muted">Fill in the batch details here. After you confirm, the app will open the menu of data point sheets for that batch.</p>
         <div class="banner">Examples: Batch <strong>26-001</strong> | Blend <strong>b26-080-01</strong> | Run <strong>01</strong></div>
@@ -79,6 +82,7 @@
       </div>
 
       <div class="card">
+        <!-- Recent run list for resuming previously created batch headers. -->
         <h2>Recent Batches</h2>
         <div class="table-wrap">
           <table class="table">

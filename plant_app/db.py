@@ -1,11 +1,16 @@
+"""SQLite persistence helpers for authentication, runs, stage entries, and audit history."""
+
+# Standard-library imports used for SQLite access, file resolution, and timestamps.
 import sqlite3
 from pathlib import Path
 from datetime import datetime
 
+# Local database file stored beside the application code.
 DB_PATH = Path(__file__).resolve().parent / "plant.db"
 
 
 def get_conn() -> sqlite3.Connection:
+    """Open a SQLite connection configured for row access and OneDrive-friendly journaling."""
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     # OneDrive-backed directories can block SQLite sidecar journal files.
@@ -16,10 +21,12 @@ def get_conn() -> sqlite3.Connection:
 
 
 def now_stamp() -> str:
+    """Return a consistent timestamp string for inserts, updates, and audit rows."""
     return datetime.now().isoformat(timespec="seconds")
 
 
 def ensure_column(cur: sqlite3.Cursor, table: str, column: str, definition: str) -> None:
+    """Add a missing column during lightweight schema migration."""
     cur.execute(f"PRAGMA table_info({table})")
     existing = {row[1] for row in cur.fetchall()}
     if column not in existing:
@@ -27,13 +34,16 @@ def ensure_column(cur: sqlite3.Cursor, table: str, column: str, definition: str)
 
 
 def table_columns(cur: sqlite3.Cursor, table: str) -> list[str]:
+    """Return the current column names for a SQLite table."""
     cur.execute(f"PRAGMA table_info({table})")
     return [row[1] for row in cur.fetchall()]
 
 
 def recreate_legacy_entry_tables(cur: sqlite3.Cursor) -> None:
+    """Migrate older entry tables that still use legacy batch-number-driven layouts."""
     extraction_cols = table_columns(cur, "extraction_entries")
     if "batch_number" in extraction_cols:
+        # Older extraction rows were tied directly to batch numbers; rename, rebuild, then copy forward.
         cur.execute("ALTER TABLE extraction_entries RENAME TO extraction_entries_legacy")
         cur.execute("""
         CREATE TABLE extraction_entries (
@@ -92,6 +102,7 @@ def recreate_legacy_entry_tables(cur: sqlite3.Cursor) -> None:
 
     filtration_cols = table_columns(cur, "filtration_entries")
     if "batch_number" in filtration_cols:
+        # Older filtration rows stored repeated readings in flat columns; migrate them into `filtration_rows`.
         cur.execute("ALTER TABLE filtration_entries RENAME TO filtration_entries_legacy")
         cur.execute("""
         CREATE TABLE filtration_entries (
@@ -152,6 +163,7 @@ def recreate_legacy_entry_tables(cur: sqlite3.Cursor) -> None:
 
     evaporation_cols = table_columns(cur, "evaporation_entries")
     if "batch_number" in evaporation_cols:
+        # Older evaporation rows also stored timed readings inline, so they are split into `evaporation_rows`.
         cur.execute("ALTER TABLE evaporation_entries RENAME TO evaporation_entries_legacy")
         cur.execute("""
         CREATE TABLE evaporation_entries (
@@ -208,9 +220,11 @@ def recreate_legacy_entry_tables(cur: sqlite3.Cursor) -> None:
 
 
 def init_db() -> None:
+    """Create tables, apply schema updates, and seed the default demo users."""
     conn = get_conn()
     cur = conn.cursor()
 
+    # Authentication table for the simple operator login flow.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,6 +238,7 @@ def init_db() -> None:
     );
     """)
 
+    # Parent run table that represents a batch/run header and final sign-off metadata.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS production_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -245,6 +260,7 @@ def init_db() -> None:
     );
     """)
 
+    # Standalone extraction entries, not tied to batch packs.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS extraction_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -277,6 +293,7 @@ def init_db() -> None:
     );
     """)
 
+    # Parent filtration table plus child rows for repeated timed readings.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS filtration_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -299,6 +316,7 @@ def init_db() -> None:
     );
     """)
 
+    # Child rows for filtration timed readings.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS filtration_rows (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -314,6 +332,7 @@ def init_db() -> None:
     );
     """)
 
+    # Batch-linked evaporation parent table.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS evaporation_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -338,6 +357,7 @@ def init_db() -> None:
     );
     """)
 
+    # Child rows for evaporation timed readings.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS evaporation_rows (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,6 +371,7 @@ def init_db() -> None:
     );
     """)
 
+    # Generic JSON-backed stage sheets defined in `stage_defs.py`.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -364,6 +385,7 @@ def init_db() -> None:
     );
     """)
 
+    # High-level audit trail of creates, updates, and final review actions.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sheet_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -381,6 +403,7 @@ def init_db() -> None:
     );
     """)
 
+    # Field-by-field correction history for edit screens.
     cur.execute("""
     CREATE TABLE IF NOT EXISTS field_change_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -398,10 +421,12 @@ def init_db() -> None:
     );
     """)
 
+    # Try to bring older local databases forward before checking for newer columns.
     recreate_legacy_entry_tables(cur)
 
     # Migrate older batch-based databases forward so run-based screens can boot
     # against an existing plant.db instead of only on a fresh file.
+    # Lightweight additive migrations for installations that already had a database file.
     ensure_column(cur, "users", "initials", "TEXT")
 
     ensure_column(cur, "extraction_entries", "run_id", "INTEGER")
@@ -441,6 +466,7 @@ def init_db() -> None:
     ensure_column(cur, "field_change_log", "corrected_value", "TEXT")
     ensure_column(cur, "field_change_log", "correction_reason", "TEXT")
 
+    # Indexes keep the dashboards and correction history responsive as data grows.
     cur.execute("CREATE INDEX IF NOT EXISTS idx_runs_updated ON production_runs(updated_at);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON production_runs(batch_number);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_extraction_run ON extraction_entries(run_id);")
@@ -453,6 +479,7 @@ def init_db() -> None:
 
     conn.commit()
 
+    # Seed operator accounts for local/demo use when the table is empty.
     cur.execute("""
         INSERT OR IGNORE INTO users (employee_number, full_name, password, role, initials, active, created_at)
         VALUES (?, ?, ?, ?, ?, 1, ?)
@@ -468,6 +495,7 @@ def init_db() -> None:
 
 
 def validate_user(employee: str, password: str) -> bool:
+    """Return True when the supplied employee credentials match an active user."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -481,6 +509,7 @@ def validate_user(employee: str, password: str) -> bool:
 
 
 def get_user_initials(employee: str) -> str:
+    """Return the stored initials for a user, or derive a fallback from the employee id."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT initials FROM users WHERE employee_number = ?", (employee.strip(),))
@@ -503,8 +532,10 @@ def create_run(
     operator_id: str,
     notes: str,
 ) -> int:
+    """Insert a new production run and return its generated id."""
     conn = get_conn()
     cur = conn.cursor()
+    # One shared timestamp is used for both created/updated values on the first insert.
     stamp = now_stamp()
     cur.execute("""
         INSERT INTO production_runs (
@@ -534,6 +565,7 @@ def create_run(
 
 
 def get_run(run_id: int):
+    """Fetch a single production run by id."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM production_runs WHERE id = ?", (run_id,))
@@ -543,6 +575,7 @@ def get_run(run_id: int):
 
 
 def list_runs(limit: int = 50):
+    """Return the most recently updated production runs for the selection screen."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -557,6 +590,7 @@ def list_runs(limit: int = 50):
 
 
 def mark_run_complete(run_id: int, employee: str = ""):
+    """Finalize a production run and stamp who closed it out."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -569,6 +603,7 @@ def mark_run_complete(run_id: int, employee: str = ""):
 
 
 def touch_run(run_id: int):
+    """Refresh a run's updated timestamp after a related sheet changes."""
     if not run_id:
         return
     conn = get_conn()
@@ -579,6 +614,7 @@ def touch_run(run_id: int):
 
 
 def insert_extraction(employee: str, data: dict) -> int:
+    """Insert a new extraction entry and return its id."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -628,6 +664,7 @@ def insert_extraction(employee: str, data: dict) -> int:
 
 
 def insert_filtration(employee: str, data: dict) -> int:
+    """Insert a new filtration entry plus its repeating child rows."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -658,6 +695,7 @@ def insert_filtration(employee: str, data: dict) -> int:
     ))
     entry_id = cur.lastrowid
 
+    # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
         cur.execute("""
             INSERT INTO filtration_rows (
@@ -684,6 +722,7 @@ def insert_filtration(employee: str, data: dict) -> int:
 
 
 def insert_evaporation(employee: str, data: dict) -> int:
+    """Insert a new evaporation entry plus its repeating child rows."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -716,6 +755,7 @@ def insert_evaporation(employee: str, data: dict) -> int:
     ))
     entry_id = cur.lastrowid
 
+    # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
         cur.execute("""
             INSERT INTO evaporation_rows (
@@ -753,6 +793,7 @@ def update_run(
     final_edit_initials: str,
     final_edit_notes: str,
 ) -> None:
+    """Persist edits to the run header and final review metadata."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -790,6 +831,7 @@ def update_run(
 
 
 def get_extraction_entry(entry_id: int):
+    """Fetch a saved extraction entry for correction or display."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM extraction_entries WHERE id = ?", (entry_id,))
@@ -799,6 +841,7 @@ def get_extraction_entry(entry_id: int):
 
 
 def update_extraction(entry_id: int, employee: str, data: dict) -> None:
+    """Update an existing extraction entry and increment its version number."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -840,6 +883,7 @@ def update_extraction(entry_id: int, employee: str, data: dict) -> None:
 
 
 def get_filtration_entry(entry_id: int):
+    """Fetch a saved filtration entry together with its ordered child rows."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM filtration_entries WHERE id = ?", (entry_id,))
@@ -855,6 +899,7 @@ def get_filtration_entry(entry_id: int):
 
 
 def update_filtration(entry_id: int, employee: str, data: dict) -> None:
+    """Replace an existing filtration entry and its child rows with corrected values."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -879,6 +924,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         data.get("photo_path", ""),
         entry_id,
     ))
+    # Rebuild the child rows from the submitted form so the saved set always matches the current screen.
     cur.execute("DELETE FROM filtration_rows WHERE filtration_entry_id = ?", (entry_id,))
     for row in data.get("rows", []):
         cur.execute("""
@@ -903,6 +949,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
 
 
 def get_evaporation_entry(entry_id: int):
+    """Fetch a saved evaporation entry together with its ordered child rows."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM evaporation_entries WHERE id = ?", (entry_id,))
@@ -918,6 +965,7 @@ def get_evaporation_entry(entry_id: int):
 
 
 def get_latest_evaporation_for_run(run_id: int):
+    """Fetch the latest evaporation entry recorded for a specific run."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -940,6 +988,7 @@ def get_latest_evaporation_for_run(run_id: int):
 
 
 def update_evaporation(entry_id: int, employee: str, data: dict) -> None:
+    """Replace an existing evaporation entry and its child rows with corrected values."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -966,6 +1015,7 @@ def update_evaporation(entry_id: int, employee: str, data: dict) -> None:
         data.get("photo_path", ""),
         entry_id,
     ))
+    # Rebuild the child rows from the submitted form so the saved set always matches the current screen.
     cur.execute("DELETE FROM evaporation_rows WHERE evaporation_entry_id = ?", (entry_id,))
     for row in data.get("rows", []):
         cur.execute("""
@@ -988,6 +1038,7 @@ def update_evaporation(entry_id: int, employee: str, data: dict) -> None:
 
 
 def get_sheet_entry(entry_id: int):
+    """Fetch a saved generic stage sheet by id."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM sheet_entries WHERE id = ?", (entry_id,))
@@ -997,6 +1048,7 @@ def get_sheet_entry(entry_id: int):
 
 
 def get_latest_sheet_entry_for_run_stage(run_id: int, stage_key: str):
+    """Fetch the most recent generic stage entry for a run/stage combination."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -1011,6 +1063,7 @@ def get_latest_sheet_entry_for_run_stage(run_id: int, stage_key: str):
 
 
 def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
+    """Update a generic stage sheet and increment its version number."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -1031,6 +1084,7 @@ def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
 
 
 def insert_sheet_entry(employee: str, data: dict) -> int:
+    """Insert a new generic stage sheet and return its id."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -1065,11 +1119,13 @@ def insert_field_change_log(
     record_id: int,
     changes: list[dict],
 ) -> None:
+    """Insert the field-level correction rows captured by the edit forms."""
     if not changes:
         return
 
     conn = get_conn()
     cur = conn.cursor()
+    # Each element in `changes` already matches the columns expected by `field_change_log`.
     for change in changes:
         cur.execute("""
             INSERT INTO field_change_log (
@@ -1096,6 +1152,7 @@ def insert_field_change_log(
 
 
 def insert_audit(table_name: str, record_id: int, action_type: str, changed_by: str, old_data: str = "", new_data: str = ""):
+    """Insert a high-level audit record describing a create, update, or finalize action."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -1107,6 +1164,7 @@ def insert_audit(table_name: str, record_id: int, action_type: str, changed_by: 
 
 
 def get_field_change_history(run_id: int | None = None, limit: int = 200):
+    """Return recent field-level correction history, optionally filtered to one run."""
     conn = get_conn()
     cur = conn.cursor()
     if run_id:
@@ -1140,8 +1198,10 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
 
 
 def last_12_hour_activity():
+    """Return a flat recent-activity feed across all supported entry tables."""
     conn = get_conn()
     cur = conn.cursor()
+    # The UNION keeps dashboard rendering simple by projecting every section into one common shape.
     cur.execute("""
         SELECT *
         FROM (

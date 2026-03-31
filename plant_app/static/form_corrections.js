@@ -1,3 +1,4 @@
+// Adds initials and original-value helpers beside editable fields on correction pages.
 document.addEventListener("DOMContentLoaded", () => {
   const selectors = "input[name], select[name], textarea[name]";
   const skipTypes = new Set(["hidden", "submit", "button", "reset", "file"]);
@@ -56,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
       wrapper.appendChild(originalWrap);
 
       const originalValue = field.value || "";
+      // Clears the initials box again when a field is changed back to its saved value.
       const syncChangeInput = () => {
         if ((field.value || "") !== originalValue) {
         } else {

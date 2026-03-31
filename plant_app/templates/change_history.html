@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="wrap">
+  <!-- Correction history view for all saved field-level edits. -->
+  <div class="wrap">
   <div class="nav">
+    <!-- Shared nav for moving back into work screens from the history page. -->
     <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Change History</div>
     <div class="navlinks">
       <a class="pill" href="/home">Home</a>
@@ -19,6 +21,7 @@
   </div>
 
   <div class="card page-intro">
+    <!-- Overview card describing what this audit page is showing. -->
     <div class="section-title">
       <h2>Supervisor Change Log</h2>
       <span class="info-chip">{{ changes|length }} Total Corrections</span>
@@ -36,6 +39,7 @@
 
   {% if run %}
   <div class="card">
+    <!-- Run-scoped correction history for the batch currently open in session. -->
     <div class="section-title">
       <h2>Active Batch Changes</h2>
       <span class="info-chip">{{ active_changes|length }} Active Corrections</span>
@@ -64,6 +68,7 @@
   {% endif %}
 
   <div class="card">
+    <!-- Plant-wide correction history across all saved entries. -->
     <div class="section-title">
       <h2>Recent Change History</h2>
       <span class="info-chip">All Sheets</span>

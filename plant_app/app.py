@@ -1,50 +1,60 @@
+"""FastAPI application for operator login, batch setup, data entry, and correction flows."""
+
+# Standard-library imports used for path resolution, timestamp helpers, and JSON sheet payloads.
 from pathlib import Path
 from datetime import datetime
 import json
 
+# FastAPI framework imports used for route declarations, form parsing, and HTML responses.
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
+# Database helpers used by routes to create, read, update, and audit plant records.
 from db import (
-    init_db,
-    validate_user,
-    get_user_initials,
-    create_run,
-    get_run,
-    list_runs,
-    mark_run_complete,
-    update_run,
-    get_extraction_entry,
-    update_extraction,
-    get_filtration_entry,
-    update_filtration,
-    get_evaporation_entry,
-    get_latest_evaporation_for_run,
-    update_evaporation,
-    get_sheet_entry,
-    get_latest_sheet_entry_for_run_stage,
-    update_sheet_entry,
-    insert_extraction,
-    insert_filtration,
-    insert_evaporation,
-    insert_sheet_entry,
-    insert_field_change_log,
-    insert_audit,
-    get_field_change_history,
-    last_12_hour_activity,
+    init_db,  # Builds tables and applies lightweight schema migrations at startup.
+    validate_user,  # Authenticates an employee number and password pair.
+    get_user_initials,  # Loads the initials displayed and reused in forms.
+    create_run,  # Creates a new batch/run record.
+    get_run,  # Fetches a single batch/run record by id.
+    list_runs,  # Lists recent runs for the batch selection screen.
+    mark_run_complete,  # Finalizes a run after review.
+    update_run,  # Saves edits to the active run header data.
+    get_extraction_entry,  # Loads a saved extraction entry for corrections.
+    update_extraction,  # Persists extraction corrections.
+    get_filtration_entry,  # Loads a saved filtration entry and its child rows.
+    update_filtration,  # Persists filtration corrections.
+    get_evaporation_entry,  # Loads a saved evaporation entry and its child rows.
+    get_latest_evaporation_for_run,  # Finds the current run's latest evaporation sheet.
+    update_evaporation,  # Persists evaporation corrections.
+    get_sheet_entry,  # Loads a saved generic stage sheet.
+    get_latest_sheet_entry_for_run_stage,  # Finds the latest generic sheet for a run/stage pair.
+    update_sheet_entry,  # Persists generic stage corrections.
+    insert_extraction,  # Creates a new extraction entry.
+    insert_filtration,  # Creates a new filtration entry and child rows.
+    insert_evaporation,  # Creates a new evaporation entry and child rows.
+    insert_sheet_entry,  # Creates a new generic stage entry.
+    insert_field_change_log,  # Records field-level correction details.
+    insert_audit,  # Records higher-level create/update/finalize events.
+    get_field_change_history,  # Reads correction history for dashboards.
+    last_12_hour_activity,  # Builds the recent-activity dashboard feed.
 )
+
+# Stage metadata controls the generic forms and dashboard navigation links.
 from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS
 
+# Main ASGI application object served by Uvicorn or another ASGI server.
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="lonza-secret-key-change-me")
 
+# Base directory used to resolve the bundled static assets and Jinja templates.
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+# Ensure the local SQLite schema exists before any request handlers run.
 init_db()
 
 
@@ -53,47 +63,58 @@ init_db()
 # ------------------------
 
 def logged_in(request: Request) -> bool:
+    """Return True when the session already contains an authenticated user."""
     return bool(request.session.get("user"))
 
 
 def current_user(request: Request) -> str:
+    """Return the employee number stored in the current session."""
     return request.session.get("user", "")
 
 
 def current_initials(request: Request) -> str:
+    """Return the operator initials stored in the current session."""
     return request.session.get("initials", "")
 
 
 def current_run_id(request: Request):
+    """Return the active production run id from the current session, if one exists."""
     return request.session.get("run_id")
 
 
 def today_str() -> str:
+    """Return today's date in the same format used by the HTML forms."""
     return datetime.now().strftime("%Y-%m-%d")
 
 
 def active_run(request: Request):
+    """Return the active run record for the session, or None when no run is selected."""
     run_id = current_run_id(request)
     return get_run(run_id) if run_id else None
 
 
 def require_login(request: Request):
+    """Redirect anonymous users back to the login page."""
     if not logged_in(request):
         return RedirectResponse("/", status_code=303)
     return None
 
 
 def require_run(request: Request):
+    """Redirect users to run selection until an active batch/run is chosen."""
     if not current_run_id(request):
         return RedirectResponse("/run/select", status_code=303)
     return None
 
 
 def get_generic_stage(stage_key: str):
+    """Look up a generic stage configuration by its route key."""
     return GENERIC_STAGE_DEFS.get(stage_key)
 
 
 def render_page(request: Request, template_name: str, **context):
+    """Render a template with the standard navigation/session context already included."""
+    # Shared template values used by most pages for nav badges and defaults.
     page_context = {
         "request": request,
         "user": current_user(request),
@@ -106,13 +127,17 @@ def render_page(request: Request, template_name: str, **context):
 
 
 def clean_value(value) -> str:
+    """Normalize optional form values into trimmed strings for comparisons and logging."""
     if value is None:
         return ""
     return str(value).strip()
 
 
 def collect_field_changes(form, old_values: dict, changed_by: str, correction_reason: str):
+    """Build field-level change records for correction pages and validate initials coverage."""
+    # `changes` becomes the audit payload saved into `field_change_log`.
     changes = []
+    # `missing_details` tracks edited fields that still need operator initials.
     missing_details = []
 
     for key, value in form.multi_items():
@@ -133,6 +158,7 @@ def collect_field_changes(form, old_values: dict, changed_by: str, correction_re
             missing_details.append(key)
             continue
 
+        # Each dictionary describes one corrected field exactly as it will be stored in SQLite.
         changes.append(
             {
                 "field_name": key,
@@ -149,6 +175,7 @@ def collect_field_changes(form, old_values: dict, changed_by: str, correction_re
 
 
 def correction_error_response(prefix: str, fields: list[str]):
+    """Return a compact plain-text validation error listing the affected fields."""
     field_list = ", ".join(fields[:8])
     if len(fields) > 8:
         field_list += ", ..."
@@ -159,14 +186,17 @@ def correction_error_response(prefix: str, fields: list[str]):
 
 
 def correction_missing_response(fields: list[str]):
+    """Specialized validation error for edited fields that are missing initials."""
     return correction_error_response("Please add initials for each edited field", fields)
 
 
 def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "") -> str:
+    """Choose the most user-friendly label for dashboards and change-history rows."""
     if stage_title:
         return stage_title
     if section:
         return section
+    # Fallback labels for tables that do not already carry a friendlier stage title.
     labels = {
         "extraction_entries": "Extraction",
         "filtration_entries": "Filtration",
@@ -178,10 +208,12 @@ def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "
 
 
 def process_dashboard_rows():
+    """Filter recent activity down to the standalone extraction and filtration sections."""
     return [row for row in last_12_hour_activity() if row["section"] in {"Extraction", "Filtration"}]
 
 
 def build_filtration_row_map(rows):
+    """Convert filtration child rows into template-friendly keys such as main_1 or dia_2."""
     row_map = {}
     for row in rows:
         prefix = "dia" if row["row_group"] == "dia" else "main"
@@ -190,10 +222,13 @@ def build_filtration_row_map(rows):
 
 
 def build_evaporation_row_map(rows):
+    """Convert evaporation child rows into template-friendly keys such as row1 and row2."""
     return {f"row{row['row_no']}": row for row in rows}
 
 
 def build_extraction_payload(form, operator_initials: str):
+    """Map the extraction form fields into the database payload expected by `insert_extraction`."""
+    # Keys in this object are intentionally aligned with the columns in `extraction_entries`.
     return {
         "run_id": None,
         "operator_initials": operator_initials,
@@ -221,6 +256,8 @@ def build_extraction_payload(form, operator_initials: str):
 
 
 def build_filtration_rows(form):
+    """Build normalized filtration row payloads for both the main and diafiltration tables."""
+    # Main filtration readings keep flow columns because those rows represent the primary process path.
     main_rows = []
     for i in range(1, 4):
         main_rows.append(
@@ -236,6 +273,7 @@ def build_filtration_rows(form):
             }
         )
 
+    # Diafiltration rows use a smaller schema and intentionally leave flow columns blank.
     dia_rows = []
     for i in range(1, 3):
         dia_rows.append(
@@ -254,6 +292,8 @@ def build_filtration_rows(form):
 
 
 def build_filtration_payload(form, operator_initials: str):
+    """Map the filtration form fields into the database payload expected by `insert_filtration`."""
+    # The parent record fields live beside the child `rows` collection in one payload object.
     return {
         "run_id": None,
         "operator_initials": operator_initials,
@@ -272,8 +312,10 @@ def build_filtration_payload(form, operator_initials: str):
 
 
 def build_evaporation_rows(form):
+    """Build normalized evaporation row payloads for the repeating timed-reading table."""
     rows = []
     for i in range(1, 4):
+        # Each row maps directly to one record in the `evaporation_rows` child table.
         rows.append(
             {
                 "row_no": i,
@@ -288,6 +330,8 @@ def build_evaporation_rows(form):
 
 
 def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
+    """Map the evaporation form fields into the database payload expected by `insert_evaporation`."""
+    # Unlike extraction/filtration, evaporation is always tied to a selected batch run.
     return {
         "run_id": run_id,
         "operator_initials": operator_initials,
@@ -308,8 +352,10 @@ def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
 
 
 def process_dashboard_items():
+    """Prepare recent extraction/filtration rows with the edit links used by the dashboard."""
     items = []
     for row in process_dashboard_rows():
+        # Edit links depend on section because each stage has a dedicated correction route.
         href = ""
         if row["section"] == "Extraction":
             href = f"/edit/extraction/{row['record_id']}"
@@ -320,6 +366,8 @@ def process_dashboard_items():
 
 
 def dashboard_batch_packs():
+    """Group recent batch-pack activity by batch number for the review dashboard."""
+    # `packs` is keyed by batch number so multiple saved sheets collapse into one dashboard card.
     packs = {}
     for row in last_12_hour_activity():
         batch_number = row["batch_number"] or "No batch"
@@ -338,6 +386,7 @@ def dashboard_batch_packs():
             edit_href = f"/edit/evaporation/{row['record_id']}"
         elif row["entry_table"] == "sheet_entries":
             edit_href = f"/edit/generic/{row['record_id']}"
+        # Each entry remains available individually so the dashboard can still open the right correction page.
         pack["entries"].append(
             {
                 **dict(row),
@@ -361,9 +410,11 @@ def dashboard_batch_packs():
 
 
 def build_batch_review(run_id: int):
+    """Gather the latest saved batch-pack sheets so the final review page can summarize them."""
     run = get_run(run_id)
     evaporation_entry, evaporation_rows = get_latest_evaporation_for_run(run_id)
 
+    # Generic stage entries are discovered from configuration instead of hard-coded one by one.
     generic_entries = []
     for stage_key, stage in GENERIC_STAGE_DEFS.items():
         entry = get_latest_sheet_entry_for_run_stage(run_id, stage_key)
@@ -381,6 +432,7 @@ def build_batch_review(run_id: int):
             }
         )
 
+    # This return object is passed straight into `batch_review.html`.
     return {
         "run": run,
         "evaporation_entry": evaporation_entry,
@@ -396,6 +448,7 @@ def build_batch_review(run_id: int):
 
 @app.get("/health", response_class=PlainTextResponse)
 def health():
+    """Simple health-check endpoint for smoke tests and deployment checks."""
     return "OK"
 
 
@@ -405,6 +458,7 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def login_page(request: Request):
+    """Render the login form or jump straight home when a session already exists."""
     if logged_in(request):
         return RedirectResponse("/home", status_code=303)
 
@@ -423,9 +477,11 @@ def login(
     employee: str = Form(...),
     password: str = Form(...),
 ):
+    """Authenticate an operator and seed the session with their identity data."""
     employee = employee.strip()
 
     if validate_user(employee, password):
+        # Session values power nav badges, default initials, and route guards.
         request.session["user"] = employee
         request.session["initials"] = get_user_initials(employee)
         return RedirectResponse("/home", status_code=303)
@@ -442,6 +498,7 @@ def login(
 
 @app.get("/logout")
 def logout(request: Request):
+    """Clear the session and return the operator to the login page."""
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 
@@ -452,6 +509,7 @@ def logout(request: Request):
 
 @app.get("/home", response_class=HTMLResponse)
 def home(request: Request):
+    """Render the landing page for starting work, resuming a batch, or reviewing data."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -465,6 +523,7 @@ def home(request: Request):
 
 @app.get("/run/select", response_class=HTMLResponse)
 def run_select_page(request: Request):
+    """Render the run selection and creation page with recent saved runs."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -485,11 +544,13 @@ def run_select(
     shift_name: str = Form(""),
     notes: str = Form(""),
 ):
+    """Create a new production run from the batch setup form and store it in session."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
     try:
+        # The run header is saved first so every later batch-pack sheet can point back to this id.
         run_id = create_run(
             batch_number=batch_number,
             split_batch_number=split_batch_number,
@@ -511,6 +572,7 @@ def run_select(
 
 @app.get("/run/use/{run_id}")
 def use_run(request: Request, run_id: int):
+    """Switch the current session to an existing run selected from the recent list."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -521,6 +583,7 @@ def use_run(request: Request, run_id: int):
 
 @app.get("/batch/edit", response_class=HTMLResponse)
 def batch_edit_page(request: Request):
+    """Render the batch header edit form for the currently selected run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -547,6 +610,7 @@ def batch_edit_submit(
     final_edit_initials: str = Form(""),
     final_edit_notes: str = Form(""),
 ):
+    """Persist edits to the run header and record the change in the audit log."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -555,6 +619,7 @@ def batch_edit_submit(
     if redirect:
         return redirect
 
+    # These fields mirror the run-setup form, with two extra final-review accountability fields.
     update_run(
         run_id=current_run_id(request),
         batch_number=batch_number,
@@ -588,6 +653,7 @@ def batch_edit_submit(
 
 @app.get("/process-dashboard", response_class=HTMLResponse)
 def process_dashboard(request: Request):
+    """Render the standalone extraction and filtration dashboard."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -601,6 +667,7 @@ def process_dashboard(request: Request):
 
 @app.get("/stages", response_class=HTMLResponse)
 def stages(request: Request):
+    """Render the batch stage picker for the currently selected run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -614,6 +681,7 @@ def stages(request: Request):
 
 @app.get("/batch/review", response_class=HTMLResponse)
 def batch_review_page(request: Request):
+    """Render the final batch-pack review page for the active run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -628,6 +696,7 @@ def batch_review_page(request: Request):
 
 @app.post("/batch/review/finalize")
 def finalize_batch_review(request: Request):
+    """Mark the active run complete once at least one batch-pack entry exists."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -658,6 +727,7 @@ def finalize_batch_review(request: Request):
 
 @app.get("/stage/extraction", response_class=HTMLResponse)
 def extraction_page(request: Request):
+    """Render the standalone extraction entry form."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -667,6 +737,7 @@ def extraction_page(request: Request):
 
 @app.post("/submit/extraction")
 async def submit_extraction(request: Request):
+    """Save a new extraction entry and audit the create action."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -697,6 +768,7 @@ async def submit_extraction(request: Request):
 
 @app.get("/stage/filtration", response_class=HTMLResponse)
 def filtration_page(request: Request):
+    """Render the standalone filtration entry form."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -706,6 +778,7 @@ def filtration_page(request: Request):
 
 @app.post("/submit/filtration")
 async def submit_filtration(request: Request):
+    """Save a new filtration entry and audit the create action."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -736,6 +809,7 @@ async def submit_filtration(request: Request):
 
 @app.get("/stage/evaporation", response_class=HTMLResponse)
 def evaporation_page(request: Request):
+    """Render the evaporation sheet or its saved read-only view for the active run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -758,6 +832,7 @@ def evaporation_page(request: Request):
 
 @app.post("/submit/evaporation")
 async def submit_evaporation(request: Request):
+    """Save a new evaporation entry for the active run and audit the create action."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -794,6 +869,7 @@ async def submit_evaporation(request: Request):
 
 @app.get("/stage/generic/{stage_key}", response_class=HTMLResponse)
 def generic_stage_page(request: Request, stage_key: str):
+    """Render a generic batch-pack sheet driven entirely by `stage_defs.py`."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -822,6 +898,7 @@ def generic_stage_page(request: Request, stage_key: str):
 
 @app.post("/submit/generic/{stage_key}")
 async def submit_generic_stage(request: Request, stage_key: str):
+    """Save a generic stage entry for the active run and audit the create action."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -835,6 +912,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/stages", status_code=303)
 
     form = await request.form()
+    # Generic sheets store their dynamic cells as JSON because each stage has different fields.
     payload = {key: value for key, value in form.multi_items()}
 
     entry_id = insert_sheet_entry(
@@ -868,6 +946,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
 
 @app.get("/edit/extraction/{entry_id}", response_class=HTMLResponse)
 def edit_extraction_page(request: Request, entry_id: int):
+    """Render the extraction correction form for a saved entry."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -886,6 +965,7 @@ def edit_extraction_page(request: Request, entry_id: int):
 
 @app.post("/edit/extraction/{entry_id}")
 async def edit_extraction_submit(request: Request, entry_id: int):
+    """Validate and save extraction corrections while logging field-level changes."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -940,6 +1020,7 @@ async def edit_extraction_submit(request: Request, entry_id: int):
 
 @app.get("/edit/filtration/{entry_id}", response_class=HTMLResponse)
 def edit_filtration_page(request: Request, entry_id: int):
+    """Render the filtration correction form for a saved entry."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -958,6 +1039,7 @@ def edit_filtration_page(request: Request, entry_id: int):
 
 @app.post("/edit/filtration/{entry_id}")
 async def edit_filtration_submit(request: Request, entry_id: int):
+    """Validate and save filtration corrections while logging field-level changes."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1008,6 +1090,7 @@ async def edit_filtration_submit(request: Request, entry_id: int):
 
 @app.get("/edit/evaporation/{entry_id}", response_class=HTMLResponse)
 def edit_evaporation_page(request: Request, entry_id: int):
+    """Render the evaporation correction form for a saved entry."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1025,6 +1108,7 @@ def edit_evaporation_page(request: Request, entry_id: int):
 
 @app.post("/edit/evaporation/{entry_id}")
 async def edit_evaporation_submit(request: Request, entry_id: int):
+    """Validate and save evaporation corrections while logging field-level changes."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1078,6 +1162,7 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
 
 @app.get("/edit/generic/{entry_id}", response_class=HTMLResponse)
 def edit_generic_page(request: Request, entry_id: int):
+    """Render the generic batch-pack correction form for a saved entry."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1100,12 +1185,14 @@ def edit_generic_page(request: Request, entry_id: int):
 
 @app.post("/edit/generic/{entry_id}")
 async def edit_generic_submit(request: Request, entry_id: int):
+    """Validate and save generic sheet corrections while logging field-level changes."""
     redirect = require_login(request)
     if redirect:
         return redirect
     entry = get_sheet_entry(entry_id)
     form = await request.form()
     correction_reason = clean_value(form.get("correction_reason", ""))
+    # Internal correction-helper fields are stripped before the real sheet payload is re-saved.
     payload = {
         key: value
         for key, value in form.multi_items()
@@ -1151,6 +1238,7 @@ async def edit_generic_submit(request: Request, entry_id: int):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
+    """Render the grouped batch-pack dashboard used to reopen saved batch sheets."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1160,16 +1248,19 @@ def dashboard(request: Request):
 
 @app.get("/change-history", response_class=HTMLResponse)
 def change_history(request: Request):
+    """Render the correction history dashboard for all runs and the active run."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
+    # `changes` holds the full plant-wide correction history.
     changes = []
     for row in get_field_change_history():
         item = dict(row)
         item["display_sheet"] = display_sheet_name(item["entry_table"])
         changes.append(item)
 
+    # `active_changes` narrows the same history to the run currently selected in session.
     active_changes = []
     if current_run_id(request):
         for row in get_field_change_history(current_run_id(request)):

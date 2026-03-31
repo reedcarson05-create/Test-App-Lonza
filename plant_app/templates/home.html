@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<!-- Home screen that routes operators into batch work, process sheets, and correction dashboards. -->
 <div class="wrap">
   <div class="nav">
+    <!-- Global nav for moving between home, active work, and logout. -->
     <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">Plant App</div>
     <div class="navlinks">
       <a class="pill" href="/process-dashboard">Current Work</a>
@@ -18,6 +20,7 @@
   </div>
 
   <div class="hero-card">
+    <!-- Top summary card showing the operator's current batch context. -->
     <div>
       <p class="eyebrow">Home</p>
       <h1>Choose what you want to do</h1>
@@ -33,6 +36,7 @@
   </div>
 
   <div class="section-grid">
+    <!-- Primary action cards for batch work and standalone process work. -->
     <div class="entry-panel entry-setup">
       <div class="entry-kicker">Step 1</div>
       <h2>Start New Batch</h2>
@@ -50,6 +54,7 @@
 
   {% if run %}
   <div class="card">
+    <!-- Quick actions for the run currently selected in session. -->
     <div class="section-title">
       <h2>Current Batch</h2>
       <span class="info-chip">Ready For Batch Sheets</span>
@@ -69,6 +74,7 @@
   {% endif %}
 
   <div class="card">
+    <!-- Shortcuts into the correction-focused dashboards. -->
     <div class="section-title">
       <h2>Review Or Fix Saved Data</h2>
       <span class="info-chip">Corrections And History</span>

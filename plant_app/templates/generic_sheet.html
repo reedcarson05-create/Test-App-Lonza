@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<!-- Generic batch-pack template driven entirely by the stage definitions in `stage_defs.py`. -->
 <div class="wrap">
   <div class="nav">
+    <!-- Shared nav plus current batch badge for batch-pack work. -->
     <div class="brand"><img src="/static/logo.png" class="logo" alt="Lonza">{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</div>
     <div class="navlinks">
       <a class="pill" href="/home">Home</a>
@@ -19,6 +21,7 @@
   </div>
 
   <form method="post" action="{{ form_action or ('/submit/generic/' ~ stage_key) }}" class="stack-gap">
+    <!-- Intro card explains whether the operator is creating, viewing, or correcting a sheet. -->
     <div class="card page-intro">
       <h2>{% if is_edit %}Correct Saved {{ stage['title'] }} Data{% elif view_only %}Saved {{ stage['title'] }} Data{% else %}Enter {{ stage['title'] }} Data{% endif %}</h2>
       <p class="muted">{% if is_edit %}Use this correction page to fix saved batch-pack data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is already saved to the active batch pack. The saved values stay here and can only be changed from the correction tab.{% else %}Fill in the sheet below and save it when you are done.{% endif %}</p>
@@ -28,6 +31,7 @@
     {% endif %}
     <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
     <div class="card">
+      <!-- Header fields come from `stage['headers']` in `stage_defs.py`. -->
       <h2>{{ stage['sheet_name'] }}</h2>
       <div class="grid three-up">
         {% for field in stage['headers'] %}
@@ -60,6 +64,7 @@
 
     {% for table in stage['tables'] %}
     <div class="card">
+      <!-- Repeating table rows come from each table definition in `stage_defs.py`. -->
       <h2>{{ table['title'] }}</h2>
       <div class="table-wrap">
         <table class="table entry-table">
@@ -81,6 +86,7 @@
     {% endfor %}
 
     <div class="card">
+      <!-- Shared free-text fields appended to every generic stage sheet. -->
       <div class="grid two-up">
         <div>
           <label>Comments</label>
