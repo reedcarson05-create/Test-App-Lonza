@@ -742,6 +742,45 @@ fieldset[disabled] textarea {
   margin-top: 8px;
 }
 
+.camera-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(7, 12, 20, 0.72);
+}
+
+.camera-dialog {
+  width: min(720px, 100%);
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--panel-shadow);
+}
+
+.camera-dialog h3 {
+  margin: 0 0 8px;
+  font-size: calc(24px * var(--font-scale));
+}
+
+.camera-copy {
+  margin-bottom: 12px;
+}
+
+.camera-video {
+  width: 100%;
+  min-height: 280px;
+  max-height: 60vh;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #0c1220;
+}
+
 .status-badge {
   display: inline-flex;
   margin-left: 8px;
