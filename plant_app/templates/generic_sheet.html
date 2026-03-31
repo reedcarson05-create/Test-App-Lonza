@@ -116,7 +116,16 @@
         </div>
         <div>
           <label>Pictures / Image Paths</label>
-          <textarea name="photo_path" rows="4" placeholder="Paste image file paths or links here">{{ entry_values.get('photo_path', '') if entry_values else '' }}</textarea>
+          <div data-image-field-container data-upload-endpoint="/upload-image">
+            <textarea name="photo_path" rows="4" placeholder="Saved image links will appear here after capture or upload." data-image-field>{{ entry_values.get('photo_path', '') if entry_values else '' }}</textarea>
+            <div class="image-tools">
+              <button class="btn ghost" type="button" data-image-camera-button>Take Photo</button>
+              <button class="btn ghost" type="button" data-image-upload-button>Upload Images</button>
+              <input type="file" accept="image/*" capture="environment" data-image-camera-input>
+              <input type="file" accept="image/*" multiple data-image-upload-input>
+            </div>
+            <p class="muted small image-status" data-image-status>No image selected yet.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -135,6 +144,7 @@
   </form>
 </div>
 <script src="/static/settings.js"></script>
+<script src="/static/image_upload.js"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v=5"></script>{% endif %}
 </body>
 </html>
