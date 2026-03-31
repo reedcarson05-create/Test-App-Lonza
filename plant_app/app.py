@@ -141,8 +141,7 @@ def save_signature_session(request: Request, form) -> None:
     if not signed_initials:
         return
     request.session["signature_initials"] = signed_initials
-    if signature_data:
-        request.session["signature_data"] = signature_data
+    request.session["signature_data"] = signature_data
     request.session["signature_signed_at"] = signed_at or datetime.now().isoformat(timespec="seconds")
 
 

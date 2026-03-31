@@ -6,7 +6,7 @@
   <title>{% if is_edit %}Edit Extraction{% else %}Extraction{% endif %}</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -115,6 +115,7 @@
   </form>
 </div>
 <script src="/static/settings.js"></script>
+<script src="/static/signature_session.js"></script>
 <script src="/static/image_upload.js"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v=5"></script>{% endif %}
 </body>

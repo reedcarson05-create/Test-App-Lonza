@@ -16,6 +16,12 @@
   --panel-shadow: 0 10px 24px rgba(9, 30, 66, 0.06);
   --font-scale: 1;
   --touch: 52px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
 }
 
 * { box-sizing: border-box; }
@@ -132,7 +138,7 @@ body.modal-open {
   backdrop-filter: blur(10px);
   padding: 12px 16px;
   border: 1px solid color-mix(in srgb, var(--line) 95%, transparent 5%);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--panel-shadow);
 }
 
@@ -160,7 +166,7 @@ body.modal-open {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   min-height: 44px;
   padding: 10px 15px;
   font-size: calc(15px * var(--font-scale));
@@ -171,7 +177,7 @@ body.modal-open {
 .card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   padding: 20px;
   box-shadow: 0 6px 18px rgba(9, 30, 66, 0.05);
   overflow: hidden;
@@ -190,7 +196,7 @@ body.modal-open {
   flex-wrap: wrap;
   background: linear-gradient(135deg, var(--hero-start), var(--hero-end));
   border: 1px solid #cfe0f5;
-  border-radius: 22px;
+  border-radius: var(--radius-2xl);
   padding: 24px;
   margin-bottom: 18px;
 }
@@ -248,7 +254,7 @@ label {
 input, select, textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   min-height: var(--touch);
   padding: 14px 16px;
   font-size: calc(18px * var(--font-scale));
@@ -295,7 +301,7 @@ fieldset[disabled] textarea {
   cursor: pointer;
   background: var(--brand);
   color: white;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   min-height: var(--touch);
   padding: 14px 20px;
   font-size: calc(18px * var(--font-scale));
@@ -337,7 +343,7 @@ fieldset[disabled] textarea {
   background: var(--banner-bg);
   color: var(--banner-text);
   border: 1px solid #cfe0f5;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   margin-bottom: 16px;
 }
@@ -345,7 +351,7 @@ fieldset[disabled] textarea {
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--surface-soft);
 }
 .review-table { margin-top: 14px; }
@@ -465,7 +471,7 @@ td.blank-display {
   min-height: 46px;
   min-width: 46px;
   padding: 10px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
@@ -477,7 +483,7 @@ td.blank-display {
   margin-top: 10px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: var(--card);
   box-shadow: var(--panel-shadow);
 }
@@ -520,7 +526,7 @@ td.blank-display {
   min-height: 42px;
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font-size: calc(15px * var(--font-scale));
@@ -541,7 +547,7 @@ td.blank-display {
   min-width: 132px;
   min-height: 44px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--brand);
   color: white;
   text-decoration: none;
@@ -560,7 +566,7 @@ td.blank-display {
   display: block;
   text-decoration: none;
   color: var(--text);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   padding: 22px;
   min-height: 220px;
   border: 1px solid var(--line);
@@ -579,7 +585,7 @@ td.blank-display {
 }
 
 .entry-panel {
-  border-radius: 22px;
+  border-radius: var(--radius-2xl);
   padding: 24px;
   min-height: 240px;
   border: 1px solid var(--line);
@@ -605,7 +611,7 @@ td.blank-display {
   width: 100%;
   min-height: 72px;
   font-size: 22px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
 }
 
 .process-btn {
@@ -619,7 +625,7 @@ td.blank-display {
 .entry-kicker {
   display: inline-flex;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -655,7 +661,7 @@ td.blank-display {
 
 .batch-pack {
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   background: var(--surface-soft);
 }
@@ -685,7 +691,7 @@ td.blank-display {
 
 .summary-card {
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 88%, white 12%), var(--surface));
 }
@@ -712,7 +718,7 @@ td.blank-display {
   align-items: center;
   min-height: 38px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-soft) 82%, white 18%);
   color: #23425f;
   font-size: 13px;
@@ -789,7 +795,7 @@ td.blank-display {
 .signature-dialog {
   width: min(760px, 100%);
   padding: 22px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--line);
   background: var(--card);
   box-shadow: var(--panel-shadow);
@@ -816,7 +822,7 @@ td.blank-display {
   display: block;
   margin-top: 6px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--surface-soft) 86%, white 14%);
   touch-action: none;
 }
@@ -829,7 +835,7 @@ td.blank-display {
 .camera-dialog {
   width: min(720px, 100%);
   padding: 20px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--line);
   background: var(--card);
   box-shadow: var(--panel-shadow);
@@ -849,7 +855,7 @@ td.blank-display {
   min-height: 280px;
   max-height: 60vh;
   object-fit: cover;
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--line);
   background: #0c1220;
 }
@@ -858,7 +864,7 @@ td.blank-display {
   display: inline-flex;
   margin-left: 8px;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-weight: 700;
 }
@@ -891,7 +897,7 @@ td.blank-display {
   background: #fff1f1;
   color: #8f1d1d;
   border: 1px solid #f0cccc;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   margin: 14px 0;
 }

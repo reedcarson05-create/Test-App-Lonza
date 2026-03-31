@@ -54,6 +54,17 @@ document.addEventListener("DOMContentLoaded", () => {
   status.style.margin = "12px 0";
   document.body.appendChild(status);
 
+  function drawStoredSignature() {
+    if (!signatureState.data) return;
+    const image = new Image();
+    image.onload = () => {
+      const rect = canvas.getBoundingClientRect();
+      context.clearRect(0, 0, rect.width, rect.height);
+      context.drawImage(image, 0, 0, rect.width, rect.height);
+    };
+    image.src = signatureState.data;
+  }
+
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -64,9 +75,8 @@ document.addEventListener("DOMContentLoaded", () => {
     context.lineJoin = "round";
     context.lineWidth = 2.5;
     context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#17202a";
-    if (!signatureState.data) {
-      context.clearRect(0, 0, rect.width, rect.height);
-    }
+    context.clearRect(0, 0, rect.width, rect.height);
+    drawStoredSignature();
   }
 
   function nowStamp() {
@@ -120,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
         field.value = signatureState.initials;
         return;
       }
-      pendingForm = field.form || null;
+      pendingForm = null;
       openModal();
     };
     field.addEventListener("focus", openForField);
@@ -155,6 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function saveSignature() {
     try {
+      const submitTarget = pendingForm;
       const initials = initialsInput.value.trim().toUpperCase();
       const signedAt = signedAtInput.value.trim();
       if (!initials) {
@@ -172,6 +183,15 @@ document.addEventListener("DOMContentLoaded", () => {
       closeModal();
       status.textContent = `Initials saved: ${signatureState.initials}`;
       status.hidden = false;
+      if (submitTarget) {
+        applySignatureToForm(submitTarget);
+        submitTarget.dataset.signatureSubmitting = "true";
+        if (typeof submitTarget.requestSubmit === "function") {
+          submitTarget.requestSubmit();
+        } else {
+          submitTarget.submit();
+        }
+      }
       window.setTimeout(() => {
         status.hidden = true;
       }, 2500);
@@ -251,6 +271,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.key === "Enter") {
       event.preventDefault();
       saveSignature();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) {
+      event.preventDefault();
+      closeModal();
     }
   });
   const observer = new MutationObserver((mutations) => {

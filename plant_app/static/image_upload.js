@@ -7,11 +7,19 @@ document.addEventListener("DOMContentLoaded", () => {
   let closeButton = null;
   let activeStream = null;
   let activeUpload = null;
+  const prefersNativeCapture = window.matchMedia?.("(pointer: coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const stopCamera = () => {
     if (!activeStream) return;
     activeStream.getTracks().forEach((track) => track.stop());
     activeStream = null;
+  };
+
+  const closeCameraModal = () => {
+    if (!cameraModal) return;
+    cameraModal.hidden = true;
+    activeUpload = null;
+    stopCamera();
   };
 
   const ensureCameraModal = () => {
@@ -39,15 +47,11 @@ document.addEventListener("DOMContentLoaded", () => {
     captureButton = cameraModal.querySelector("[data-camera-capture]");
     closeButton = cameraModal.querySelector("[data-camera-close]");
 
-    closeButton.addEventListener("click", () => {
-      cameraModal.hidden = true;
-      stopCamera();
-    });
+    closeButton.addEventListener("click", closeCameraModal);
 
     cameraModal.addEventListener("click", (event) => {
       if (event.target === cameraModal) {
-        cameraModal.hidden = true;
-        stopCamera();
+        closeCameraModal();
       }
     });
 
@@ -64,8 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!blob || !activeUpload) return;
         const file = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
         await activeUpload([file]);
-        cameraModal.hidden = true;
-        stopCamera();
+        closeCameraModal();
       }, "image/jpeg", 0.92);
     });
   };
@@ -121,6 +124,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (error) {
         console.error("Image upload failed", error);
         setStatus("Image upload failed.");
+      } finally {
+        cameraInput.value = "";
+        uploadInput.value = "";
       }
     };
 
@@ -141,13 +147,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
       } catch (error) {
         console.error("Camera access failed", error);
-        cameraModal.hidden = true;
-        stopCamera();
+        closeCameraModal();
         return false;
       }
     };
 
     cameraButton.addEventListener("click", async () => {
+      if (prefersNativeCapture) {
+        cameraInput.click();
+        return;
+      }
       if (navigator.mediaDevices?.getUserMedia) {
         const opened = await openDesktopCamera();
         if (opened) return;
