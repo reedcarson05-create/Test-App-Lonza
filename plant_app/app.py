@@ -552,6 +552,19 @@ def save_settings(
     return JSONResponse(preferences)
 
 
+@app.get("/settings")
+def get_settings(request: Request):
+    """Return the logged-in user's latest saved display preferences."""
+    redirect = require_login(request)
+    if redirect:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    preferences = get_user_preferences(current_user(request))
+    request.session["theme"] = preferences["theme"]
+    request.session["font_scale"] = preferences["font_scale"]
+    return JSONResponse(preferences)
+
+
 @app.post("/upload-image")
 async def upload_image(request: Request, files: list[UploadFile] = File(...)):
     """Save uploaded device images into the app's static folder and return their URLs."""
