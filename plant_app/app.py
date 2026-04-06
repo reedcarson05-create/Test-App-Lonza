@@ -58,7 +58,7 @@ UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-ASSET_VERSION = "20260331-3"
+ASSET_VERSION = "20260406-2"
 
 # Ensure the local SQLite schema exists before any request handlers run.
 init_db()
@@ -98,6 +98,11 @@ def current_signature_data(request: Request) -> str:
     return request.session.get("signature_data", "")
 
 
+def signature_session_ready(request: Request) -> bool:
+    """Return True when the login session already has initials, signed time, and drawing data."""
+    return bool(current_signature_initials(request) and current_signature_signed_at(request) and current_signature_data(request))
+
+
 def current_theme(request: Request) -> str:
     """Return the saved theme stored in the current session."""
     return request.session.get("theme", "light")
@@ -135,15 +140,27 @@ def blank_display(value, entry_date: str = "", initials: str = "") -> str:
 
 
 def save_signature_session(request: Request, form) -> None:
-    """Persist a freshly captured initials signature into the server session."""
+    """Persist a freshly captured handwritten signature into the server session."""
     signed_initials = clean_value(form.get("__session_signature_initials", "")).upper()
     signature_data = clean_value(form.get("__session_signature_data", ""))
     signed_at = clean_value(form.get("__session_signature_signed_at", ""))
-    if not signed_initials:
+    if not signed_initials or not signature_data or not signed_at:
         return
     request.session["signature_initials"] = signed_initials
     request.session["signature_data"] = signature_data
-    request.session["signature_signed_at"] = signed_at or datetime.now().isoformat(timespec="seconds")
+    request.session["signature_signed_at"] = signed_at
+
+
+def require_handwritten_signature(request: Request, form):
+    """Return a validation error until the current login session has a saved handwritten signature."""
+    save_signature_session(request, form)
+    if signature_session_ready(request):
+        return None
+    return PlainTextResponse(
+        "Please sign once by hand with your initials, date, and time before saving this sheet. "
+        "That signature will be reused until you log out.",
+        status_code=400,
+    )
 
 
 def active_run(request: Request):
@@ -182,6 +199,7 @@ def render_page(request: Request, template_name: str, **context):
         "session_signature_initials": current_signature_initials(request),
         "session_signature_signed_at": current_signature_signed_at(request),
         "session_signature_data": current_signature_data(request),
+        "signature_session_ready": signature_session_ready(request),
         "settings_theme": current_theme(request),
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
@@ -217,6 +235,8 @@ def collect_field_changes(form, old_values: dict, changed_by: str, correction_re
 
     for key, value in form.multi_items():
         if key == "correction_reason":
+            continue
+        if key.startswith("__session_signature_"):
             continue
         if key.startswith("__change__") or key.startswith("__original__") or key.startswith("__corrected__"):
             continue
@@ -911,7 +931,9 @@ async def submit_extraction(request: Request):
         return redirect
 
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
 
     try:
@@ -953,7 +975,9 @@ async def submit_filtration(request: Request):
         return redirect
 
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
 
     try:
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
@@ -1012,7 +1036,9 @@ async def submit_evaporation(request: Request):
         return redirect
 
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     try:
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
         entry_id = insert_evaporation(
@@ -1083,9 +1109,11 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/stages", status_code=303)
 
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     # Generic sheets store their dynamic cells as JSON because each stage has different fields.
-    payload = {key: value for key, value in form.multi_items()}
+    payload = {key: value for key, value in form.multi_items() if not key.startswith("__session_signature_")}
 
     entry_id = insert_sheet_entry(
         current_user(request),
@@ -1143,7 +1171,9 @@ async def edit_extraction_submit(request: Request, entry_id: int):
         return redirect
     entry = get_extraction_entry(entry_id)
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     correction_reason = clean_value(form.get("correction_reason", ""))
     changes, missing_details, mismatched_values = collect_field_changes(
         form,
@@ -1218,7 +1248,9 @@ async def edit_filtration_submit(request: Request, entry_id: int):
         return redirect
     entry, existing_rows = get_filtration_entry(entry_id)
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     correction_reason = clean_value(form.get("correction_reason", ""))
     old_values = {
         "operator_initials": entry["operator_initials"],
@@ -1288,7 +1320,9 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
         return redirect
     entry, existing_rows = get_evaporation_entry(entry_id)
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     correction_reason = clean_value(form.get("correction_reason", ""))
     old_values = {
         "operator_initials": entry["operator_initials"],
@@ -1366,7 +1400,9 @@ async def edit_generic_submit(request: Request, entry_id: int):
         return redirect
     entry = get_sheet_entry(entry_id)
     form = await request.form()
-    save_signature_session(request, form)
+    signature_error = require_handwritten_signature(request, form)
+    if signature_error:
+        return signature_error
     correction_reason = clean_value(form.get("correction_reason", ""))
     # Internal correction-helper fields are stripped before the real sheet payload is re-saved.
     payload = {
@@ -1375,6 +1411,7 @@ async def edit_generic_submit(request: Request, entry_id: int):
         if not key.startswith("__change__")
         and not key.startswith("__original__")
         and not key.startswith("__corrected__")
+        and not key.startswith("__session_signature_")
         and key != "correction_reason"
     }
     old_values = json.loads(entry["payload_json"] or "{}")

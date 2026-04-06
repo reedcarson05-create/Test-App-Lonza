@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!forms.length) return;
 
   const body = document.body;
+  const sessionBanners = Array.from(document.querySelectorAll("[data-signature-session-banner]"));
   const signatureState = {
     initials: (body.dataset.sessionSignatureInitials || "").toUpperCase(),
     data: body.dataset.sessionSignatureData || "",
@@ -20,27 +21,27 @@ document.addEventListener("DOMContentLoaded", () => {
   modal.hidden = true;
   modal.innerHTML = `
     <div class="signature-dialog" role="dialog" aria-modal="true" aria-labelledby="signature-title">
-      <h3 id="signature-title">Sign Initials</h3>
-      <p class="muted signature-copy">Sign once for this login session. The app will reuse these initials until you log out.</p>
+      <h3 id="signature-title">Save Handwritten Signature</h3>
+      <p class="muted signature-copy">Sign once for this login session. The app will reuse this signature, your initials, and the signed time until you log out.</p>
       <div class="grid two-up">
         <div>
           <label for="signature-initials-input">Initials</label>
           <input id="signature-initials-input" type="text" maxlength="6" autocomplete="off" spellcheck="false">
         </div>
         <div>
-          <label>Signed At</label>
+          <label>Signed Date / Time</label>
           <input id="signature-signed-at" type="text">
         </div>
       </div>
-      <p class="muted signature-copy">You can type a signed time manually, or leave the auto-filled value. Drawing on the pad is optional.</p>
+      <p class="muted signature-copy">Draw your signature on the pad, then keep the auto-filled date and time or edit it before saving.</p>
       <div class="signature-pad-wrap">
-        <label>Draw Initials</label>
+        <label>Draw Signature</label>
         <canvas class="signature-pad" width="900" height="260"></canvas>
       </div>
       <div class="actions">
         <button class="btn ghost" type="button" data-signature-clear>Clear</button>
         <button class="btn ghost" type="button" data-signature-cancel>Cancel</button>
-        <button class="btn" type="button" data-signature-save>Save Initials</button>
+        <button class="btn" type="button" data-signature-save>Save Signature</button>
       </div>
     </div>
   `;
@@ -53,11 +54,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelButton = modal.querySelector("[data-signature-cancel]");
   const saveButton = modal.querySelector("[data-signature-save]");
   const context = canvas.getContext("2d");
-  const status = document.createElement("div");
-  status.className = "pill";
-  status.hidden = true;
-  status.style.margin = "12px 0";
-  document.body.appendChild(status);
+
+  function signatureReady() {
+    return Boolean(signatureState.initials && signatureState.data && signatureState.signedAt);
+  }
+
+  function signatureBannerText() {
+    if (signatureReady()) {
+      return `Handwritten signature saved for this login: ${signatureState.initials} at ${signatureState.signedAt}. It will be reused until you log out.`;
+    }
+    return "Before your first save on this login, sign once by hand and confirm your initials, date, and time. The saved signature will be reused until you log out.";
+  }
+
+  function syncSessionBanner() {
+    sessionBanners.forEach((banner) => {
+      banner.textContent = signatureBannerText();
+      banner.classList.toggle("is-saved", signatureReady());
+    });
+  }
 
   function renderPad(signatureData = "") {
     const rect = canvas.getBoundingClientRect();
@@ -108,6 +122,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return Array.from(root.querySelectorAll("input[name], textarea[name]")).filter((field) => {
       if (field.disabled) return false;
       if ((field.type || "").toLowerCase() === "hidden") return false;
+      if ((field.name || "").startsWith("__")) return false;
+      if (field.classList.contains("change-initials")) return false;
       return field.name.toLowerCase().includes("initials");
     });
   }
@@ -129,14 +145,14 @@ document.addEventListener("DOMContentLoaded", () => {
     field.readOnly = true;
     field.classList.add("signature-trigger");
     if (!field.placeholder) {
-      field.placeholder = "Tap to sign initials";
+      field.placeholder = "Tap to save signature";
     }
-    if (signatureState.initials && !field.value) {
+    if (signatureReady() && !field.value) {
       field.value = signatureState.initials;
     }
     const openForField = (event) => {
       event.preventDefault();
-      if (signatureState.initials) {
+      if (signatureReady()) {
         field.value = signatureState.initials;
         return;
       }
@@ -185,17 +201,24 @@ document.addEventListener("DOMContentLoaded", () => {
         initialsInput.focus();
         return;
       }
+      if (!signedAt) {
+        signedAtInput.focus();
+        return;
+      }
+      if (!draftHasStroke) {
+        window.alert("Please draw your handwritten signature before saving.");
+        return;
+      }
       signatureState.initials = initials;
-      signatureState.signedAt = signedAt || new Date().toISOString();
-      signatureState.data = draftHasStroke ? canvas.toDataURL("image/png") : "";
+      signatureState.signedAt = signedAt;
+      signatureState.data = canvas.toDataURL("image/png");
       body.dataset.sessionSignatureInitials = signatureState.initials;
       body.dataset.sessionSignatureSignedAt = signatureState.signedAt;
       body.dataset.sessionSignatureData = signatureState.data;
       decorateAllSignatureFields(document);
       forms.forEach(applySignatureToForm);
       closeModal();
-      status.textContent = `Initials saved: ${signatureState.initials}`;
-      status.hidden = false;
+      syncSessionBanner();
       if (submitTarget) {
         applySignatureToForm(submitTarget);
         submitTarget.dataset.signatureSubmitting = "true";
@@ -205,11 +228,8 @@ document.addEventListener("DOMContentLoaded", () => {
           submitTarget.submit();
         }
       }
-      window.setTimeout(() => {
-        status.hidden = true;
-      }, 2500);
     } catch (error) {
-      window.alert(`Could not save initials: ${error}`);
+      window.alert(`Could not save signature: ${error}`);
     }
   }
 
@@ -310,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
         delete form.dataset.signatureSubmitting;
         return;
       }
-      if (!signatureState.initials) {
+      if (!signatureReady()) {
         event.preventDefault();
         pendingForm = form;
         openModal();
@@ -328,8 +348,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   decorateAllSignatureFields(document);
+  syncSessionBanner();
   forms.forEach((form) => {
-    if (signatureState.initials) {
+    if (signatureReady()) {
       applySignatureToForm(form);
     }
   });
