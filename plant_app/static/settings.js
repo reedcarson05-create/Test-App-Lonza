@@ -1,10 +1,113 @@
-// Shared accessibility/settings control for theme and text size preferences.
+// Shared page chrome for settings persistence plus a reusable loading screen.
 document.addEventListener("DOMContentLoaded", () => {
+  initLoadingScreen();
+  initSettingsPanel();
+});
+
+function initLoadingScreen() {
+  const page = document.body;
+  if (!page) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "app-loading-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `
+    <div class="loading-screen" role="status" aria-live="polite" aria-atomic="true">
+      <p class="loading-screen-kicker">Plant App</p>
+      <h2 class="loading-screen-title">Loading</h2>
+      <p class="loading-screen-copy" data-loading-message>Opening the next screen...</p>
+      <div class="loading-screen-track" aria-hidden="true">
+        <span class="loading-screen-bar"></span>
+      </div>
+    </div>
+  `;
+  page.appendChild(overlay);
+
+  const messageNode = overlay.querySelector("[data-loading-message]");
+
+  const showLoadingScreen = (message) => {
+    if (messageNode) {
+      messageNode.textContent = message || "Opening the next screen...";
+    }
+    page.classList.add("page-loading");
+    page.setAttribute("aria-busy", "true");
+    overlay.setAttribute("aria-hidden", "false");
+  };
+
+  const hideLoadingScreen = () => {
+    page.classList.remove("page-loading");
+    page.removeAttribute("aria-busy");
+    overlay.setAttribute("aria-hidden", "true");
+  };
+
+  const inferFormMessage = (form, submitter) => {
+    const buttonText = (submitter?.dataset.loadingLabel || submitter?.textContent || "").trim().toLowerCase();
+    const action = form.getAttribute("action") || window.location.pathname;
+
+    if (buttonText.includes("login") || action === "/login") {
+      return "Signing in...";
+    }
+    if (buttonText.includes("finalize")) {
+      return "Finalizing the batch pack...";
+    }
+    if (buttonText.includes("save") || buttonText.includes("confirm")) {
+      return "Saving your changes...";
+    }
+    return "Loading the next screen...";
+  };
+
+  const inferLinkMessage = (link) => {
+    const label = (link.dataset.loadingLabel || link.textContent || "").trim().toLowerCase();
+    if (label.includes("logout")) {
+      return "Signing out...";
+    }
+    if (label.includes("open") || label.includes("start") || label.includes("home")) {
+      return "Opening the next screen...";
+    }
+    return "Loading the next screen...";
+  };
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    showLoadingScreen(inferFormMessage(form, event.submitter));
+  }, true);
+
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const link = target.closest("a[href]");
+    if (!(link instanceof HTMLAnchorElement)) return;
+    if (link.hasAttribute("download")) return;
+    if (link.target && link.target !== "_self") return;
+
+    const href = link.getAttribute("href") || "";
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+
+    const url = new URL(href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+
+    showLoadingScreen(inferLinkMessage(link));
+  }, true);
+
+  window.addEventListener("pageshow", hideLoadingScreen);
+  window.addEventListener("load", hideLoadingScreen);
+
+  window.showPlantLoading = showLoadingScreen;
+  window.hidePlantLoading = hideLoadingScreen;
+}
+
+function initSettingsPanel() {
   const root = document.documentElement;
   const page = document.body;
   const panel = document.querySelector("[data-settings-panel]");
   const toggle = document.querySelector("[data-settings-toggle]");
-  if (!panel || !toggle || !page) return;
+  if (!page || !panel || !toggle) return;
 
   const settingsEndpoint = page.dataset.settingsEndpoint || "";
   const shouldPersist = page.dataset.settingsPersist === "true";
@@ -85,7 +188,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("click", (event) => {
-    if (!panel.hidden && !event.target.closest(".settings-root")) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (!panel.hidden && !target.closest(".settings-root")) {
       closePanel();
     }
   });
@@ -113,4 +218,4 @@ document.addEventListener("DOMContentLoaded", () => {
   applyTheme(initialTheme);
   applyFontScale(initialFontScale);
   refreshPreferences();
-});
+}

@@ -1,22 +1,20 @@
-"""SQL Server persistence helpers for authentication, runs, stage entries, and audit history."""
+"""Local SQLite persistence helpers for authentication, runs, stage entries, and audit history."""
 
-import pyodbc
+import os
+import sqlite3
+from pathlib import Path
 from datetime import datetime
 
-SQL_SERVER = "localhost"
-SQL_DATABASE = "LonzaPlantOpsApp"
+BASE_DIR = Path(__file__).resolve().parent
+SQLITE_PATH = BASE_DIR / os.getenv("PLANT_APP_SQLITE_PATH", "plant.db")
 
 
 def get_conn():
-    """Open a SQL Server connection."""
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 18 for SQL Server};"
-        f"SERVER={SQL_SERVER};"
-        f"DATABASE={SQL_DATABASE};"
-        "Trusted_Connection=yes;"
-        "Encrypt=yes;"
-        "TrustServerCertificate=yes;"
-    )
+    """Open the local SQLite database used by the desktop app."""
+    conn = sqlite3.connect(SQLITE_PATH, timeout=30, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 def now_stamp() -> str:
@@ -25,48 +23,243 @@ def now_stamp() -> str:
 
 
 def row_to_dict(columns: list[str], row) -> dict | None:
-    """Convert a pyodbc row into a plain dictionary."""
+    """Convert a sqlite row into a plain dictionary."""
     if row is None:
         return None
+    if isinstance(row, sqlite3.Row):
+        return dict(row)
     return dict(zip(columns, row))
 
 
 def rows_to_dicts(columns: list[str], rows) -> list[dict]:
-    """Convert a list of pyodbc rows into plain dictionaries."""
+    """Convert a list of database rows into plain dictionaries."""
     return [row_to_dict(columns, row) for row in rows]
 
 
+def ensure_column(cur: sqlite3.Cursor, table_name: str, column_name: str, column_sql: str) -> None:
+    """Add a column to an existing SQLite table when older local databases are missing it."""
+    columns = {row["name"] for row in cur.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    if column_name not in columns:
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}")
+
+
 def init_db() -> None:
-    """Validate that the SQL Server database is reachable and seed fallback local users."""
+    """Create the local SQLite schema when needed and seed fallback local users."""
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT 1")
     cur.execute("""
-        IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE employee_number = ?)
-        BEGIN
-            INSERT INTO dbo.users (
-                employee_number, full_name, password, role, initials,
-                active, created_at, theme_preference, font_scale_preference
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        END
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_number TEXT UNIQUE NOT NULL,
+            full_name TEXT,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'operator',
+            active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            initials TEXT,
+            theme_preference TEXT DEFAULT 'light',
+            font_scale_preference TEXT DEFAULT '1'
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS production_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_number TEXT,
+            split_batch_number TEXT,
+            blend_number TEXT,
+            run_number TEXT,
+            batch_type TEXT DEFAULT 'standard',
+            reused_batch INTEGER DEFAULT 0,
+            product_name TEXT,
+            shift_name TEXT,
+            operator_id TEXT,
+            notes TEXT,
+            status TEXT DEFAULT 'Open',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            final_edit_initials TEXT,
+            final_edit_notes TEXT,
+            finalized_at TEXT,
+            finalized_by TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS extraction_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            entry_time TEXT,
+            location TEXT DEFAULT 'Pile',
+            time_on_pile TEXT,
+            start_time TEXT,
+            stop_time TEXT,
+            psf1_speed TEXT,
+            psf1_load TEXT,
+            psf1_blowback TEXT,
+            psf2_speed TEXT,
+            psf2_load TEXT,
+            psf2_blowback TEXT,
+            press_speed TEXT,
+            press_load TEXT,
+            press_blowback TEXT,
+            pressate_ri TEXT,
+            chip_bin_steam TEXT,
+            chip_chute_temp TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS filtration_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            clarification_sequential_no TEXT,
+            retentate_flow_set_point TEXT,
+            zero_refract TEXT,
+            startup_time TEXT,
+            shutdown_time TEXT,
+            start_time TEXT,
+            stop_time TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS filtration_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filtration_entry_id INTEGER NOT NULL,
+            row_group TEXT,
+            row_no INTEGER,
+            row_time TEXT,
+            feed_ri TEXT,
+            retentate_ri TEXT,
+            permeate_ri TEXT,
+            perm_flow_c TEXT,
+            perm_flow_d TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS evaporation_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            evaporator_no TEXT,
+            startup_time TEXT,
+            shutdown_time TEXT,
+            feed_ri TEXT,
+            concentrate_ri TEXT,
+            steam_pressure TEXT,
+            vacuum TEXT,
+            sump_level TEXT,
+            product_temp TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS evaporation_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evaporation_entry_id INTEGER NOT NULL,
+            row_no INTEGER,
+            row_time TEXT,
+            feed_rate TEXT,
+            evap_temp TEXT,
+            row_vacuum TEXT,
+            row_concentrate_ri TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_name TEXT NOT NULL,
+            record_id INTEGER NOT NULL,
+            action_type TEXT NOT NULL,
+            changed_by TEXT,
+            old_data TEXT,
+            new_data TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sheet_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            stage_key TEXT NOT NULL,
+            stage_title TEXT NOT NULL,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            comments TEXT,
+            payload_json TEXT NOT NULL,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS field_change_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            entry_table TEXT NOT NULL,
+            record_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            field_value TEXT,
+            change_initials TEXT NOT NULL,
+            changed_by_employee TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            original_value TEXT,
+            corrected_value TEXT,
+            correction_reason TEXT
+        )
+    """)
+
+    ensure_column(cur, "users", "initials", "TEXT")
+    ensure_column(cur, "users", "theme_preference", "TEXT DEFAULT 'light'")
+    ensure_column(cur, "users", "font_scale_preference", "TEXT DEFAULT '1'")
+    ensure_column(cur, "production_runs", "final_edit_initials", "TEXT")
+    ensure_column(cur, "production_runs", "final_edit_notes", "TEXT")
+    ensure_column(cur, "production_runs", "finalized_at", "TEXT")
+    ensure_column(cur, "production_runs", "finalized_by", "TEXT")
+    ensure_column(cur, "field_change_log", "original_value", "TEXT")
+    ensure_column(cur, "field_change_log", "corrected_value", "TEXT")
+    ensure_column(cur, "field_change_log", "correction_reason", "TEXT")
+
+    cur.execute("""
+        INSERT OR IGNORE INTO users (
+            employee_number, full_name, password, role, initials,
+            active, created_at, theme_preference, font_scale_preference
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         "1001",
-        "1001", "Operator 1", "test123", "operator", "OP",
+        "Operator 1", "test123", "operator", "OP",
         1, now_stamp(), "light", "1",
     ))
     cur.execute("""
-        IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE employee_number = ?)
-        BEGIN
-            INSERT INTO dbo.users (
-                employee_number, full_name, password, role, initials,
-                active, created_at, theme_preference, font_scale_preference
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        END
+        INSERT OR IGNORE INTO users (
+            employee_number, full_name, password, role, initials,
+            active, created_at, theme_preference, font_scale_preference
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         "2001",
-        "2001", "Supervisor 1", "test123", "supervisor", "SU",
+        "Supervisor 1", "test123", "supervisor", "SU",
         1, now_stamp(), "light", "1",
     ))
     conn.commit()
@@ -160,7 +353,6 @@ def create_run(
             reused_batch, product_name, shift_name, operator_id, notes, status,
             created_at, updated_at
         )
-        OUTPUT INSERTED.id
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?)
     """, (
         batch_number.strip(),
@@ -176,7 +368,7 @@ def create_run(
         stamp,
         stamp,
     ))
-    run_id = cur.fetchone()[0]
+    run_id = cur.lastrowid
     conn.commit()
     conn.close()
     return run_id
@@ -198,11 +390,12 @@ def list_runs(limit: int = 50):
     conn = get_conn()
     cur = conn.cursor()
     safe_limit = max(1, int(limit))
-    cur.execute(f"""
-        SELECT TOP ({safe_limit}) *
+    cur.execute("""
+        SELECT *
         FROM production_runs
         ORDER BY updated_at DESC
-    """)
+        LIMIT ?
+    """, (safe_limit,))
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -247,7 +440,6 @@ def insert_extraction(employee: str, data: dict) -> int:
             pressate_ri, chip_bin_steam, chip_chute_temp,
             comments, photo_path, version_no, previous_entry_id, created_at
         )
-        OUTPUT INSERTED.id
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["run_id"],
@@ -277,7 +469,7 @@ def insert_extraction(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     ))
-    entry_id = cur.fetchone()[0]
+    entry_id = cur.lastrowid
     conn.commit()
     conn.close()
     touch_run(data["run_id"])
@@ -295,7 +487,6 @@ def insert_filtration(employee: str, data: dict) -> int:
             startup_time, shutdown_time, start_time, stop_time,
             comments, photo_path, version_no, previous_entry_id, created_at
         )
-        OUTPUT INSERTED.id
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["run_id"],
@@ -315,7 +506,7 @@ def insert_filtration(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     ))
-    entry_id = cur.fetchone()[0]
+    entry_id = cur.lastrowid
 
     # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
@@ -354,7 +545,6 @@ def insert_evaporation(employee: str, data: dict) -> int:
             vacuum, sump_level, product_temp, comments, photo_path,
             version_no, previous_entry_id, created_at
         )
-        OUTPUT INSERTED.id
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["run_id"],
@@ -376,7 +566,7 @@ def insert_evaporation(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     ))
-    entry_id = cur.fetchone()[0]
+    entry_id = cur.lastrowid
 
     # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
@@ -597,9 +787,10 @@ def get_latest_evaporation_for_run(run_id: int):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT TOP 1 * FROM evaporation_entries
+        SELECT * FROM evaporation_entries
         WHERE run_id = ?
         ORDER BY id DESC
+        LIMIT 1
     """, (run_id,))
     entry_columns = [col[0] for col in cur.description]
     entry = row_to_dict(entry_columns, cur.fetchone())
@@ -682,9 +873,10 @@ def get_latest_sheet_entry_for_run_stage(run_id: int, stage_key: str):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT TOP 1 * FROM sheet_entries
+        SELECT * FROM sheet_entries
         WHERE run_id = ? AND stage_key = ?
         ORDER BY id DESC
+        LIMIT 1
     """, (run_id, stage_key))
     columns = [col[0] for col in cur.description]
     row = row_to_dict(columns, cur.fetchone())
@@ -722,7 +914,6 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
             run_id, stage_key, stage_title, employee, operator_initials,
             entry_date, comments, payload_json, version_no, previous_entry_id, created_at
         )
-        OUTPUT INSERTED.id
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["run_id"],
@@ -737,7 +928,7 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     ))
-    entry_id = cur.fetchone()[0]
+    entry_id = cur.lastrowid
     conn.commit()
     conn.close()
     touch_run(data["run_id"])
@@ -800,8 +991,8 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
     cur = conn.cursor()
     if run_id:
         safe_limit = max(1, int(limit))
-        cur.execute(f"""
-            SELECT TOP ({safe_limit})
+        cur.execute("""
+            SELECT
                 f.*,
                 r.batch_number,
                 r.run_number,
@@ -810,11 +1001,12 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
             LEFT JOIN production_runs r ON r.id = f.run_id
             WHERE f.run_id = ?
             ORDER BY f.created_at DESC
-        """, (run_id,))
+            LIMIT ?
+        """, (run_id, safe_limit))
     else:
         safe_limit = max(1, int(limit))
-        cur.execute(f"""
-            SELECT TOP ({safe_limit})
+        cur.execute("""
+            SELECT
                 f.*,
                 r.batch_number,
                 r.run_number,
@@ -822,7 +1014,8 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
             FROM field_change_log f
             LEFT JOIN production_runs r ON r.id = f.run_id
             ORDER BY f.created_at DESC
-        """)
+            LIMIT ?
+        """, (safe_limit,))
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -852,7 +1045,7 @@ def last_12_hour_activity():
                 e.stop_time AS end_label
             FROM extraction_entries e
             LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE TRY_CONVERT(datetime2, e.created_at) >= DATEADD(HOUR, -12, GETDATE())
+            WHERE datetime(replace(e.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
 
             UNION ALL
 
@@ -871,7 +1064,7 @@ def last_12_hour_activity():
                 f.shutdown_time AS end_label
             FROM filtration_entries f
             LEFT JOIN production_runs r ON r.id = f.run_id
-            WHERE TRY_CONVERT(datetime2, f.created_at) >= DATEADD(HOUR, -12, GETDATE())
+            WHERE datetime(replace(f.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
 
             UNION ALL
 
@@ -890,7 +1083,7 @@ def last_12_hour_activity():
                 v.shutdown_time AS end_label
             FROM evaporation_entries v
             LEFT JOIN production_runs r ON r.id = v.run_id
-            WHERE TRY_CONVERT(datetime2, v.created_at) >= DATEADD(HOUR, -12, GETDATE())
+            WHERE datetime(replace(v.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
 
             UNION ALL
 
@@ -909,7 +1102,7 @@ def last_12_hour_activity():
                 '' AS end_label
             FROM sheet_entries s
             LEFT JOIN production_runs r ON r.id = s.run_id
-            WHERE TRY_CONVERT(datetime2, s.created_at) >= DATEADD(HOUR, -12, GETDATE())
+            WHERE datetime(replace(s.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
         ) activity
         ORDER BY activity_time DESC
     """)

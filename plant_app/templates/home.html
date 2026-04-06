@@ -57,6 +57,27 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="section-title">
+      <h2>Open On Another Device</h2>
+      <span class="info-chip">Same Wi-Fi</span>
+    </div>
+    {% if local_access_urls %}
+    <div class="network-grid">
+      {% for url in local_access_urls %}
+      <div class="network-panel">
+        <p class="eyebrow">Use This Address</p>
+        <div class="network-url">{{ url }}</div>
+        <p class="muted">Open it on a phone, tablet, or another computer connected to the same Wi-Fi while this PC stays powered on.</p>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted network-footnote">If another device cannot connect at first, allow Python or the Plant App through Windows Firewall on this PC.</p>
+    {% else %}
+    <div class="banner">A local network address is not available yet. Connect this computer to Wi-Fi or Ethernet, then reload this page.</div>
+    {% endif %}
+  </div>
+
   <div class="section-grid">
     <!-- Primary action cards for batch work and standalone process work. -->
     <div class="entry-panel entry-setup">

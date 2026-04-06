@@ -1,12 +1,12 @@
 <!doctype html>
-<html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lonza Operator Login</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
 </head>
-<body class="login-page">
+<body class="login-page" data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="false">
   <!-- Login screen for authenticating operators before they enter plant data. -->
   <div class="wrap narrow">
     <div class="card login-card">
@@ -29,9 +29,10 @@
           <label>Password</label>
           <input type="password" name="password" required autocomplete="current-password">
         </div>
-        <button class="btn" type="submit">Login</button>
+        <button class="btn" type="submit" data-loading-label="Signing in...">Login</button>
       </form>
     </div>
   </div>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>
 </html>

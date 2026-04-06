@@ -10,6 +10,7 @@ This guide explains what each active file does, what to change when requirements
 - You need a new page or route.
 - You need to change how form fields are mapped before saving.
 - You need to adjust login, session, redirect, or correction rules.
+- You need to change LAN/startup behavior, like the local-network URLs shown in the UI or the default host/port used by the local launch scripts.
 - Main sections:
 - Imports and app setup: change middleware, startup behavior, static/template paths here.
 - Helper functions: change shared logic like date formatting, active-run lookup, correction validation, or dashboard shaping here.
@@ -20,7 +21,7 @@ This guide explains what each active file does, what to change when requirements
 - If you add a new saved sheet type, also update dashboard builders and change-history display labels.
 
 ### `db.py`
-- Purpose: SQLite schema creation, migrations, CRUD helpers, audit logging, and dashboard queries.
+- Purpose: Local SQLite schema creation, lightweight migrations, CRUD helpers, audit logging, and dashboard queries for the standalone desktop app.
 - Change this file when:
 - You add or rename columns.
 - You add a new table or child-row table.
@@ -55,6 +56,7 @@ This guide explains what each active file does, what to change when requirements
 - Purpose: Shared styling for every HTML template.
 - Change this file when:
 - You want to change colors, spacing, table styling, buttons, or layout behavior.
+- You want to change the global loading screen or the industrial 3D visual treatment used across cards, forms, and navigation.
 - Safe edit notes:
 - Start with the `:root` variables when changing the overall look.
 - Reuse existing utility classes before creating new one-off selectors.
@@ -179,6 +181,38 @@ This guide explains what each active file does, what to change when requirements
 - You add or remove a library.
 - Safe edit notes:
 - If a dependency is only needed for development, note that separately rather than mixing it into runtime requirements by accident.
+
+## Local Launch And Startup Scripts
+
+### `start_plant_app.ps1`
+- Purpose: Starts the app on `0.0.0.0:8000` by default so other devices on the same Wi-Fi can open it.
+- Change this file when:
+- You want a different default port, different logging behavior, or different Python-discovery logic.
+
+### `start_plant_app_hidden.vbs`
+- Purpose: Launches `start_plant_app.ps1` without leaving a PowerShell window on-screen.
+- Change this file when:
+- You need different hidden-launch behavior for Windows startup.
+
+### `install_device_access.ps1`
+- Purpose: Creates a Startup-folder launcher so the app opens automatically after Windows signs in, and tries to add a private-network firewall rule for LAN access.
+- Change this file when:
+- You want a different startup filename, firewall rule, or port.
+
+### `launch_plant_desktop_app.ps1`
+- Purpose: Starts the local server if needed, waits for `/health`, then opens the app in Edge or Chrome app mode so it behaves like a standalone Windows app with its own taskbar window.
+- Change this file when:
+- You want different browser-selection logic, window size, health-check timing, or app-mode launch flags.
+
+### `launch_plant_desktop_app.vbs`
+- Purpose: Launches `launch_plant_desktop_app.ps1` without leaving a PowerShell window on-screen.
+- Change this file when:
+- You need different hidden-launch behavior for desktop shortcuts.
+
+### `install_windows_app.ps1`
+- Purpose: Creates desktop, Start Menu, and Startup shortcuts for the standalone Windows app and attempts to place a taskbar launcher for it.
+- Change this file when:
+- You want different shortcut names, icons, startup behavior, or taskbar-pinning logic.
 
 ## Fastest Way To Make Common Changes
 

@@ -4,6 +4,8 @@
 from pathlib import Path
 from datetime import datetime
 import json
+import os
+import socket
 from uuid import uuid4
 
 # FastAPI framework imports used for route declarations, form parsing, and HTML responses.
@@ -58,7 +60,22 @@ UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-ASSET_VERSION = "20260406-2"
+ASSET_VERSION = "20260406-3"
+
+
+def configured_host() -> str:
+    """Return the bind host used by the local launcher scripts and `python app.py`."""
+    return os.getenv("PLANT_APP_HOST", "0.0.0.0").strip() or "0.0.0.0"
+
+
+def configured_port() -> int:
+    """Return the configured local port, falling back safely when the env var is invalid."""
+    raw_value = os.getenv("PLANT_APP_PORT", "8000")
+    try:
+        port = int(raw_value)
+    except (TypeError, ValueError):
+        return 8000
+    return port if 1 <= port <= 65535 else 8000
 
 # Ensure the local SQLite schema exists before any request handlers run.
 init_db()
@@ -121,6 +138,38 @@ def current_run_id(request: Request):
 def today_str() -> str:
     """Return today's date in the same format used by the HTML forms."""
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def local_ipv4_addresses() -> list[str]:
+    """Collect non-loopback IPv4 addresses that other devices on the LAN can reach."""
+    addresses: list[str] = []
+
+    def remember(address: str) -> None:
+        if not address or address.startswith("127.") or ":" in address or address in addresses:
+            return
+        addresses.append(address)
+
+    try:
+        for _, _, _, _, sockaddr in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            remember(sockaddr[0])
+    except OSError:
+        pass
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("10.255.255.255", 1))
+            remember(sock.getsockname()[0])
+    except OSError:
+        pass
+
+    return addresses
+
+
+def local_access_urls(request: Request) -> list[str]:
+    """Build the same-Wi-Fi URLs shown in the UI for phones, tablets, and other PCs."""
+    scheme = request.url.scheme if request.url.scheme in {"http", "https"} else "http"
+    port = request.url.port or configured_port()
+    return [f"{scheme}://{address}:{port}" for address in local_ipv4_addresses()]
 
 
 def blank_stamp(entry_date: str = "", initials: str = "") -> str:
@@ -206,6 +255,8 @@ def render_page(request: Request, template_name: str, **context):
         "asset_version": ASSET_VERSION,
         "today": today_str(),
         "run": active_run(request),
+        "local_access_urls": local_access_urls(request),
+        "local_port": request.url.port or configured_port(),
         "blank_display": blank_display,
         "blank_stamp": blank_stamp,
         "is_blank_value": is_blank_value,
@@ -566,6 +617,8 @@ def login_page(request: Request):
             "settings_font_scale": "1",
             "settings_persist": False,
             "asset_version": ASSET_VERSION,
+            "local_access_urls": local_access_urls(request),
+            "local_port": request.url.port or configured_port(),
         },
     )
 
@@ -598,6 +651,8 @@ def login(
             "settings_font_scale": "1",
             "settings_persist": False,
             "asset_version": ASSET_VERSION,
+            "local_access_urls": local_access_urls(request),
+            "local_port": request.url.port or configured_port(),
         },
         status_code=400,
     )
@@ -1487,3 +1542,9 @@ def change_history(request: Request):
         changes=changes,
         active_changes=active_changes,
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host=configured_host(), port=configured_port(), reload=False)
