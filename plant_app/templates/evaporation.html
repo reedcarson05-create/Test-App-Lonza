@@ -46,6 +46,13 @@
       <h2>{% if is_edit %}Correct Saved Evaporation Data{% elif view_only %}Saved Evaporation Data{% else %}Enter Evaporation Data{% endif %}</h2>
       <p class="muted">{% if is_edit %}Use this correction page to fix saved batch-pack data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This batch already has a saved evaporation entry. The values stay locked here and can only be changed from the correction tab.{% else %}Enter the batch readings below and save when the sheet is complete.{% endif %}</p>
     </div>
+    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+      {% if signature_session_ready %}
+      Handwritten signature saved for this login: {{ session_signature_initials }} at {{ session_signature_signed_at }}. It will be reused until you log out.
+      {% else %}
+      Before your first save on this login, sign once by hand and confirm your initials, date, and time. The saved signature will be reused until you log out.
+      {% endif %}
+    </div>
     {% if view_only and not is_edit %}
     <div class="banner">This evaporation entry is already saved to the active batch pack.</div>
     {% endif %}
@@ -123,6 +130,7 @@
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>
 <script src="/static/image_upload.js?v={{ asset_version }}"></script>
+<script src="/static/signature_session.js?v={{ asset_version }}"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}
 </body>
 </html>

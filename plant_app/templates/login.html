@@ -6,13 +6,19 @@
   <title>Lonza Operator Login</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
 </head>
-<body>
+<body class="login-page">
   <!-- Login screen for authenticating operators before they enter plant data. -->
   <div class="wrap narrow">
     <div class="card login-card">
       <div class="login-logo"><img src="/static/logo.png" alt="Lonza"></div>
+      <p class="eyebrow center">Plant Operations</p>
       <h1>Operator Login</h1>
-      <p class="muted center">Use your employee number to enter the plant data app.</p>
+      <p class="muted center">Secure sign-in for batch setup, process sheets, and correction history.</p>
+      <div class="login-meta">
+        <span class="info-chip">Batch Setup</span>
+        <span class="info-chip">Process Sheets</span>
+        <span class="info-chip">Change History</span>
+      </div>
       {% if error %}<div class="alert">{{ error }}</div>{% endif %}
       <form method="post" action="/login" class="stack">
         <div>
