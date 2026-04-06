@@ -11,10 +11,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const defaultInitials = (body.dataset.defaultInitials || "").toUpperCase();
   let pendingForm = null;
+  let activeTriggerField = null;
+  let suppressTriggerUntil = 0;
   let drawing = false;
   let draftSignatureData = signatureState.data;
   let draftHasStroke = Boolean(signatureState.data);
+  let draftSignatureDirty = false;
   let canvasRenderToken = 0;
+  let saveInFlight = false;
 
   const modal = document.createElement("div");
   modal.className = "signature-modal";
@@ -150,15 +154,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (signatureReady() && !field.value) {
       field.value = signatureState.initials;
     }
+
     const openForField = (event) => {
       event.preventDefault();
+      event.stopPropagation();
+      if (Date.now() < suppressTriggerUntil) {
+        field.blur();
+        return;
+      }
+      activeTriggerField = field;
       if (signatureReady()) {
         field.value = signatureState.initials;
+        field.blur();
         return;
       }
       pendingForm = null;
-      openModal();
+      openModal(field);
     };
+
     field.addEventListener("focus", openForField);
     field.addEventListener("click", openForField);
   }
@@ -170,14 +183,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function clearPad() {
     draftSignatureData = "";
     draftHasStroke = false;
+    draftSignatureDirty = true;
     canvasRenderToken += 1;
     const rect = canvas.getBoundingClientRect();
     context.clearRect(0, 0, rect.width, rect.height);
   }
 
-  function openModal() {
+  function openModal(triggerField = null) {
+    activeTriggerField = triggerField;
     draftSignatureData = signatureState.data;
     draftHasStroke = Boolean(signatureState.data);
+    draftSignatureDirty = false;
     initialsInput.value = signatureState.initials || defaultInitials;
     signedAtInput.value = signatureState.signedAt || nowStamp();
     modal.hidden = false;
@@ -189,10 +205,46 @@ document.addEventListener("DOMContentLoaded", () => {
   function closeModal() {
     modal.hidden = true;
     body.classList.remove("modal-open");
+    suppressTriggerUntil = Date.now() + 250;
+    if (activeTriggerField) {
+      activeTriggerField.blur();
+    }
+    activeTriggerField = null;
     pendingForm = null;
   }
 
-  function saveSignature() {
+  async function persistSignature(initials, signatureData, signedAt) {
+    const response = await window.fetch("/signature-session", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        initials,
+        signature_data: signatureData,
+        signed_at: signedAt,
+      }),
+    });
+
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch (_) {
+      payload = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(payload.error || `The signature could not be saved (${response.status}).`);
+    }
+
+    return payload;
+  }
+
+  async function saveSignature() {
+    if (saveInFlight) return;
+
     try {
       const submitTarget = pendingForm;
       const initials = initialsInput.value.trim().toUpperCase();
@@ -209,9 +261,20 @@ document.addEventListener("DOMContentLoaded", () => {
         window.alert("Please draw your handwritten signature before saving.");
         return;
       }
-      signatureState.initials = initials;
-      signatureState.signedAt = signedAt;
-      signatureState.data = canvas.toDataURL("image/png");
+
+      const signaturePayload = draftSignatureDirty ? canvas.toDataURL("image/png") : draftSignatureData;
+      const originalLabel = saveButton.textContent;
+      saveInFlight = true;
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+
+      const savedSignature = await persistSignature(initials, signaturePayload, signedAt);
+      signatureState.initials = (savedSignature.initials || initials).toUpperCase();
+      signatureState.signedAt = savedSignature.signed_at || signedAt;
+      signatureState.data = savedSignature.signature_data || signaturePayload;
+      draftSignatureData = signatureState.data;
+      draftHasStroke = true;
+      draftSignatureDirty = false;
       body.dataset.sessionSignatureInitials = signatureState.initials;
       body.dataset.sessionSignatureSignedAt = signatureState.signedAt;
       body.dataset.sessionSignatureData = signatureState.data;
@@ -219,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
       forms.forEach(applySignatureToForm);
       closeModal();
       syncSessionBanner();
+      saveButton.textContent = originalLabel;
       if (submitTarget) {
         applySignatureToForm(submitTarget);
         submitTarget.dataset.signatureSubmitting = "true";
@@ -229,7 +293,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     } catch (error) {
-      window.alert(`Could not save signature: ${error}`);
+      window.alert(error instanceof Error ? error.message : `Could not save signature: ${error}`);
+    } finally {
+      saveInFlight = false;
+      saveButton.disabled = false;
+      saveButton.textContent = "Save Signature";
     }
   }
 
@@ -244,6 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.addEventListener("pointerdown", (event) => {
     drawing = true;
     draftHasStroke = true;
+    draftSignatureDirty = true;
     draftSignatureData = "";
     canvasRenderToken += 1;
     const point = pointerPosition(event);
@@ -293,26 +362,30 @@ document.addEventListener("DOMContentLoaded", () => {
   saveButton.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    saveSignature();
+    void saveSignature();
   });
+
   initialsInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      saveSignature();
+      void saveSignature();
     }
   });
+
   signedAtInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      saveSignature();
+      void saveSignature();
     }
   });
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) {
       event.preventDefault();
       closeModal();
     }
   });
+
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {

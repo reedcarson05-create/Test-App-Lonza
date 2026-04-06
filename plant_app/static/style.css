@@ -1130,42 +1130,6 @@ td.blank-display {
   margin-top: 16px;
 }
 
-.network-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.network-panel {
-  position: relative;
-  overflow: hidden;
-  padding: 18px;
-  border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line) 82%);
-  background: linear-gradient(155deg, color-mix(in srgb, var(--surface-strong) 88%, white 12%), color-mix(in srgb, var(--brand-soft) 28%, var(--surface) 72%));
-  box-shadow: var(--panel-shadow);
-}
-
-.network-url {
-  margin: 10px 0 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line) 78%);
-  background: rgba(7, 20, 29, 0.92);
-  color: #f4fbff;
-  font-family: "Consolas", "Courier New", monospace;
-  font-size: calc(16px * var(--font-scale));
-  font-weight: 700;
-  overflow-wrap: anywhere;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 18px rgba(10, 26, 39, 0.16);
-}
-
-.network-footnote {
-  margin-top: 14px;
-}
-
 .action-grid .btn {
   width: 100%;
 }
@@ -1447,12 +1411,7 @@ body.page-loading .app-loading-overlay {
   }
 }
 
-html[data-theme="dark"] .network-url {
-  background: rgba(8, 16, 22, 0.94);
-}
-
-html[data-theme="dark"] .loading-screen,
-html[data-theme="dark"] .network-panel {
+html[data-theme="dark"] .loading-screen {
   background: linear-gradient(160deg, rgba(31, 46, 58, 0.98), rgba(18, 29, 37, 0.98));
 }
 

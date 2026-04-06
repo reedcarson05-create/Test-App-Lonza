@@ -1,6 +1,8 @@
 """FastAPI application for operator login, batch setup, data entry, and correction flows."""
 
 # Standard-library imports used for path resolution, timestamp helpers, and JSON sheet payloads.
+import base64
+import binascii
 from pathlib import Path
 from datetime import datetime
 import json
@@ -58,9 +60,11 @@ app.add_middleware(SessionMiddleware, secret_key="lonza-secret-key-change-me")
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SIGNATURE_DIR = UPLOAD_DIR / "signatures"
+SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-ASSET_VERSION = "20260406-3"
+ASSET_VERSION = "20260406-4"
 
 
 def configured_host() -> str:
@@ -118,6 +122,88 @@ def current_signature_data(request: Request) -> str:
 def signature_session_ready(request: Request) -> bool:
     """Return True when the login session already has initials, signed time, and drawing data."""
     return bool(current_signature_initials(request) and current_signature_signed_at(request) and current_signature_data(request))
+
+
+def signature_asset_public_path(file_path: Path) -> str:
+    """Return the public static URL used to re-open a saved signature image."""
+    return f"/static/uploads/signatures/{file_path.name}"
+
+
+def signature_asset_file_path(signature_reference: str) -> Path | None:
+    """Resolve a saved signature URL back to its on-disk PNG path when it belongs to this app."""
+    cleaned = clean_value(signature_reference)
+    prefix = "/static/uploads/signatures/"
+    if not cleaned.startswith(prefix):
+        return None
+    filename = cleaned.rsplit("/", 1)[-1].strip()
+    if not filename or filename in {".", ".."} or "/" in filename or "\\" in filename:
+        return None
+    return SIGNATURE_DIR / filename
+
+
+def delete_signature_asset(signature_reference: str) -> None:
+    """Delete a previously saved signature PNG when it belongs to the local uploads folder."""
+    file_path = signature_asset_file_path(signature_reference)
+    if not file_path:
+        return
+    try:
+        if file_path.exists():
+            file_path.unlink()
+    except OSError:
+        pass
+
+
+def persist_signature_image(signature_data: str) -> str:
+    """Store a drawn signature PNG under `static/uploads/signatures` and return its public URL."""
+    cleaned = clean_value(signature_data)
+    if not cleaned:
+        return ""
+
+    existing_file = signature_asset_file_path(cleaned)
+    if existing_file:
+        return cleaned
+
+    prefix = "data:image/png;base64,"
+    if not cleaned.startswith(prefix):
+        return ""
+
+    try:
+        raw_bytes = base64.b64decode(cleaned[len(prefix):], validate=True)
+    except (ValueError, binascii.Error):
+        return ""
+
+    if not raw_bytes:
+        return ""
+
+    file_path = SIGNATURE_DIR / f"signature-{uuid4().hex}.png"
+    file_path.write_bytes(raw_bytes)
+    return signature_asset_public_path(file_path)
+
+
+def update_signature_session(request: Request, initials: str, signature_data: str, signed_at: str) -> bool:
+    """Persist the active signature metadata for the login session and move image bytes to disk."""
+    signed_initials = clean_value(initials).upper()
+    saved_signature = persist_signature_image(signature_data)
+    saved_at = clean_value(signed_at)
+    if not signed_initials or not saved_signature or not saved_at:
+        return False
+
+    previous_signature = clean_value(request.session.get("signature_data", ""))
+    if previous_signature and previous_signature != saved_signature:
+        delete_signature_asset(previous_signature)
+
+    request.session["signature_initials"] = signed_initials
+    request.session["signature_data"] = saved_signature
+    request.session["signature_signed_at"] = saved_at
+    return True
+
+
+def clear_signature_session(request: Request) -> None:
+    """Remove any saved signature PNG for the session and clear its signature-specific keys."""
+    delete_signature_asset(clean_value(request.session.get("signature_data", "")))
+    request.session.pop("signature_initials", None)
+    request.session.pop("signature_data", None)
+    request.session.pop("signature_signed_at", None)
 
 
 def current_theme(request: Request) -> str:
@@ -193,11 +279,7 @@ def save_signature_session(request: Request, form) -> None:
     signed_initials = clean_value(form.get("__session_signature_initials", "")).upper()
     signature_data = clean_value(form.get("__session_signature_data", ""))
     signed_at = clean_value(form.get("__session_signature_signed_at", ""))
-    if not signed_initials or not signature_data or not signed_at:
-        return
-    request.session["signature_initials"] = signed_initials
-    request.session["signature_data"] = signature_data
-    request.session["signature_signed_at"] = signed_at
+    update_signature_session(request, signed_initials, signature_data, signed_at)
 
 
 def require_handwritten_signature(request: Request, form):
@@ -635,6 +717,7 @@ def login(
     if validate_user(employee, password):
         preferences = get_user_preferences(employee)
         # Session values power nav badges, default initials, and route guards.
+        clear_signature_session(request)
         request.session.clear()
         request.session["user"] = employee
         request.session["initials"] = get_user_initials(employee)
@@ -661,8 +744,40 @@ def login(
 @app.get("/logout")
 def logout(request: Request):
     """Clear the session and return the operator to the login page."""
+    clear_signature_session(request)
     request.session.clear()
     return RedirectResponse("/", status_code=303)
+
+
+@app.post("/signature-session")
+async def save_signature_session_api(request: Request):
+    """Save the handwritten signature for the current login session and return its reusable URL."""
+    redirect = require_login(request)
+    if redirect:
+        return JSONResponse({"error": "Please log in again before saving a signature."}, status_code=401)
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "The signature payload was not valid JSON."}, status_code=400)
+
+    initials = clean_value(payload.get("initials", "")).upper()
+    signature_data = clean_value(payload.get("signature_data", ""))
+    signed_at = clean_value(payload.get("signed_at", ""))
+    if not initials or not signature_data or not signed_at:
+        return JSONResponse({"error": "Initials, signed time, and a handwritten signature are all required."}, status_code=400)
+
+    if not update_signature_session(request, initials, signature_data, signed_at):
+        return JSONResponse({"error": "The app could not save that signature image. Please try again."}, status_code=400)
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "initials": current_signature_initials(request),
+            "signed_at": current_signature_signed_at(request),
+            "signature_data": current_signature_data(request),
+        }
+    )
 
 
 @app.post("/settings")

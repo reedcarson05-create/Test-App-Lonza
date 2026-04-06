@@ -42,6 +42,13 @@
   </div>
 
   <form method="post" action="/batch/edit" class="stack-gap">
+    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+      {% if signature_session_ready %}
+      Handwritten signature saved for this login: {{ session_signature_initials }} at {{ session_signature_signed_at }}. It will be reused until you log out.
+      {% else %}
+      Before your first save on this login, sign once by hand and confirm your initials, date, and time. The saved signature will be reused until you log out.
+      {% endif %}
+    </div>
     <div class="card">
       <h2>Batch Details</h2>
       <div class="grid two-up">
@@ -90,5 +97,6 @@
   </form>
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/signature_session.js?v={{ asset_version }}"></script>
 </body>
 </html>
