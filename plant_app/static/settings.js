@@ -12,66 +12,76 @@ function initDnaBackground() {
   const layer = document.createElement("div");
   layer.className = "dna-bg";
   layer.setAttribute("aria-hidden", "true");
-  layer.innerHTML = buildStaticDnaMarkup();
+  layer.innerHTML = buildMovingDnaMarkup();
   page.prepend(layer);
 }
 
-function buildStaticDnaMarkup() {
-  const rungCount = 16;
+function buildMovingDnaMarkup() {
+  const rungCount = 18;
   const railPointsA = [];
   const railPointsB = [];
   const nodes = [];
   const rungs = [];
   const centerX = 320;
-  const amplitude = 98;
-  const top = -120;
-  const spacing = 118;
+  const amplitude = 118;
+  const top = -180;
+  const spacing = 112;
 
   for (let index = 0; index < rungCount; index += 1) {
-    const phase = index * 0.7;
+    const phase = index * 0.62;
     const y = top + index * spacing;
     const offset = Math.sin(phase) * amplitude;
     const depth = (Math.cos(phase) + 1) * 0.5;
     const leftX = centerX - offset;
     const rightX = centerX + offset;
-    const railAY = y + Math.cos(phase) * 26;
-    const railBY = y - Math.cos(phase) * 26;
+    const railAY = y + Math.cos(phase) * 34;
+    const railBY = y - Math.cos(phase) * 34;
 
     railPointsA.push(`${leftX},${railAY}`);
     railPointsB.push(`${rightX},${railBY}`);
-    rungs.push(
-      `<line x1="${leftX}" y1="${y}" x2="${rightX}" y2="${y}" class="dna-bg__rung" style="opacity:${(0.28 + depth * 0.4).toFixed(3)}" />`
-    );
-    nodes.push(
-      `<circle cx="${leftX}" cy="${railAY}" r="${(6 + depth * 5).toFixed(2)}" class="dna-bg__node dna-bg__node--a" style="opacity:${(0.34 + depth * 0.42).toFixed(3)}" />`
-    );
-    nodes.push(
-      `<circle cx="${rightX}" cy="${railBY}" r="${(6 + (1 - depth) * 5).toFixed(2)}" class="dna-bg__node dna-bg__node--b" style="opacity:${(0.34 + (1 - depth) * 0.42).toFixed(3)}" />`
-    );
+    rungs.push({
+      leftX,
+      rightX,
+      railAY,
+      railBY,
+      opacity: (0.32 + depth * 0.42).toFixed(3),
+      strokeWidth: (3.2 + depth * 1.6).toFixed(2),
+    });
+    nodes.push({
+      x: leftX,
+      y: railAY,
+      radius: (7 + depth * 5).toFixed(2),
+      opacity: (0.4 + depth * 0.38).toFixed(3),
+      variant: "a",
+    });
+    nodes.push({
+      x: rightX,
+      y: railBY,
+      radius: (7 + (1 - depth) * 5).toFixed(2),
+      opacity: (0.4 + (1 - depth) * 0.38).toFixed(3),
+      variant: "b",
+    });
   }
 
-  return `
-    <div class="dna-bg__glow dna-bg__glow--left"></div>
-    <div class="dna-bg__glow dna-bg__glow--right"></div>
-    <div class="dna-bg__helix-wrap">
+  const buildHelixSvg = (suffix) => `
       <svg class="dna-bg__helix" viewBox="0 0 640 1800" preserveAspectRatio="xMidYMid meet" role="presentation" aria-hidden="true">
         <defs>
-          <linearGradient id="dna-rail-a" x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id="dna-rail-a-${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#8ef3ff" />
             <stop offset="50%" stop-color="#2df0c2" />
             <stop offset="100%" stop-color="#8ef3ff" />
           </linearGradient>
-          <linearGradient id="dna-rail-b" x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id="dna-rail-b-${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stop-color="#ffd37a" />
             <stop offset="50%" stop-color="#59e9ff" />
             <stop offset="100%" stop-color="#ffd37a" />
           </linearGradient>
-          <linearGradient id="dna-rung" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="dna-rung-${suffix}" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stop-color="#49f0d3" />
             <stop offset="50%" stop-color="#d7fdff" />
             <stop offset="100%" stop-color="#ffc86e" />
           </linearGradient>
-          <filter id="dna-soft-glow" x="-40%" y="-20%" width="180%" height="140%">
+          <filter id="dna-soft-glow-${suffix}" x="-40%" y="-20%" width="180%" height="140%">
             <feGaussianBlur stdDeviation="8" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
@@ -79,13 +89,31 @@ function buildStaticDnaMarkup() {
             </feMerge>
           </filter>
         </defs>
-        <g filter="url(#dna-soft-glow)">
-          <polyline points="${railPointsA.join(" ")}" class="dna-bg__rail dna-bg__rail--a" />
-          <polyline points="${railPointsB.join(" ")}" class="dna-bg__rail dna-bg__rail--b" />
-          ${rungs.join("")}
-          ${nodes.join("")}
+        <g filter="url(#dna-soft-glow-${suffix})">
+          <polyline points="${railPointsA.join(" ")}" class="dna-bg__rail dna-bg__rail--a" style="stroke:url(#dna-rail-a-${suffix})" />
+          <polyline points="${railPointsB.join(" ")}" class="dna-bg__rail dna-bg__rail--b" style="stroke:url(#dna-rail-b-${suffix})" />
+          ${rungs
+            .map(
+              (rung) =>
+                `<line x1="${rung.leftX}" y1="${rung.railAY}" x2="${rung.rightX}" y2="${rung.railBY}" class="dna-bg__rung" style="stroke:url(#dna-rung-${suffix});opacity:${rung.opacity};stroke-width:${rung.strokeWidth}" />`
+            )
+            .join("")}
+          ${nodes
+            .map(
+              (node) =>
+                `<circle cx="${node.x}" cy="${node.y}" r="${node.radius}" class="dna-bg__node dna-bg__node--${node.variant}" style="opacity:${node.opacity}" />`
+            )
+            .join("")}
         </g>
       </svg>
+  `;
+
+  return `
+    <div class="dna-bg__glow dna-bg__glow--left"></div>
+    <div class="dna-bg__glow dna-bg__glow--right"></div>
+    <div class="dna-bg__track">
+      <div class="dna-bg__helix-wrap">${buildHelixSvg("a")}</div>
+      <div class="dna-bg__helix-wrap">${buildHelixSvg("b")}</div>
     </div>
     <div class="dna-bg__mesh"></div>
   `;
@@ -94,7 +122,6 @@ function buildStaticDnaMarkup() {
 function initLoadingScreen() {
   const page = document.body;
   if (!page) return;
-  page.classList.add("page-transition-entering");
 
   const overlay = document.createElement("div");
   overlay.className = "app-loading-overlay";
@@ -112,12 +139,6 @@ function initLoadingScreen() {
   page.appendChild(overlay);
 
   const messageNode = overlay.querySelector("[data-loading-message]");
-  let transitionTimer = 0;
-  let pageTurning = false;
-
-  window.setTimeout(() => {
-    page.classList.remove("page-transition-entering");
-  }, 760);
 
   const showLoadingScreen = (message, options = {}) => {
     if (messageNode) {
@@ -130,23 +151,15 @@ function initLoadingScreen() {
   };
 
   const hideLoadingScreen = () => {
-    window.clearTimeout(transitionTimer);
-    pageTurning = false;
     page.classList.remove("page-loading");
-    page.classList.remove("page-transition-leaving");
     page.removeAttribute("aria-busy");
     overlay.classList.remove("is-minimal");
     overlay.setAttribute("aria-hidden", "true");
   };
 
-  const runPageTurn = (message, continueNavigation) => {
-    if (pageTurning) return;
-    pageTurning = true;
+  const showLoadingThen = (message, continueNavigation) => {
     showLoadingScreen(message, { minimal: true });
-    page.classList.add("page-transition-leaving");
-    transitionTimer = window.setTimeout(() => {
-      continueNavigation();
-    }, 430);
+    continueNavigation();
   };
 
   const inferFormMessage = (form, submitter) => {
@@ -189,7 +202,7 @@ function initLoadingScreen() {
       return;
     }
     event.preventDefault();
-    runPageTurn(inferFormMessage(form, event.submitter), () => {
+    showLoadingThen(inferFormMessage(form, event.submitter), () => {
       form.dataset.submitting = "true";
       HTMLFormElement.prototype.submit.call(form);
     });
@@ -214,7 +227,7 @@ function initLoadingScreen() {
     const url = new URL(href, window.location.href);
     if (url.origin !== window.location.origin) return;
     event.preventDefault();
-    runPageTurn(inferLinkMessage(link), () => {
+    showLoadingThen(inferLinkMessage(link), () => {
       window.location.assign(url.toString());
     });
   }, true);
