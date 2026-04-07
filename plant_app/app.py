@@ -73,7 +73,7 @@ BOOT_STATIC_FILES = (
     "image_upload.js",
     "logo.png",
 )
-BOOT_MIN_DURATION_MS = 6200
+BOOT_MIN_DURATION_MS = 9500
 
 
 def asset_version() -> str:

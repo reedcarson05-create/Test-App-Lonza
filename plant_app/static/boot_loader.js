@@ -14,51 +14,38 @@ document.addEventListener("DOMContentLoaded", () => {
   const percentNode = document.querySelector("[data-boot-percent]");
   const statusNode = document.querySelector("[data-boot-status]");
   const detailNode = document.querySelector("[data-boot-detail]");
-  const eraNode = document.querySelector("[data-boot-era]");
   const phaseNodes = Array.from(document.querySelectorAll("[data-boot-phase-threshold]"));
 
-  if (!fillNode || !percentNode || !statusNode || !detailNode || !eraNode) return;
+  if (!fillNode || !percentNode || !statusNode || !detailNode) return;
 
   const targetUrl = manifest.target_url || "/?fresh=1";
-  const minDurationMs = Math.max(Number(manifest.min_duration_ms) || 6200, 4200);
+  const minDurationMs = Math.max(Number(manifest.min_duration_ms) || 9500, 4200);
   const tasks = Array.isArray(manifest.tasks) ? manifest.tasks : [];
   const phases = [
     {
       threshold: 0,
       stage: "retro",
-      era: "1988",
-      headline: "Booting legacy control shell",
-      detail: "Starting the old-school startup routine before the app swaps into modern UI layers.",
     },
     {
-      threshold: 0.28,
+      threshold: 0.4,
       stage: "y2k",
-      era: "1999",
-      headline: "Refreshing the interface language",
-      detail: "Upgrading the loading surface from pixel segments into polished gradients and glassier chrome.",
     },
     {
-      threshold: 0.58,
+      threshold: 0.68,
       stage: "web",
-      era: "2012",
-      headline: "Caching shared plant app assets",
-      detail: "Preloading scripts for signatures, corrections, image uploads, and the shared stylesheet.",
     },
     {
-      threshold: 0.84,
+      threshold: 0.87,
       stage: "modern",
-      era: "2026",
-      headline: "Warming templates and login flow",
-      detail: "Compiling the page stack and preparing the operator sign-in screen before handoff.",
     },
   ];
 
   let completedTasks = 0;
-  let latestTaskLabel = tasks[0]?.label || "Preparing startup sequence";
   let displayProgress = 0;
   let resourcesReady = tasks.length === 0;
   let redirected = false;
   const startedAt = performance.now();
+  const easeAccelerating = (value, power) => Math.pow(Math.max(0, Math.min(value, 1)), power);
 
   const updatePhase = (progress) => {
     const activePhase = phases.reduce((current, phase) => (
@@ -66,9 +53,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ), phases[0]);
 
     root.dataset.bootStage = activePhase.stage;
-    eraNode.textContent = activePhase.era;
-    statusNode.textContent = activePhase.headline;
-    detailNode.textContent = latestTaskLabel || activePhase.detail;
+    statusNode.textContent = "Loading";
+    detailNode.textContent = "";
 
     phaseNodes.forEach((node) => {
       const threshold = Number(node.dataset.bootPhaseThreshold || "1");
@@ -84,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const preloadTask = async (task) => {
-    latestTaskLabel = task.label || latestTaskLabel;
     try {
       const response = await fetch(task.url, {
         method: "GET",
@@ -111,14 +96,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   Promise.allSettled(tasks.map(preloadTask)).then(() => {
     resourcesReady = true;
-    latestTaskLabel = "Startup cache is ready. Opening secure operator login.";
   });
 
   const tick = (now) => {
     const elapsed = now - startedAt;
     const timeRatio = Math.min(elapsed / minDurationMs, 1);
     const taskRatio = tasks.length ? completedTasks / tasks.length : 1;
-    let targetProgress = Math.max(timeRatio * 0.88, taskRatio * 0.94);
+    const easedTimeRatio = easeAccelerating(timeRatio, 1.85);
+    const easedTaskRatio = easeAccelerating(taskRatio, 1.35);
+    let targetProgress = Math.min(0.97, easedTimeRatio * 0.8 + easedTaskRatio * 0.16);
 
     if (resourcesReady && timeRatio >= 1) {
       targetProgress = 1;
@@ -126,7 +112,8 @@ document.addEventListener("DOMContentLoaded", () => {
       targetProgress = Math.min(0.96, Math.max(targetProgress, 0.92));
     }
 
-    displayProgress += (targetProgress - displayProgress) * (targetProgress >= 0.999 ? 0.2 : 0.09);
+    const chaseRate = targetProgress >= 0.999 ? 0.18 : 0.025 + timeRatio * 0.085;
+    displayProgress += (targetProgress - displayProgress) * chaseRate;
     if (targetProgress === 1 && 1 - displayProgress < 0.004) {
       displayProgress = 1;
     }
@@ -136,7 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (displayProgress >= 1 && resourcesReady && timeRatio >= 1) {
       if (!redirected) {
         redirected = true;
-        detailNode.textContent = "Startup complete. Handing off to operator login.";
         window.setTimeout(() => {
           window.location.replace(targetUrl);
         }, 420);

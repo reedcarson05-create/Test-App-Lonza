@@ -14,11 +14,25 @@ if (-not (Test-Path -LiteralPath $runtimeDir)) {
 }
 
 $logFile = Join-Path $runtimeDir "desktop_app.log"
-$baseUrl = "http://127.0.0.1:$Port"
 $launchStamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-$windowUrl = "$baseUrl/boot?launch=$launchStamp"
-$healthUrl = "$baseUrl/health"
-$bootUrl = "$baseUrl/boot"
+$baseUrl = ""
+$windowUrl = ""
+$healthUrl = ""
+$bootUrl = ""
+
+function Set-LaunchUrls {
+  param(
+    [int]$ActivePort
+  )
+
+  $script:Port = $ActivePort
+  $script:baseUrl = "http://127.0.0.1:$ActivePort"
+  $script:windowUrl = "$script:baseUrl/boot?launch=$launchStamp"
+  $script:healthUrl = "$script:baseUrl/health"
+  $script:bootUrl = "$script:baseUrl/boot"
+}
+
+Set-LaunchUrls -ActivePort $Port
 
 function Write-LaunchLog {
   param(
@@ -93,6 +107,28 @@ function Stop-StaleProjectServer {
   return $true
 }
 
+function Resolve-DesktopPort {
+  param(
+    [int]$PreferredPort
+  )
+
+  $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  foreach ($candidate in $candidates) {
+    $candidateHealth = "http://127.0.0.1:$candidate/health"
+    $candidateBoot = "http://127.0.0.1:$candidate/boot"
+
+    if (-not (Test-AppServerReady -Url $candidateHealth)) {
+      return $candidate
+    }
+
+    if (Test-AppServerReady -Url $candidateBoot) {
+      return $candidate
+    }
+  }
+
+  throw "No available desktop launch port was found. Close any old Plant App windows and try again."
+}
+
 function Resolve-BrowserExe {
   $browserCandidates = @(
     "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
@@ -153,7 +189,20 @@ function Resolve-PythonExe {
 }
 
 if ((Test-AppServerReady -Url $healthUrl) -and (-not (Test-AppServerReady -Url $bootUrl))) {
-  Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot | Out-Null
+  $stoppedStale = $false
+  try {
+    $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot
+  } catch {
+    Write-LaunchLog ("Could not stop the stale server on port {0}: {1}" -f $Port, $_.Exception.Message)
+  }
+
+  if (-not $stoppedStale) {
+    $fallbackPort = Resolve-DesktopPort -PreferredPort $Port
+    if ($fallbackPort -ne $Port) {
+      Write-LaunchLog "Port $Port is serving an older app host. Switching desktop launch to port $fallbackPort."
+      Set-LaunchUrls -ActivePort $fallbackPort
+    }
+  }
 }
 
 if (-not (Test-AppServerReady -Url $healthUrl)) {
