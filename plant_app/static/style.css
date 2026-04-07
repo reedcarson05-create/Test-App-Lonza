@@ -282,11 +282,11 @@ body.login-page {
   transform-origin: 50% 50%;
   transform: perspective(1800px) rotateY(12deg) rotateX(4deg) rotateZ(-1.5deg) scale(1.12);
   filter: saturate(128%);
-  animation: dna-helix-rotate 18s ease-in-out infinite;
+  animation: dna-helix-spin 22s linear infinite;
 }
 
 .dna-bg__helix-wrap:last-child .dna-bg__helix {
-  animation-delay: -9s;
+  animation-delay: -11s;
 }
 
 .dna-bg__mesh {
@@ -320,14 +320,17 @@ body.login-page {
   }
 }
 
-@keyframes dna-helix-rotate {
-  0%,
-  100% {
-    transform: perspective(1800px) rotateY(8deg) rotateX(4deg) rotateZ(-2deg) scale(1.1);
+@keyframes dna-helix-spin {
+  0% {
+    transform: perspective(1800px) rotateY(0deg) rotateX(4deg) rotateZ(-2deg) scale(1.1);
   }
 
   50% {
-    transform: perspective(1800px) rotateY(20deg) rotateX(4deg) rotateZ(1.5deg) scale(1.14);
+    transform: perspective(1800px) rotateY(180deg) rotateX(4deg) rotateZ(1deg) scale(1.14);
+  }
+
+  100% {
+    transform: perspective(1800px) rotateY(360deg) rotateX(4deg) rotateZ(-2deg) scale(1.1);
   }
 }
 
