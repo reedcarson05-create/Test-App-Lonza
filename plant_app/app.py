@@ -451,9 +451,10 @@ def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "
     return labels.get(entry_table, entry_table.replace("_", " ").title())
 
 
-def process_dashboard_rows():
+def process_dashboard_rows(rows=None):
     """Filter recent activity down to the standalone extraction and filtration sections."""
-    return [row for row in last_12_hour_activity() if row["section"] in {"Extraction", "Filtration"}]
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    return [row for row in source_rows if row["section"] in {"Extraction", "Filtration"}]
 
 
 def build_filtration_row_map(rows):
@@ -595,10 +596,11 @@ def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
     }
 
 
-def process_dashboard_items():
+def process_dashboard_items(rows=None):
     """Prepare recent extraction/filtration rows with the edit links used by the dashboard."""
     items = []
-    for row in process_dashboard_rows():
+    source_rows = rows if rows is not None else process_dashboard_rows()
+    for row in source_rows:
         # Edit links depend on section because each stage has a dedicated correction route.
         href = ""
         if row["section"] == "Extraction":
@@ -609,11 +611,12 @@ def process_dashboard_items():
     return items
 
 
-def dashboard_batch_packs():
+def dashboard_batch_packs(rows=None):
     """Group recent batch-pack activity by batch number for the review dashboard."""
     # `packs` is keyed by batch number so multiple saved sheets collapse into one dashboard card.
     packs = {}
-    for row in last_12_hour_activity():
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    for row in source_rows:
         batch_number = row["batch_number"] or "No batch"
         pack = packs.setdefault(
             batch_number,
@@ -1029,7 +1032,8 @@ def process_dashboard(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "process_dashboard.html", stage_links=PROCESS_STAGE_LINKS, items=process_dashboard_items())
+    activity_rows = process_dashboard_rows(last_12_hour_activity())
+    return render_page(request, "process_dashboard.html", stage_links=PROCESS_STAGE_LINKS, items=process_dashboard_items(activity_rows))
 
 
 # ------------------------
@@ -1642,7 +1646,8 @@ def dashboard(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "dashboard.html", rows=last_12_hour_activity(), batch_packs=dashboard_batch_packs())
+    activity_rows = last_12_hour_activity()
+    return render_page(request, "dashboard.html", rows=activity_rows, batch_packs=dashboard_batch_packs(activity_rows))
 
 
 @app.get("/change-history", response_class=HTMLResponse)

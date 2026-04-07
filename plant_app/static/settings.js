@@ -9,351 +9,86 @@ function initDnaBackground() {
   const page = document.body;
   if (!page || page.querySelector(".dna-bg")) return;
 
-  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const cpuCores = navigator.hardwareConcurrency || 4;
-  const lowPowerMode = motionQuery.matches || cpuCores <= 6;
   const layer = document.createElement("div");
   layer.className = "dna-bg";
   layer.setAttribute("aria-hidden", "true");
-  layer.innerHTML = `
+  layer.innerHTML = buildStaticDnaMarkup();
+  page.prepend(layer);
+}
+
+function buildStaticDnaMarkup() {
+  const rungCount = 16;
+  const railPointsA = [];
+  const railPointsB = [];
+  const nodes = [];
+  const rungs = [];
+  const centerX = 320;
+  const amplitude = 98;
+  const top = -120;
+  const spacing = 118;
+
+  for (let index = 0; index < rungCount; index += 1) {
+    const phase = index * 0.7;
+    const y = top + index * spacing;
+    const offset = Math.sin(phase) * amplitude;
+    const depth = (Math.cos(phase) + 1) * 0.5;
+    const leftX = centerX - offset;
+    const rightX = centerX + offset;
+    const railAY = y + Math.cos(phase) * 26;
+    const railBY = y - Math.cos(phase) * 26;
+
+    railPointsA.push(`${leftX},${railAY}`);
+    railPointsB.push(`${rightX},${railBY}`);
+    rungs.push(
+      `<line x1="${leftX}" y1="${y}" x2="${rightX}" y2="${y}" class="dna-bg__rung" style="opacity:${(0.28 + depth * 0.4).toFixed(3)}" />`
+    );
+    nodes.push(
+      `<circle cx="${leftX}" cy="${railAY}" r="${(6 + depth * 5).toFixed(2)}" class="dna-bg__node dna-bg__node--a" style="opacity:${(0.34 + depth * 0.42).toFixed(3)}" />`
+    );
+    nodes.push(
+      `<circle cx="${rightX}" cy="${railBY}" r="${(6 + (1 - depth) * 5).toFixed(2)}" class="dna-bg__node dna-bg__node--b" style="opacity:${(0.34 + (1 - depth) * 0.42).toFixed(3)}" />`
+    );
+  }
+
+  return `
     <div class="dna-bg__glow dna-bg__glow--left"></div>
     <div class="dna-bg__glow dna-bg__glow--right"></div>
-    <canvas class="dna-bg__canvas"></canvas>
+    <div class="dna-bg__helix-wrap">
+      <svg class="dna-bg__helix" viewBox="0 0 640 1800" preserveAspectRatio="xMidYMid meet" role="presentation" aria-hidden="true">
+        <defs>
+          <linearGradient id="dna-rail-a" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#8ef3ff" />
+            <stop offset="50%" stop-color="#2df0c2" />
+            <stop offset="100%" stop-color="#8ef3ff" />
+          </linearGradient>
+          <linearGradient id="dna-rail-b" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ffd37a" />
+            <stop offset="50%" stop-color="#59e9ff" />
+            <stop offset="100%" stop-color="#ffd37a" />
+          </linearGradient>
+          <linearGradient id="dna-rung" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#49f0d3" />
+            <stop offset="50%" stop-color="#d7fdff" />
+            <stop offset="100%" stop-color="#ffc86e" />
+          </linearGradient>
+          <filter id="dna-soft-glow" x="-40%" y="-20%" width="180%" height="140%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#dna-soft-glow)">
+          <polyline points="${railPointsA.join(" ")}" class="dna-bg__rail dna-bg__rail--a" />
+          <polyline points="${railPointsB.join(" ")}" class="dna-bg__rail dna-bg__rail--b" />
+          ${rungs.join("")}
+          ${nodes.join("")}
+        </g>
+      </svg>
+    </div>
     <div class="dna-bg__mesh"></div>
   `;
-  page.prepend(layer);
-
-  const canvas = layer.querySelector(".dna-bg__canvas");
-  const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
-  if (!canvas || !ctx) {
-    layer.remove();
-    return;
-  }
-
-  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-  const mix = (start, end, amount) => start + (end - start) * amount;
-  const blendRgb = (start, end, amount) => start.map((channel, index) => Math.round(mix(channel, end[index], amount)));
-  const rgba = (rgb, alpha) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
-
-  let width = 0;
-  let height = 0;
-  let dpr = 1;
-  let renderScale = 1;
-  let spinAngle = Math.random() * Math.PI * 2;
-  let riseOffset = 0;
-  let scrollBoost = 0;
-  let targetBoost = 0;
-  let particles = [];
-  let lastFrame = performance.now();
-  let lastDraw = 0;
-  let lastScrollY = window.scrollY;
-  let lastScrollTime = lastFrame;
-
-  const paletteForTheme = () => {
-    const darkMode = document.documentElement.dataset.theme === "dark";
-    if (darkMode) {
-      return {
-        rail: [119, 229, 255],
-        railAlt: [77, 255, 210],
-        rungA: [86, 255, 223],
-        rungB: [255, 188, 84],
-        particleA: [150, 244, 255],
-        particleB: [255, 214, 129],
-        ambient: [16, 84, 130],
-        core: [15, 224, 193],
-      };
-    }
-
-    return {
-      rail: [92, 238, 255],
-      railAlt: [51, 249, 204],
-      rungA: [36, 240, 199],
-      rungB: [255, 194, 96],
-      particleA: [163, 248, 255],
-      particleB: [255, 226, 151],
-      ambient: [18, 114, 161],
-      core: [18, 239, 204],
-    };
-  };
-
-  const desiredParticleCount = () => {
-    return 0;
-  };
-
-  const seedParticle = (particle = {}) => {
-    particle.side = Math.random() < 0.5 ? -1 : 1;
-    particle.life = particle.life ?? Math.random();
-    particle.speed = 0.12 + Math.random() * 0.2;
-    particle.size = 1.6 + Math.random() * 3.8;
-    particle.outward = 28 + Math.random() * 128;
-    particle.spin = (Math.random() - 0.5) * 1.3;
-    particle.wobble = 0.8 + Math.random() * 2.3;
-    particle.phaseOffset = Math.random() * Math.PI * 2;
-    particle.seed = Math.random() * Math.PI * 2;
-    particle.tint = Math.random();
-    particle.lift = 8 + Math.random() * 24;
-    return particle;
-  };
-
-  const syncParticles = () => {
-    const desired = desiredParticleCount();
-    while (particles.length < desired) {
-      particles.push(seedParticle());
-    }
-    if (particles.length > desired) {
-      particles = particles.slice(0, desired);
-    }
-  };
-
-  const resizeCanvas = () => {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    renderScale = lowPowerMode ? 0.24 : (width < 700 ? 0.28 : 0.34);
-    canvas.width = Math.max(1, Math.round(width * dpr * renderScale));
-    canvas.height = Math.max(1, Math.round(height * dpr * renderScale));
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    syncParticles();
-  };
-
-  const projectPoint = (y, phase, side) => {
-    const centerX = width * 0.5;
-    const centerY = height * 0.48;
-    const radius = Math.max(108, Math.min(width * 0.165, 196));
-    const depthRange = Math.max(120, Math.min(width * 0.15, 220));
-    const perspective = width < 700 ? 920 : 1180;
-    const baseX = centerX + Math.sin(phase) * radius * side;
-    const z = Math.cos(phase) * depthRange * side;
-    const scale = perspective / (perspective - z);
-
-    return {
-      x: centerX + (baseX - centerX) * scale,
-      y: centerY + (y - centerY) * scale,
-      z,
-      scale,
-      depthRange,
-    };
-  };
-
-  const buildHelixRows = () => {
-    const spacing = width < 700 ? 88 : 104;
-    const overscan = spacing * 6;
-    const visibleSpan = height + overscan * 2;
-    const count = Math.ceil(visibleSpan / spacing) + 2;
-    const twistStep = 0.72;
-    const rows = [];
-
-    for (let index = 0; index < count; index += 1) {
-      const y = height + overscan - ((index * spacing + riseOffset) % visibleSpan);
-      const phase = spinAngle + index * twistStep;
-      rows.push({
-        a: projectPoint(y, phase, 1),
-        b: projectPoint(y, phase, -1),
-        phase,
-      });
-    }
-
-    return rows;
-  };
-
-  const drawAmbientGlow = (palette, boost) => {
-    const centerX = width * 0.5;
-    const centerY = height * 0.46;
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * 0.42);
-    gradient.addColorStop(0, rgba(palette.ambient, lowPowerMode ? 0.1 : 0.18 + boost * 0.04));
-    gradient.addColorStop(0.34, rgba(palette.core, lowPowerMode ? 0.04 : 0.08 + boost * 0.03));
-    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-  };
-
-  const drawHelix = (palette, boost) => {
-    const rows = buildHelixRows();
-    const depthRange = rows[0]?.a.depthRange || 180;
-    const segments = [];
-    const nodes = [];
-
-    for (let index = 0; index < rows.length; index += 1) {
-      const row = rows[index];
-      const next = rows[index + 1];
-      nodes.push({ point: row.a, z: row.a.z, tint: palette.rail });
-      nodes.push({ point: row.b, z: row.b.z, tint: palette.railAlt });
-      segments.push({
-        kind: "rung",
-        from: row.a,
-        to: row.b,
-        z: (row.a.z + row.b.z) * 0.5,
-      });
-
-      if (!next) continue;
-      segments.push({
-        kind: "rail",
-        side: "a",
-        from: row.a,
-        to: next.a,
-        z: (row.a.z + next.a.z) * 0.5,
-        tint: palette.rail,
-      });
-      segments.push({
-        kind: "rail",
-        side: "b",
-        from: row.b,
-        to: next.b,
-        z: (row.b.z + next.b.z) * 0.5,
-        tint: palette.railAlt,
-      });
-    }
-
-    segments.sort((left, right) => left.z - right.z);
-    nodes.sort((left, right) => left.z - right.z);
-
-    for (const segment of segments) {
-      const depthMix = clamp((segment.z + depthRange) / (depthRange * 2), 0, 1);
-      const lineScale = mix(segment.from.scale, segment.to.scale, 0.5);
-
-      if (segment.kind === "rail") {
-        ctx.beginPath();
-        ctx.moveTo(segment.from.x, segment.from.y);
-        ctx.lineTo(segment.to.x, segment.to.y);
-        ctx.strokeStyle = rgba(segment.tint, 0.12 + depthMix * 0.26);
-        ctx.lineWidth = Math.max(0.8, (0.8 + depthMix * 2 + boost * 0.2) * lineScale);
-        ctx.stroke();
-
-        if (lowPowerMode) {
-          continue;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(segment.from.x, segment.from.y);
-        ctx.lineTo(segment.to.x, segment.to.y);
-        ctx.strokeStyle = `rgba(240, 254, 255, ${0.04 + depthMix * 0.1})`;
-        ctx.lineWidth = Math.max(0.5, (0.4 + depthMix * 0.7) * lineScale);
-        ctx.stroke();
-        continue;
-      }
-
-      ctx.beginPath();
-      ctx.moveTo(segment.from.x, segment.from.y);
-      ctx.lineTo(segment.to.x, segment.to.y);
-      if (lowPowerMode) {
-        ctx.strokeStyle = rgba(depthMix > 0.5 ? palette.rungA : palette.rungB, 0.1 + depthMix * 0.16);
-      } else {
-        const rungGradient = ctx.createLinearGradient(segment.from.x, segment.from.y, segment.to.x, segment.to.y);
-        rungGradient.addColorStop(0, rgba(palette.rungA, 0.14 + depthMix * 0.22));
-        rungGradient.addColorStop(0.5, rgba(palette.particleA, 0.06 + depthMix * 0.1));
-        rungGradient.addColorStop(1, rgba(palette.rungB, 0.12 + depthMix * 0.2));
-        ctx.strokeStyle = rungGradient;
-      }
-      ctx.lineWidth = Math.max(0.7, (0.65 + depthMix * 0.95 + boost * 0.08) * lineScale);
-      ctx.stroke();
-    }
-
-    for (const node of nodes) {
-      const depthMix = clamp((node.z + depthRange) / (depthRange * 2), 0, 1);
-      ctx.beginPath();
-      ctx.fillStyle = rgba(node.tint, lowPowerMode ? 0.2 + depthMix * 0.24 : 0.26 + depthMix * 0.34);
-      ctx.arc(node.point.x, node.point.y, Math.max(1, (0.9 + depthMix * 1.5) * node.point.scale), 0, Math.PI * 2);
-      ctx.fill();
-    }
-  };
-
-  const drawParticles = (palette, dt, boost) => {
-    if (particles.length === 0) return;
-    const items = [];
-
-    for (const particle of particles) {
-      particle.life += dt * (particle.speed + boost * 0.16);
-      if (particle.life > 1.08) {
-        seedParticle(particle);
-        particle.life = 0;
-      }
-
-      const progress = clamp(particle.life, 0, 1);
-      const y = height + 90 - progress * (height + 180);
-      const phase = spinAngle + particle.phaseOffset + progress * (5.4 + particle.spin);
-      const origin = projectPoint(y, phase, particle.side);
-      const spread = Math.pow(progress, 0.82) * particle.outward * (0.82 + boost * 0.22);
-      const driftX =
-        Math.cos(particle.seed + progress * (4.6 + particle.spin)) * spread +
-        Math.sin((spinAngle + progress * 8.4) * particle.wobble + particle.seed) * (12 + particle.outward * 0.14);
-      const driftY = Math.sin(particle.seed + progress * 11.4) * particle.lift;
-      const tint = blendRgb(palette.particleA, palette.particleB, particle.tint);
-      items.push({
-        x: origin.x + driftX * origin.scale,
-        y: origin.y + driftY,
-        z: origin.z + progress * 60,
-        color: tint,
-        alpha: 0.08 + (1 - progress) * 0.5,
-        size: particle.size * (0.55 + origin.scale * 0.82),
-      });
-    }
-
-    items.sort((left, right) => left.z - right.z);
-    for (const item of items) {
-      ctx.fillStyle = rgba(item.color, Math.min(0.92, item.alpha + 0.18));
-      ctx.beginPath();
-      ctx.arc(item.x, item.y, Math.max(0.8, item.size * 0.7), 0, Math.PI * 2);
-      ctx.fill();
-    }
-  };
-
-  const animate = (timestamp) => {
-    const dt = Math.min(0.05, Math.max(0.001, (timestamp - lastFrame) / 1000));
-    lastFrame = timestamp;
-
-    if (document.visibilityState === "hidden") {
-      window.requestAnimationFrame(animate);
-      return;
-    }
-
-    const targetFrameMs = lowPowerMode ? 1000 / 10 : 1000 / 14;
-    if (timestamp - lastDraw < targetFrameMs) {
-      window.requestAnimationFrame(animate);
-      return;
-    }
-    lastDraw = timestamp;
-
-    scrollBoost = mix(scrollBoost, targetBoost, motionQuery.matches ? 0.08 : 0.1);
-    targetBoost *= motionQuery.matches ? 0.8 : 0.9;
-
-    const baseSpin = lowPowerMode ? 0.08 : 0.18;
-    const baseRise = lowPowerMode ? 4 : 10;
-    spinAngle += dt * (baseSpin + scrollBoost * 0.75);
-    riseOffset += dt * (baseRise + scrollBoost * 34);
-
-    ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-
-    const palette = paletteForTheme();
-    drawAmbientGlow(palette, scrollBoost);
-    drawHelix(palette, scrollBoost);
-    drawParticles(palette, dt, scrollBoost);
-    window.requestAnimationFrame(animate);
-  };
-
-  const handleScroll = () => {
-    const now = performance.now();
-    const currentY = window.scrollY;
-    const distance = Math.abs(currentY - lastScrollY);
-    const elapsed = Math.max(16, now - lastScrollTime);
-    const velocity = distance / elapsed;
-    targetBoost = clamp(targetBoost + velocity * (lowPowerMode ? 0.18 : 0.42), 0, lowPowerMode ? 0.18 : 0.45);
-    lastScrollY = currentY;
-    lastScrollTime = now;
-  };
-
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
-  window.addEventListener("scroll", handleScroll, { passive: true });
-  if (typeof motionQuery.addEventListener === "function") {
-    motionQuery.addEventListener("change", resizeCanvas);
-  } else if (typeof motionQuery.addListener === "function") {
-    motionQuery.addListener(resizeCanvas);
-  }
-  window.requestAnimationFrame(animate);
 }
 
 function initLoadingScreen() {

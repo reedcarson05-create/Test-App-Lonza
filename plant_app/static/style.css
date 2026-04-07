@@ -241,18 +241,29 @@ body.login-page {
   pointer-events: none;
 }
 
-.dna-bg__canvas,
+.dna-bg__helix-wrap,
+.dna-bg__helix,
 .dna-bg__mesh,
 .dna-bg__glow {
   position: absolute;
   inset: 0;
 }
 
-.dna-bg__canvas {
-  width: 100%;
-  height: 100%;
-  opacity: 0.96;
-  filter: saturate(132%);
+.dna-bg__helix-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.82;
+  transform: translateZ(0);
+}
+
+.dna-bg__helix {
+  width: min(54vw, 660px);
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  transform: perspective(1600px) rotateY(18deg) rotateX(4deg) rotateZ(-8deg) scale(1.12);
+  filter: saturate(122%);
 }
 
 .dna-bg__mesh {
@@ -276,6 +287,42 @@ body.login-page {
   mix-blend-mode: screen;
 }
 
+.dna-bg__rail,
+.dna-bg__rung,
+.dna-bg__node {
+  vector-effect: non-scaling-stroke;
+}
+
+.dna-bg__rail {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dna-bg__rail--a {
+  stroke: url(#dna-rail-a);
+  stroke-width: 12;
+}
+
+.dna-bg__rail--b {
+  stroke: url(#dna-rail-b);
+  stroke-width: 12;
+}
+
+.dna-bg__rung {
+  stroke: url(#dna-rung);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.dna-bg__node--a {
+  fill: #86f3ff;
+}
+
+.dna-bg__node--b {
+  fill: #ffd17a;
+}
+
 .dna-bg__glow {
   filter: blur(48px);
   opacity: 0.7;
@@ -297,6 +344,10 @@ html[data-theme="dark"] .dna-bg__mesh {
   opacity: 0.34;
 }
 
+html[data-theme="dark"] .dna-bg__helix {
+  opacity: 0.74;
+}
+
 html[data-theme="dark"] .dna-bg__glow--left {
   background:
     radial-gradient(circle at 26% 28%, rgba(77, 214, 255, 0.26), transparent 0 24rem),
@@ -307,6 +358,14 @@ html[data-theme="dark"] .dna-bg__glow--right {
   background:
     radial-gradient(circle at 72% 22%, rgba(34, 214, 161, 0.2), transparent 0 22rem),
     radial-gradient(circle at 66% 78%, rgba(255, 173, 58, 0.14), transparent 0 18rem);
+}
+
+html[data-theme="dark"] .dna-bg__node--a {
+  fill: #72ebff;
+}
+
+html[data-theme="dark"] .dna-bg__node--b {
+  fill: #ffc96d;
 }
 
 button,

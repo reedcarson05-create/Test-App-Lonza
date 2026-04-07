@@ -3,7 +3,7 @@
 import os
 import sqlite3
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BASE_DIR = Path(__file__).resolve().parent
 SQLITE_PATH = BASE_DIR / os.getenv("PLANT_APP_SQLITE_PATH", "plant.db")
@@ -14,6 +14,11 @@ def get_conn():
     conn = sqlite3.connect(SQLITE_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA temp_store = MEMORY")
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA cache_size = -20000")
     return conn
 
 
@@ -239,6 +244,24 @@ def init_db() -> None:
     ensure_column(cur, "field_change_log", "original_value", "TEXT")
     ensure_column(cur, "field_change_log", "corrected_value", "TEXT")
     ensure_column(cur, "field_change_log", "correction_reason", "TEXT")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_employee_number ON users(employee_number)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_runs_updated_at ON production_runs(updated_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch_number ON production_runs(batch_number)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_extraction_run_created ON extraction_entries(run_id, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_extraction_created_at ON extraction_entries(created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_filtration_run_created ON filtration_entries(run_id, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_filtration_created_at ON filtration_entries(created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_filtration_rows_entry_row ON filtration_rows(filtration_entry_id, row_group, row_no)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaporation_run_created ON evaporation_entries(run_id, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaporation_created_at ON evaporation_entries(created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaporation_rows_entry_row ON evaporation_rows(evaporation_entry_id, row_no)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_sheet_run_stage_created ON sheet_entries(run_id, stage_key, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_sheet_created_at ON sheet_entries(created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_table_record_created ON audit_log(table_name, record_id, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_log(created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_field_change_run_created ON field_change_log(run_id, created_at DESC)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_field_change_created_at ON field_change_log(created_at DESC)")
 
     cur.execute("""
         INSERT OR IGNORE INTO users (
@@ -1022,10 +1045,13 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
     return rows
 
 
-def last_12_hour_activity():
+def last_12_hour_activity(hours: int = 12, limit: int = 300):
     """Return a flat recent-activity feed across all supported entry tables."""
     conn = get_conn()
     cur = conn.cursor()
+    safe_hours = max(1, int(hours))
+    safe_limit = max(1, int(limit))
+    threshold = (datetime.now() - timedelta(hours=safe_hours)).isoformat(timespec="seconds")
     # The UNION keeps dashboard rendering simple by projecting every section into one common shape.
     cur.execute("""
         SELECT *
@@ -1045,7 +1071,7 @@ def last_12_hour_activity():
                 e.stop_time AS end_label
             FROM extraction_entries e
             LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE datetime(replace(e.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
+            WHERE e.created_at >= ?
 
             UNION ALL
 
@@ -1064,7 +1090,7 @@ def last_12_hour_activity():
                 f.shutdown_time AS end_label
             FROM filtration_entries f
             LEFT JOIN production_runs r ON r.id = f.run_id
-            WHERE datetime(replace(f.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
+            WHERE f.created_at >= ?
 
             UNION ALL
 
@@ -1083,7 +1109,7 @@ def last_12_hour_activity():
                 v.shutdown_time AS end_label
             FROM evaporation_entries v
             LEFT JOIN production_runs r ON r.id = v.run_id
-            WHERE datetime(replace(v.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
+            WHERE v.created_at >= ?
 
             UNION ALL
 
@@ -1102,10 +1128,11 @@ def last_12_hour_activity():
                 '' AS end_label
             FROM sheet_entries s
             LEFT JOIN production_runs r ON r.id = s.run_id
-            WHERE datetime(replace(s.created_at, 'T', ' ')) >= datetime('now', '-12 hours')
+            WHERE s.created_at >= ?
         ) activity
         ORDER BY activity_time DESC
-    """)
+        LIMIT ?
+    """, (threshold, threshold, threshold, threshold, safe_limit))
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
