@@ -18,6 +18,7 @@ $baseUrl = "http://127.0.0.1:$Port"
 $launchStamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $windowUrl = "$baseUrl/boot?launch=$launchStamp"
 $healthUrl = "$baseUrl/health"
+$bootUrl = "$baseUrl/boot"
 
 function Write-LaunchLog {
   param(
@@ -39,6 +40,57 @@ function Test-AppServerReady {
   } catch {
     return $false
   }
+}
+
+function Get-PortOwnerProcess {
+  param(
+    [int]$LocalPort
+  )
+
+  try {
+    $connection = Get-NetTCPConnection -LocalPort $LocalPort -State Listen -ErrorAction Stop |
+      Select-Object -First 1
+  } catch {
+    return $null
+  }
+
+  if (-not $connection) {
+    return $null
+  }
+
+  try {
+    return Get-CimInstance Win32_Process -Filter "ProcessId = $($connection.OwningProcess)" -ErrorAction Stop
+  } catch {
+    return $null
+  }
+}
+
+function Stop-StaleProjectServer {
+  param(
+    [int]$LocalPort,
+    [string]$ExpectedRoot
+  )
+
+  $owner = Get-PortOwnerProcess -LocalPort $LocalPort
+  if (-not $owner) {
+    return $false
+  }
+
+  $commandLine = [string]$owner.CommandLine
+  $normalizedRoot = $ExpectedRoot.ToLowerInvariant()
+  $looksLikeProjectServer = (
+    $commandLine.ToLowerInvariant().Contains($normalizedRoot) -and
+    $commandLine.ToLowerInvariant().Contains("app.py")
+  )
+
+  if (-not $looksLikeProjectServer) {
+    throw "Port $LocalPort is already in use by another process and the launcher will not stop it automatically."
+  }
+
+  Write-LaunchLog "Stopping stale Plant App server process $($owner.ProcessId) because /boot was unavailable."
+  Stop-Process -Id $owner.ProcessId -Force
+  Start-Sleep -Milliseconds 700
+  return $true
 }
 
 function Resolve-BrowserExe {
@@ -100,6 +152,10 @@ function Resolve-PythonExe {
   throw "No suitable Python runtime was found. Install the Plant App dependencies first."
 }
 
+if ((Test-AppServerReady -Url $healthUrl) -and (-not (Test-AppServerReady -Url $bootUrl))) {
+  Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot | Out-Null
+}
+
 if (-not (Test-AppServerReady -Url $healthUrl)) {
   $pythonExe = Resolve-PythonExe
   $env:PLANT_APP_HOST = "0.0.0.0"
@@ -120,6 +176,10 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
 
 if (-not (Test-AppServerReady -Url $healthUrl)) {
   throw "The Plant App server did not become ready on $windowUrl."
+}
+
+if (-not (Test-AppServerReady -Url $bootUrl)) {
+  throw "The Plant App server started, but the /boot route is unavailable. Restart the launcher after confirming the background host updated."
 }
 
 if (-not $SkipBrowser) {
