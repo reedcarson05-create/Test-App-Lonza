@@ -10,6 +10,8 @@ function initDnaBackground() {
   if (!page || page.querySelector(".dna-bg")) return;
 
   const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const cpuCores = navigator.hardwareConcurrency || 4;
+  const lowPowerMode = motionQuery.matches || cpuCores <= 6;
   const layer = document.createElement("div");
   layer.className = "dna-bg";
   layer.setAttribute("aria-hidden", "true");
@@ -75,10 +77,10 @@ function initDnaBackground() {
   };
 
   const desiredParticleCount = () => {
-    if (motionQuery.matches) return 8;
-    if (width < 700) return 12;
-    if (width < 1100) return 18;
-    return 26;
+    if (lowPowerMode) return 0;
+    if (width < 700) return 4;
+    if (width < 1100) return 6;
+    return 8;
   };
 
   const seedParticle = (particle = {}) => {
@@ -110,7 +112,7 @@ function initDnaBackground() {
     width = window.innerWidth;
     height = window.innerHeight;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    renderScale = motionQuery.matches ? 0.44 : (width < 700 ? 0.42 : 0.5);
+    renderScale = lowPowerMode ? 0.24 : (width < 700 ? 0.28 : 0.34);
     canvas.width = Math.max(1, Math.round(width * dpr * renderScale));
     canvas.height = Math.max(1, Math.round(height * dpr * renderScale));
     canvas.style.width = `${width}px`;
@@ -140,11 +142,11 @@ function initDnaBackground() {
   };
 
   const buildHelixRows = () => {
-    const spacing = width < 700 ? 62 : 72;
+    const spacing = width < 700 ? 88 : 104;
     const overscan = spacing * 6;
     const visibleSpan = height + overscan * 2;
     const count = Math.ceil(visibleSpan / spacing) + 2;
-    const twistStep = 0.62;
+    const twistStep = 0.72;
     const rows = [];
 
     for (let index = 0; index < count; index += 1) {
@@ -164,8 +166,8 @@ function initDnaBackground() {
     const centerX = width * 0.5;
     const centerY = height * 0.46;
     const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * 0.42);
-    gradient.addColorStop(0, rgba(palette.ambient, 0.22 + boost * 0.06));
-    gradient.addColorStop(0.34, rgba(palette.core, 0.1 + boost * 0.04));
+    gradient.addColorStop(0, rgba(palette.ambient, lowPowerMode ? 0.1 : 0.18 + boost * 0.04));
+    gradient.addColorStop(0.34, rgba(palette.core, lowPowerMode ? 0.04 : 0.08 + boost * 0.03));
     gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
@@ -211,9 +213,6 @@ function initDnaBackground() {
     segments.sort((left, right) => left.z - right.z);
     nodes.sort((left, right) => left.z - right.z);
 
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-
     for (const segment of segments) {
       const depthMix = clamp((segment.z + depthRange) / (depthRange * 2), 0, 1);
       const lineScale = mix(segment.from.scale, segment.to.scale, 0.5);
@@ -222,54 +221,50 @@ function initDnaBackground() {
         ctx.beginPath();
         ctx.moveTo(segment.from.x, segment.from.y);
         ctx.lineTo(segment.to.x, segment.to.y);
-        ctx.strokeStyle = rgba(segment.tint, 0.16 + depthMix * 0.44);
-        ctx.lineWidth = Math.max(1.2, (1.2 + depthMix * 3.1 + boost * 0.4) * lineScale);
-        ctx.shadowBlur = 14 + depthMix * 22;
-        ctx.shadowColor = rgba(segment.tint, 0.2 + depthMix * 0.24);
+        ctx.strokeStyle = rgba(segment.tint, 0.12 + depthMix * 0.26);
+        ctx.lineWidth = Math.max(0.8, (0.8 + depthMix * 2 + boost * 0.2) * lineScale);
         ctx.stroke();
 
-        ctx.shadowBlur = 0;
+        if (lowPowerMode) {
+          continue;
+        }
+
         ctx.beginPath();
         ctx.moveTo(segment.from.x, segment.from.y);
         ctx.lineTo(segment.to.x, segment.to.y);
-        ctx.strokeStyle = `rgba(240, 254, 255, ${0.06 + depthMix * 0.16})`;
-        ctx.lineWidth = Math.max(0.8, (0.6 + depthMix * 1.1) * lineScale);
+        ctx.strokeStyle = `rgba(240, 254, 255, ${0.04 + depthMix * 0.1})`;
+        ctx.lineWidth = Math.max(0.5, (0.4 + depthMix * 0.7) * lineScale);
         ctx.stroke();
         continue;
       }
 
-      const rungGradient = ctx.createLinearGradient(segment.from.x, segment.from.y, segment.to.x, segment.to.y);
-      rungGradient.addColorStop(0, rgba(palette.rungA, 0.18 + depthMix * 0.38));
-      rungGradient.addColorStop(0.5, rgba(palette.particleA, 0.1 + depthMix * 0.2));
-      rungGradient.addColorStop(1, rgba(palette.rungB, 0.16 + depthMix * 0.34));
       ctx.beginPath();
       ctx.moveTo(segment.from.x, segment.from.y);
       ctx.lineTo(segment.to.x, segment.to.y);
-      ctx.strokeStyle = rungGradient;
-      ctx.lineWidth = Math.max(0.8, (0.75 + depthMix * 1.4 + boost * 0.16) * lineScale);
-      ctx.shadowBlur = 12 + depthMix * 16;
-      ctx.shadowColor = rgba(palette.rungA, 0.12 + depthMix * 0.16);
+      if (lowPowerMode) {
+        ctx.strokeStyle = rgba(depthMix > 0.5 ? palette.rungA : palette.rungB, 0.1 + depthMix * 0.16);
+      } else {
+        const rungGradient = ctx.createLinearGradient(segment.from.x, segment.from.y, segment.to.x, segment.to.y);
+        rungGradient.addColorStop(0, rgba(palette.rungA, 0.14 + depthMix * 0.22));
+        rungGradient.addColorStop(0.5, rgba(palette.particleA, 0.06 + depthMix * 0.1));
+        rungGradient.addColorStop(1, rgba(palette.rungB, 0.12 + depthMix * 0.2));
+        ctx.strokeStyle = rungGradient;
+      }
+      ctx.lineWidth = Math.max(0.7, (0.65 + depthMix * 0.95 + boost * 0.08) * lineScale);
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
 
     for (const node of nodes) {
       const depthMix = clamp((node.z + depthRange) / (depthRange * 2), 0, 1);
-      const radius = Math.max(1.2, (1.2 + depthMix * 2.8 + boost * 0.24) * node.point.scale);
-      const fill = ctx.createRadialGradient(node.point.x, node.point.y, 0, node.point.x, node.point.y, radius * 5.4);
-      fill.addColorStop(0, `rgba(255, 255, 255, ${0.22 + depthMix * 0.34})`);
-      fill.addColorStop(0.24, rgba(node.tint, 0.28 + depthMix * 0.48));
-      fill.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.arc(node.point.x, node.point.y, radius * 5.4, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(node.tint, lowPowerMode ? 0.2 + depthMix * 0.24 : 0.26 + depthMix * 0.34);
+      ctx.arc(node.point.x, node.point.y, Math.max(1, (0.9 + depthMix * 1.5) * node.point.scale), 0, Math.PI * 2);
       ctx.fill();
     }
-
-    ctx.restore();
   };
 
   const drawParticles = (palette, dt, boost) => {
+    if (particles.length === 0) return;
     const items = [];
 
     for (const particle of particles) {
@@ -300,26 +295,12 @@ function initDnaBackground() {
     }
 
     items.sort((left, right) => left.z - right.z);
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-
     for (const item of items) {
-      const glow = ctx.createRadialGradient(item.x, item.y, 0, item.x, item.y, item.size * 5.6);
-      glow.addColorStop(0, rgba(item.color, item.alpha));
-      glow.addColorStop(0.42, rgba(item.color, item.alpha * 0.38));
-      glow.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(item.x, item.y, item.size * 5.6, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.fillStyle = rgba(item.color, Math.min(0.92, item.alpha + 0.18));
       ctx.beginPath();
       ctx.arc(item.x, item.y, Math.max(0.8, item.size * 0.7), 0, Math.PI * 2);
       ctx.fill();
     }
-
-    ctx.restore();
   };
 
   const animate = (timestamp) => {
@@ -331,7 +312,7 @@ function initDnaBackground() {
       return;
     }
 
-    const targetFrameMs = motionQuery.matches ? 1000 / 14 : 1000 / 24;
+    const targetFrameMs = lowPowerMode ? 1000 / 10 : 1000 / 14;
     if (timestamp - lastDraw < targetFrameMs) {
       window.requestAnimationFrame(animate);
       return;
@@ -341,10 +322,10 @@ function initDnaBackground() {
     scrollBoost = mix(scrollBoost, targetBoost, motionQuery.matches ? 0.08 : 0.1);
     targetBoost *= motionQuery.matches ? 0.8 : 0.9;
 
-    const baseSpin = motionQuery.matches ? 0.12 : 0.28;
-    const baseRise = motionQuery.matches ? 6 : 14;
-    spinAngle += dt * (baseSpin + scrollBoost * 1.5);
-    riseOffset += dt * (baseRise + scrollBoost * 78);
+    const baseSpin = lowPowerMode ? 0.08 : 0.18;
+    const baseRise = lowPowerMode ? 4 : 10;
+    spinAngle += dt * (baseSpin + scrollBoost * 0.75);
+    riseOffset += dt * (baseRise + scrollBoost * 34);
 
     ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -362,7 +343,7 @@ function initDnaBackground() {
     const distance = Math.abs(currentY - lastScrollY);
     const elapsed = Math.max(16, now - lastScrollTime);
     const velocity = distance / elapsed;
-    targetBoost = clamp(targetBoost + velocity * (motionQuery.matches ? 0.2 : 0.8), 0, motionQuery.matches ? 0.25 : 0.85);
+    targetBoost = clamp(targetBoost + velocity * (lowPowerMode ? 0.18 : 0.42), 0, lowPowerMode ? 0.18 : 0.45);
     lastScrollY = currentY;
     lastScrollTime = now;
   };
