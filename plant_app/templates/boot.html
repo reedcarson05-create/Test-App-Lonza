@@ -1,0 +1,51 @@
+<!doctype html>
+<html data-theme="dark" data-boot-stage="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plant App Startup</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+</head>
+<body class="boot-page">
+  <div class="boot-wrap">
+    <section class="boot-shell">
+      <div class="boot-brand">
+        <div class="boot-logo">
+          <img src="/static/logo.png" alt="Lonza">
+          <span>Plant App Startup</span>
+        </div>
+        <div class="boot-era" data-boot-era>1988</div>
+      </div>
+
+      <p class="boot-kicker">System Initialization</p>
+      <h1>Loading the app before operator sign-in</h1>
+      <p class="boot-copy">
+        Preloading shared assets, warming templates, and getting the login screen ready so the rest of the app feels lighter once operators start moving through it.
+      </p>
+
+      <div class="boot-phase-row">
+        <div class="boot-phase-pill is-active" data-boot-phase-threshold="0">Retro</div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.28">Y2K</div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.58">Web App</div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.84">Modern</div>
+      </div>
+
+      <div class="boot-loader">
+        <div class="boot-loader-track">
+          <div class="boot-loader-fill" data-boot-fill></div>
+        </div>
+        <div class="boot-readout">
+          <div>
+            <div class="boot-status" data-boot-status>Booting legacy control shell</div>
+            <div class="boot-status-detail" data-boot-detail>Starting the old-school startup routine before the app swaps into modern UI layers.</div>
+          </div>
+          <div class="boot-percent" data-boot-percent>0%</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script id="boot-manifest" type="application/json">{{ boot_manifest | tojson }}</script>
+  <script src="/static/boot_loader.js?v={{ asset_version }}"></script>
+</body>
+</html>

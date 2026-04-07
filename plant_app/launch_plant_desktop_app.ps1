@@ -14,8 +14,10 @@ if (-not (Test-Path -LiteralPath $runtimeDir)) {
 }
 
 $logFile = Join-Path $runtimeDir "desktop_app.log"
-$windowUrl = "http://127.0.0.1:$Port"
-$healthUrl = "$windowUrl/health"
+$baseUrl = "http://127.0.0.1:$Port"
+$launchStamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$windowUrl = "$baseUrl/boot?launch=$launchStamp"
+$healthUrl = "$baseUrl/health"
 
 function Write-LaunchLog {
   param(

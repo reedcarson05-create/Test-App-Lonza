@@ -64,6 +64,16 @@ SIGNATURE_DIR = UPLOAD_DIR / "signatures"
 SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+BOOT_TEMPLATE_NAMES = tuple(sorted(path.name for path in (BASE_DIR / "templates").glob("*.html")))
+BOOT_STATIC_FILES = (
+    "style.css",
+    "settings.js",
+    "signature_session.js",
+    "form_corrections.js",
+    "image_upload.js",
+    "logo.png",
+)
+BOOT_MIN_DURATION_MS = 6200
 
 
 def asset_version() -> str:
@@ -71,6 +81,7 @@ def asset_version() -> str:
     candidate_paths = (
         BASE_DIR / "static" / "style.css",
         BASE_DIR / "static" / "settings.js",
+        BASE_DIR / "static" / "boot_loader.js",
         BASE_DIR / "static" / "signature_session.js",
         BASE_DIR / "static" / "form_corrections.js",
     )
@@ -81,6 +92,85 @@ def asset_version() -> str:
         except OSError:
             continue
     return str(latest_stamp or int(datetime.now().timestamp()))
+
+
+def warm_boot_cache() -> None:
+    """Prime templates, static metadata, and common database reads before the login page opens."""
+    for template_name in BOOT_TEMPLATE_NAMES:
+        try:
+            templates.env.get_template(template_name)
+        except Exception:
+            continue
+
+    for static_name in BOOT_STATIC_FILES:
+        try:
+            (BASE_DIR / "static" / static_name).stat()
+        except OSError:
+            continue
+
+    asset_version()
+    try:
+        list_runs(limit=12)
+    except Exception:
+        pass
+    try:
+        last_12_hour_activity(limit=36)
+    except Exception:
+        pass
+
+
+def build_boot_manifest(request: Request) -> dict:
+    """Return the startup preload plan shown by the animated boot screen."""
+    version = asset_version()
+    login_url = "/?fresh=1"
+    tasks = [
+        {
+            "label": "Loading system stylesheet",
+            "url": f"/static/style.css?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching shared app controls",
+            "url": f"/static/settings.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching signature capture tools",
+            "url": f"/static/signature_session.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching correction editor tools",
+            "url": f"/static/form_corrections.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching image upload helpers",
+            "url": f"/static/image_upload.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Loading plant branding assets",
+            "url": f"/static/logo.png?v={version}",
+            "kind": "image",
+        },
+        {
+            "label": "Warming templates and database reads",
+            "url": "/boot/warm",
+            "kind": "json",
+        },
+        {
+            "label": "Preparing the operator login screen",
+            "url": login_url,
+            "kind": "text",
+        },
+    ]
+    return {
+        "target_url": login_url,
+        "min_duration_ms": BOOT_MIN_DURATION_MS,
+        "tasks": tasks,
+        "local_port": request.url.port or configured_port(),
+    }
 
 
 def configured_host() -> str:
@@ -699,6 +789,31 @@ def health():
     return "OK"
 
 
+@app.get("/boot", response_class=HTMLResponse)
+def boot_page(request: Request):
+    """Show the startup animation, clear any stale session, and preload shared app resources."""
+    clear_signature_session(request)
+    request.session.clear()
+    response = templates.TemplateResponse(
+        "boot.html",
+        {
+            "request": request,
+            "boot_manifest": build_boot_manifest(request),
+            "asset_version": asset_version(),
+        },
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/boot/warm")
+def boot_warm():
+    """Warm shared templates and database queries so the first operator interaction feels lighter."""
+    warm_boot_cache()
+    return JSONResponse({"ok": True})
+
+
 # ------------------------
 # LOGIN
 # ------------------------
@@ -706,10 +821,14 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def login_page(request: Request):
     """Render the login form or jump straight home when a session already exists."""
-    if logged_in(request):
+    fresh_login = request.query_params.get("fresh") == "1"
+    if fresh_login:
+        clear_signature_session(request)
+        request.session.clear()
+    elif logged_in(request):
         return RedirectResponse("/home", status_code=303)
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         "login.html",
         {
             "request": request,
@@ -722,6 +841,10 @@ def login_page(request: Request):
             "local_port": request.url.port or configured_port(),
         },
     )
+    if fresh_login:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.post("/login")

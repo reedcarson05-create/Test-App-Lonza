@@ -1,123 +1,8 @@
 // Shared page chrome for settings persistence plus a reusable loading screen.
 document.addEventListener("DOMContentLoaded", () => {
-  initDnaBackground();
   initLoadingScreen();
   initSettingsPanel();
 });
-
-function initDnaBackground() {
-  const page = document.body;
-  if (!page || page.querySelector(".dna-bg")) return;
-
-  const layer = document.createElement("div");
-  layer.className = "dna-bg";
-  layer.setAttribute("aria-hidden", "true");
-  layer.innerHTML = buildMovingDnaMarkup();
-  page.prepend(layer);
-}
-
-function buildMovingDnaMarkup() {
-  const rungCount = 18;
-  const railPointsA = [];
-  const railPointsB = [];
-  const nodes = [];
-  const rungs = [];
-  const centerX = 320;
-  const amplitude = 118;
-  const top = -180;
-  const spacing = 112;
-
-  for (let index = 0; index < rungCount; index += 1) {
-    const phase = index * 0.62;
-    const y = top + index * spacing;
-    const offset = Math.sin(phase) * amplitude;
-    const depth = (Math.cos(phase) + 1) * 0.5;
-    const leftX = centerX - offset;
-    const rightX = centerX + offset;
-    const railAY = y + Math.cos(phase) * 34;
-    const railBY = y - Math.cos(phase) * 34;
-
-    railPointsA.push(`${leftX},${railAY}`);
-    railPointsB.push(`${rightX},${railBY}`);
-    rungs.push({
-      leftX,
-      rightX,
-      railAY,
-      railBY,
-      opacity: (0.32 + depth * 0.42).toFixed(3),
-      strokeWidth: (3.2 + depth * 1.6).toFixed(2),
-    });
-    nodes.push({
-      x: leftX,
-      y: railAY,
-      radius: (7 + depth * 5).toFixed(2),
-      opacity: (0.4 + depth * 0.38).toFixed(3),
-      variant: "a",
-    });
-    nodes.push({
-      x: rightX,
-      y: railBY,
-      radius: (7 + (1 - depth) * 5).toFixed(2),
-      opacity: (0.4 + (1 - depth) * 0.38).toFixed(3),
-      variant: "b",
-    });
-  }
-
-  const buildHelixSvg = (suffix) => `
-      <svg class="dna-bg__helix" viewBox="0 0 640 1800" preserveAspectRatio="xMidYMid meet" role="presentation" aria-hidden="true">
-        <defs>
-          <linearGradient id="dna-rail-a-${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#8ef3ff" />
-            <stop offset="50%" stop-color="#2df0c2" />
-            <stop offset="100%" stop-color="#8ef3ff" />
-          </linearGradient>
-          <linearGradient id="dna-rail-b-${suffix}" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#ffd37a" />
-            <stop offset="50%" stop-color="#59e9ff" />
-            <stop offset="100%" stop-color="#ffd37a" />
-          </linearGradient>
-          <linearGradient id="dna-rung-${suffix}" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#49f0d3" />
-            <stop offset="50%" stop-color="#d7fdff" />
-            <stop offset="100%" stop-color="#ffc86e" />
-          </linearGradient>
-          <filter id="dna-soft-glow-${suffix}" x="-40%" y="-20%" width="180%" height="140%">
-            <feGaussianBlur stdDeviation="8" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <g filter="url(#dna-soft-glow-${suffix})">
-          <polyline points="${railPointsA.join(" ")}" class="dna-bg__rail dna-bg__rail--a" style="stroke:url(#dna-rail-a-${suffix})" />
-          <polyline points="${railPointsB.join(" ")}" class="dna-bg__rail dna-bg__rail--b" style="stroke:url(#dna-rail-b-${suffix})" />
-          ${rungs
-            .map(
-              (rung) =>
-                `<line x1="${rung.leftX}" y1="${rung.railAY}" x2="${rung.rightX}" y2="${rung.railBY}" class="dna-bg__rung" style="stroke:url(#dna-rung-${suffix});opacity:${rung.opacity};stroke-width:${rung.strokeWidth}" />`
-            )
-            .join("")}
-          ${nodes
-            .map(
-              (node) =>
-                `<circle cx="${node.x}" cy="${node.y}" r="${node.radius}" class="dna-bg__node dna-bg__node--${node.variant}" style="opacity:${node.opacity}" />`
-            )
-            .join("")}
-        </g>
-      </svg>
-  `;
-
-  return `
-    <div class="dna-bg__glow dna-bg__glow--left"></div>
-    <div class="dna-bg__glow dna-bg__glow--right"></div>
-    <div class="dna-bg__track">
-      <div class="dna-bg__helix-wrap">${buildHelixSvg("a")}</div>
-      <div class="dna-bg__helix-wrap">${buildHelixSvg("b")}</div>
-    </div>
-    <div class="dna-bg__mesh"></div>
-  `;
-}
 
 function initLoadingScreen() {
   const page = document.body;
@@ -140,11 +25,10 @@ function initLoadingScreen() {
 
   const messageNode = overlay.querySelector("[data-loading-message]");
 
-  const showLoadingScreen = (message, options = {}) => {
+  const showLoadingScreen = (message) => {
     if (messageNode) {
       messageNode.textContent = message || "Opening the next screen...";
     }
-    overlay.classList.toggle("is-minimal", options.minimal === true);
     page.classList.add("page-loading");
     page.setAttribute("aria-busy", "true");
     overlay.setAttribute("aria-hidden", "false");
@@ -153,13 +37,7 @@ function initLoadingScreen() {
   const hideLoadingScreen = () => {
     page.classList.remove("page-loading");
     page.removeAttribute("aria-busy");
-    overlay.classList.remove("is-minimal");
     overlay.setAttribute("aria-hidden", "true");
-  };
-
-  const showLoadingThen = (message, continueNavigation) => {
-    showLoadingScreen(message, { minimal: true });
-    continueNavigation();
   };
 
   const inferFormMessage = (form, submitter) => {
@@ -192,20 +70,7 @@ function initLoadingScreen() {
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
-    if (form.dataset.skipPageTurn === "true") {
-      showLoadingScreen(inferFormMessage(form, event.submitter));
-      return;
-    }
-    if (form.dataset.submitting === "true") {
-      delete form.dataset.submitting;
-      showLoadingScreen(inferFormMessage(form, event.submitter));
-      return;
-    }
-    event.preventDefault();
-    showLoadingThen(inferFormMessage(form, event.submitter), () => {
-      form.dataset.submitting = "true";
-      HTMLFormElement.prototype.submit.call(form);
-    });
+    showLoadingScreen(inferFormMessage(form, event.submitter));
   }, true);
 
   document.addEventListener("click", (event) => {
@@ -226,10 +91,8 @@ function initLoadingScreen() {
 
     const url = new URL(href, window.location.href);
     if (url.origin !== window.location.origin) return;
-    event.preventDefault();
-    showLoadingThen(inferLinkMessage(link), () => {
-      window.location.assign(url.toString());
-    });
+
+    showLoadingScreen(inferLinkMessage(link));
   }, true);
 
   window.addEventListener("pageshow", hideLoadingScreen);
