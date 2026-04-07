@@ -84,9 +84,10 @@ html[data-theme="dark"] {
 
 html[data-theme="dark"] body {
   background:
-    radial-gradient(circle at top right, rgba(67, 168, 194, 0.22), transparent 30rem),
-    radial-gradient(circle at left 12%, rgba(216, 159, 81, 0.1), transparent 26rem),
-    linear-gradient(180deg, #101921 0%, #16222b 56%, #0c141a 100%);
+    radial-gradient(circle at 18% 16%, rgba(70, 208, 255, 0.22), transparent 24rem),
+    radial-gradient(circle at 82% 12%, rgba(44, 202, 161, 0.18), transparent 22rem),
+    radial-gradient(circle at 50% 110%, rgba(255, 176, 69, 0.12), transparent 28rem),
+    linear-gradient(180deg, #040b11 0%, #09151f 36%, #0a1823 100%);
 }
 
 html[data-theme="dark"] .hero-card,
@@ -162,15 +163,18 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.68), transparent 34rem),
-    radial-gradient(circle at top right, rgba(45, 165, 196, 0.16), transparent 34rem),
-    radial-gradient(circle at left 12%, rgba(201, 133, 45, 0.1), transparent 26rem),
-    linear-gradient(180deg, #eff5f8 0%, var(--bg) 54%, color-mix(in srgb, var(--bg-deep) 28%, var(--bg) 72%) 100%);
+    radial-gradient(circle at 18% 18%, rgba(69, 242, 255, 0.18), transparent 24rem),
+    radial-gradient(circle at 82% 12%, rgba(46, 228, 176, 0.16), transparent 22rem),
+    radial-gradient(circle at 50% 110%, rgba(255, 183, 72, 0.12), transparent 28rem),
+    linear-gradient(180deg, #081521 0%, #0b1d2b 38%, #0d2533 100%);
   color: var(--text);
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
   line-height: 1.55;
   font-size: calc(16px * var(--font-scale));
+  overflow-x: hidden;
+  position: relative;
+  isolation: isolate;
 }
 
 body.modal-open {
@@ -181,6 +185,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background:
     linear-gradient(transparent 0, rgba(255, 255, 255, 0.16) 50%, transparent 100%),
@@ -192,6 +197,18 @@ body::before {
       transparent 96px
     );
   opacity: 0.7;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(97, 245, 255, 0.08), transparent 32rem),
+    radial-gradient(circle at center, transparent 30%, rgba(2, 8, 14, 0.2) 100%);
+  mix-blend-mode: screen;
 }
 
 html[data-theme="dark"] body::before {
@@ -206,8 +223,90 @@ html[data-theme="dark"] body::before {
     );
 }
 
+html[data-theme="dark"] body::after {
+  background:
+    radial-gradient(circle at center, rgba(120, 255, 239, 0.1), transparent 32rem),
+    radial-gradient(circle at center, transparent 28%, rgba(0, 0, 0, 0.38) 100%);
+}
+
 body.login-page {
   min-height: 100vh;
+}
+
+.dna-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dna-bg__canvas,
+.dna-bg__mesh,
+.dna-bg__glow {
+  position: absolute;
+  inset: 0;
+}
+
+.dna-bg__canvas {
+  width: 100%;
+  height: 100%;
+  opacity: 0.96;
+  filter: saturate(132%);
+}
+
+.dna-bg__mesh {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%, rgba(255, 255, 255, 0.03) 68%, rgba(255, 255, 255, 0.02)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(107, 235, 255, 0.08) 0,
+      rgba(107, 235, 255, 0.08) 1px,
+      transparent 1px,
+      transparent 72px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(107, 235, 255, 0.05) 0,
+      rgba(107, 235, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 72px
+    );
+  opacity: 0.42;
+  mix-blend-mode: screen;
+}
+
+.dna-bg__glow {
+  filter: blur(48px);
+  opacity: 0.7;
+}
+
+.dna-bg__glow--left {
+  background:
+    radial-gradient(circle at 26% 28%, rgba(71, 234, 255, 0.3), transparent 0 24rem),
+    radial-gradient(circle at 34% 62%, rgba(34, 196, 255, 0.16), transparent 0 20rem);
+}
+
+.dna-bg__glow--right {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(35, 234, 175, 0.24), transparent 0 22rem),
+    radial-gradient(circle at 66% 78%, rgba(255, 186, 70, 0.16), transparent 0 18rem);
+}
+
+html[data-theme="dark"] .dna-bg__mesh {
+  opacity: 0.34;
+}
+
+html[data-theme="dark"] .dna-bg__glow--left {
+  background:
+    radial-gradient(circle at 26% 28%, rgba(77, 214, 255, 0.26), transparent 0 24rem),
+    radial-gradient(circle at 34% 62%, rgba(35, 150, 255, 0.14), transparent 0 20rem);
+}
+
+html[data-theme="dark"] .dna-bg__glow--right {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(34, 214, 161, 0.2), transparent 0 22rem),
+    radial-gradient(circle at 66% 78%, rgba(255, 173, 58, 0.14), transparent 0 18rem);
 }
 
 button,
@@ -265,6 +364,12 @@ a {
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px 22px 40px;
+}
+
+.wrap,
+.settings-root {
+  position: relative;
+  z-index: 1;
 }
 
 .wrap.narrow {
