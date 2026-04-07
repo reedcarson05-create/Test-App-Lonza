@@ -370,6 +370,10 @@ a {
 .settings-root {
   position: relative;
   z-index: 1;
+  transform-origin: 50% 36%;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity, filter;
 }
 
 .wrap.narrow {
@@ -1446,12 +1450,26 @@ td.blank-display {
   transition: opacity 0.2s ease;
 }
 
+.app-loading-overlay.is-minimal {
+  background: rgba(3, 10, 16, 0.12);
+  backdrop-filter: blur(3px);
+}
+
 body.page-loading {
   overflow: hidden;
   cursor: progress;
 }
 
 body.page-loading .app-loading-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.page-transition-leaving {
+  cursor: wait;
+}
+
+body.page-transition-leaving .app-loading-overlay {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1463,6 +1481,12 @@ body.page-loading .app-loading-overlay {
   border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line) 82%);
   background: linear-gradient(160deg, color-mix(in srgb, var(--surface-strong) 92%, white 8%), color-mix(in srgb, var(--surface) 78%, var(--brand-soft) 22%));
   box-shadow: var(--shadow-lg);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.app-loading-overlay.is-minimal .loading-screen {
+  opacity: 0;
+  transform: scale(0.88);
 }
 
 .loading-screen-kicker {
@@ -1518,6 +1542,51 @@ body.page-loading .app-loading-overlay {
 
 html[data-theme="dark"] .loading-screen {
   background: linear-gradient(160deg, rgba(31, 46, 58, 0.98), rgba(18, 29, 37, 0.98));
+}
+
+@keyframes page-screen-in {
+  0% {
+    opacity: 0;
+    transform: perspective(1800px) rotateY(-18deg) rotateX(7deg) translateY(34px) scale(0.94);
+    filter: blur(12px);
+  }
+
+  55% {
+    opacity: 1;
+    transform: perspective(1800px) rotateY(6deg) rotateX(-2deg) translateY(-4px) scale(1.01);
+    filter: blur(1.5px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(1800px) rotateY(0deg) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes page-screen-out {
+  0% {
+    opacity: 1;
+    transform: perspective(1800px) rotateY(0deg) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: perspective(1800px) rotateY(22deg) rotateX(-7deg) translateY(-24px) scale(0.92);
+    filter: blur(12px);
+  }
+}
+
+body.page-transition-entering .wrap,
+body.page-transition-entering .settings-root {
+  animation: page-screen-in 0.72s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+body.page-transition-leaving .wrap,
+body.page-transition-leaving .settings-root {
+  animation: page-screen-out 0.42s cubic-bezier(0.4, 0, 0.7, 1) both;
+  pointer-events: none;
 }
 
 .success-check {
@@ -1613,6 +1682,40 @@ html[data-theme="dark"] .loading-screen {
 
   .login-card {
     margin-top: 64px;
+  }
+
+  @keyframes page-screen-in {
+    0% {
+      opacity: 0;
+      transform: perspective(1200px) rotateY(-12deg) rotateX(5deg) translateY(24px) scale(0.96);
+      filter: blur(8px);
+    }
+
+    55% {
+      opacity: 1;
+      transform: perspective(1200px) rotateY(4deg) rotateX(-1.5deg) translateY(-2px) scale(1.005);
+      filter: blur(1px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: perspective(1200px) rotateY(0deg) rotateX(0deg) translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes page-screen-out {
+    0% {
+      opacity: 1;
+      transform: perspective(1200px) rotateY(0deg) rotateX(0deg) translateY(0) scale(1);
+      filter: blur(0);
+    }
+
+    100% {
+      opacity: 0;
+      transform: perspective(1200px) rotateY(14deg) rotateX(-4deg) translateY(-14px) scale(0.95);
+      filter: blur(8px);
+    }
   }
 }
 

@@ -36,12 +36,14 @@ function initDnaBackground() {
   let width = 0;
   let height = 0;
   let dpr = 1;
+  let renderScale = 1;
   let spinAngle = Math.random() * Math.PI * 2;
   let riseOffset = 0;
   let scrollBoost = 0;
   let targetBoost = 0;
   let particles = [];
   let lastFrame = performance.now();
+  let lastDraw = 0;
   let lastScrollY = window.scrollY;
   let lastScrollTime = lastFrame;
 
@@ -73,10 +75,10 @@ function initDnaBackground() {
   };
 
   const desiredParticleCount = () => {
-    if (motionQuery.matches) return 18;
-    if (width < 700) return 34;
-    if (width < 1100) return 52;
-    return 76;
+    if (motionQuery.matches) return 8;
+    if (width < 700) return 12;
+    if (width < 1100) return 18;
+    return 26;
   };
 
   const seedParticle = (particle = {}) => {
@@ -108,11 +110,13 @@ function initDnaBackground() {
     width = window.innerWidth;
     height = window.innerHeight;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    renderScale = motionQuery.matches ? 0.44 : (width < 700 ? 0.42 : 0.5);
+    canvas.width = Math.max(1, Math.round(width * dpr * renderScale));
+    canvas.height = Math.max(1, Math.round(height * dpr * renderScale));
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
     syncParticles();
   };
 
@@ -136,11 +140,11 @@ function initDnaBackground() {
   };
 
   const buildHelixRows = () => {
-    const spacing = width < 700 ? 44 : 52;
+    const spacing = width < 700 ? 62 : 72;
     const overscan = spacing * 6;
     const visibleSpan = height + overscan * 2;
     const count = Math.ceil(visibleSpan / spacing) + 2;
-    const twistStep = 0.54;
+    const twistStep = 0.62;
     const rows = [];
 
     for (let index = 0; index < count; index += 1) {
@@ -322,15 +326,27 @@ function initDnaBackground() {
     const dt = Math.min(0.05, Math.max(0.001, (timestamp - lastFrame) / 1000));
     lastFrame = timestamp;
 
+    if (document.visibilityState === "hidden") {
+      window.requestAnimationFrame(animate);
+      return;
+    }
+
+    const targetFrameMs = motionQuery.matches ? 1000 / 14 : 1000 / 24;
+    if (timestamp - lastDraw < targetFrameMs) {
+      window.requestAnimationFrame(animate);
+      return;
+    }
+    lastDraw = timestamp;
+
     scrollBoost = mix(scrollBoost, targetBoost, motionQuery.matches ? 0.08 : 0.1);
     targetBoost *= motionQuery.matches ? 0.8 : 0.9;
 
-    const baseSpin = motionQuery.matches ? 0.18 : 0.5;
-    const baseRise = motionQuery.matches ? 10 : 24;
-    spinAngle += dt * (baseSpin + scrollBoost * 2.8);
-    riseOffset += dt * (baseRise + scrollBoost * 150);
+    const baseSpin = motionQuery.matches ? 0.12 : 0.28;
+    const baseRise = motionQuery.matches ? 6 : 14;
+    spinAngle += dt * (baseSpin + scrollBoost * 1.5);
+    riseOffset += dt * (baseRise + scrollBoost * 78);
 
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
     const palette = paletteForTheme();
@@ -346,7 +362,7 @@ function initDnaBackground() {
     const distance = Math.abs(currentY - lastScrollY);
     const elapsed = Math.max(16, now - lastScrollTime);
     const velocity = distance / elapsed;
-    targetBoost = clamp(targetBoost + velocity * (motionQuery.matches ? 0.35 : 1.35), 0, motionQuery.matches ? 0.45 : 1.55);
+    targetBoost = clamp(targetBoost + velocity * (motionQuery.matches ? 0.2 : 0.8), 0, motionQuery.matches ? 0.25 : 0.85);
     lastScrollY = currentY;
     lastScrollTime = now;
   };
@@ -365,6 +381,7 @@ function initDnaBackground() {
 function initLoadingScreen() {
   const page = document.body;
   if (!page) return;
+  page.classList.add("page-transition-entering");
 
   const overlay = document.createElement("div");
   overlay.className = "app-loading-overlay";
@@ -382,20 +399,41 @@ function initLoadingScreen() {
   page.appendChild(overlay);
 
   const messageNode = overlay.querySelector("[data-loading-message]");
+  let transitionTimer = 0;
+  let pageTurning = false;
 
-  const showLoadingScreen = (message) => {
+  window.setTimeout(() => {
+    page.classList.remove("page-transition-entering");
+  }, 760);
+
+  const showLoadingScreen = (message, options = {}) => {
     if (messageNode) {
       messageNode.textContent = message || "Opening the next screen...";
     }
+    overlay.classList.toggle("is-minimal", options.minimal === true);
     page.classList.add("page-loading");
     page.setAttribute("aria-busy", "true");
     overlay.setAttribute("aria-hidden", "false");
   };
 
   const hideLoadingScreen = () => {
+    window.clearTimeout(transitionTimer);
+    pageTurning = false;
     page.classList.remove("page-loading");
+    page.classList.remove("page-transition-leaving");
     page.removeAttribute("aria-busy");
+    overlay.classList.remove("is-minimal");
     overlay.setAttribute("aria-hidden", "true");
+  };
+
+  const runPageTurn = (message, continueNavigation) => {
+    if (pageTurning) return;
+    pageTurning = true;
+    showLoadingScreen(message, { minimal: true });
+    page.classList.add("page-transition-leaving");
+    transitionTimer = window.setTimeout(() => {
+      continueNavigation();
+    }, 430);
   };
 
   const inferFormMessage = (form, submitter) => {
@@ -428,7 +466,20 @@ function initLoadingScreen() {
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
-    showLoadingScreen(inferFormMessage(form, event.submitter));
+    if (form.dataset.skipPageTurn === "true") {
+      showLoadingScreen(inferFormMessage(form, event.submitter));
+      return;
+    }
+    if (form.dataset.submitting === "true") {
+      delete form.dataset.submitting;
+      showLoadingScreen(inferFormMessage(form, event.submitter));
+      return;
+    }
+    event.preventDefault();
+    runPageTurn(inferFormMessage(form, event.submitter), () => {
+      form.dataset.submitting = "true";
+      HTMLFormElement.prototype.submit.call(form);
+    });
   }, true);
 
   document.addEventListener("click", (event) => {
@@ -449,8 +500,10 @@ function initLoadingScreen() {
 
     const url = new URL(href, window.location.href);
     if (url.origin !== window.location.origin) return;
-
-    showLoadingScreen(inferLinkMessage(link));
+    event.preventDefault();
+    runPageTurn(inferLinkMessage(link), () => {
+      window.location.assign(url.toString());
+    });
   }, true);
 
   window.addEventListener("pageshow", hideLoadingScreen);

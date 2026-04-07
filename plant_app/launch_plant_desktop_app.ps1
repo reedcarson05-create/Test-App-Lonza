@@ -125,6 +125,7 @@ if (-not $SkipBrowser) {
   $browserArguments = @(
     "--new-window",
     "--app=$windowUrl",
+    "--disable-http-cache",
     "--window-size=1460,960"
   )
 

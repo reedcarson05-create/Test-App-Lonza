@@ -64,7 +64,23 @@ SIGNATURE_DIR = UPLOAD_DIR / "signatures"
 SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-ASSET_VERSION = "20260406-4"
+
+
+def asset_version() -> str:
+    """Return a cache-busting version based on the latest UI asset timestamp."""
+    candidate_paths = (
+        BASE_DIR / "static" / "style.css",
+        BASE_DIR / "static" / "settings.js",
+        BASE_DIR / "static" / "signature_session.js",
+        BASE_DIR / "static" / "form_corrections.js",
+    )
+    latest_stamp = 0
+    for path in candidate_paths:
+        try:
+            latest_stamp = max(latest_stamp, path.stat().st_mtime_ns)
+        except OSError:
+            continue
+    return str(latest_stamp or int(datetime.now().timestamp()))
 
 
 def configured_host() -> str:
@@ -334,7 +350,7 @@ def render_page(request: Request, template_name: str, **context):
         "settings_theme": current_theme(request),
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
-        "asset_version": ASSET_VERSION,
+        "asset_version": asset_version(),
         "today": today_str(),
         "run": active_run(request),
         "local_access_urls": local_access_urls(request),
@@ -698,7 +714,7 @@ def login_page(request: Request):
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
-            "asset_version": ASSET_VERSION,
+            "asset_version": asset_version(),
             "local_access_urls": local_access_urls(request),
             "local_port": request.url.port or configured_port(),
         },
@@ -733,7 +749,7 @@ def login(
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
-            "asset_version": ASSET_VERSION,
+            "asset_version": asset_version(),
             "local_access_urls": local_access_urls(request),
             "local_port": request.url.port or configured_port(),
         },
