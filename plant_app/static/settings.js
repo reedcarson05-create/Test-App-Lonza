@@ -77,10 +77,7 @@ function initDnaBackground() {
   };
 
   const desiredParticleCount = () => {
-    if (lowPowerMode) return 0;
-    if (width < 700) return 4;
-    if (width < 1100) return 6;
-    return 8;
+    return 0;
   };
 
   const seedParticle = (particle = {}) => {
