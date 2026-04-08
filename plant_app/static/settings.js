@@ -70,8 +70,12 @@ function initLoadingScreen() {
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
+    if (event.defaultPrevented) {
+      hideLoadingScreen();
+      return;
+    }
     showLoadingScreen(inferFormMessage(form, event.submitter));
-  }, true);
+  });
 
   document.addEventListener("click", (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -113,6 +117,10 @@ function initSettingsPanel() {
   const shouldPersist = page.dataset.settingsPersist === "true";
   const initialTheme = page.dataset.settingsTheme || "light";
   const initialFontScale = page.dataset.settingsFontScale || "1";
+  const appStatusEndpoint = page.dataset.appStatusEndpoint || "";
+  const pageBuildVersion = page.dataset.appVersion || "";
+  const pageBuildLabel = page.dataset.appBuildLabel || "";
+  const pageChangedFile = page.dataset.appChangedFile || "";
 
   const applyTheme = (theme) => {
     root.dataset.theme = theme === "dark" ? "dark" : "light";
@@ -169,6 +177,135 @@ function initSettingsPanel() {
     }
   };
 
+  const describeBuild = (label, changedFile) => {
+    const details = [];
+    if (label) {
+      details.push(label);
+    }
+    if (changedFile) {
+      details.push(changedFile);
+    }
+    return details.join(" | ");
+  };
+
+  const reloadPageWithFreshQuery = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("refresh", Date.now().toString());
+    if (typeof window.showPlantLoading === "function") {
+      window.showPlantLoading("Loading the newest app build...");
+    }
+    window.location.replace(url.toString());
+  };
+
+  const initAppUpdateSection = () => {
+    if (!appStatusEndpoint || panel.querySelector("[data-app-update-group]")) return;
+
+    const group = document.createElement("div");
+    group.className = "settings-group settings-update-group";
+    group.dataset.appUpdateGroup = "true";
+    group.innerHTML = `
+      <span class="settings-label">App Updates</span>
+      <p class="settings-copy muted small settings-build-meta" data-app-build-meta></p>
+      <div class="settings-update-actions">
+        <button class="btn ghost settings-update-button" type="button" data-app-update-button>Check for Updates</button>
+        <button class="btn settings-update-button" type="button" data-app-reload-button hidden>Reload Page</button>
+      </div>
+      <p class="settings-status muted small" data-app-update-status aria-live="polite"></p>
+    `;
+    panel.appendChild(group);
+
+    const buildMeta = group.querySelector("[data-app-build-meta]");
+    const statusNode = group.querySelector("[data-app-update-status]");
+    const checkButton = group.querySelector("[data-app-update-button]");
+    const reloadButton = group.querySelector("[data-app-reload-button]");
+
+    const setStatus = (message, state = "") => {
+      statusNode.textContent = message;
+      statusNode.dataset.state = state;
+    };
+
+    const setReloadVisible = (visible) => {
+      reloadButton.hidden = !visible;
+    };
+
+    if (buildMeta) {
+      buildMeta.textContent = pageBuildLabel
+        ? `This page loaded build ${describeBuild(pageBuildLabel, pageChangedFile)}.`
+        : "This page does not expose a build stamp yet.";
+    }
+    setStatus("Use Check for Updates to see whether newer code has been picked up.", "idle");
+    setReloadVisible(false);
+
+    reloadButton.addEventListener("click", () => {
+      reloadPageWithFreshQuery();
+    });
+
+    checkButton.addEventListener("click", async () => {
+      checkButton.disabled = true;
+      checkButton.textContent = "Checking...";
+      setReloadVisible(false);
+      setStatus("Checking the newest code visible to the app...", "checking");
+
+      try {
+        const response = await fetch(appStatusEndpoint, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+          },
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (response.status === 404) {
+          setStatus(
+            "This app window is still using an older backend build. The new Settings button loaded from disk, but the running Plant App needs to be closed and reopened before update checks will work.",
+            "warning"
+          );
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`Update check failed (${response.status}).`);
+        }
+
+        const status = await response.json();
+        const loadedVersion = status.loaded_version || "";
+        const loadedBuildLabel = status.loaded_build_label || "";
+        const loadedChangedFile = status.loaded_changed_file || "";
+        const diskVersion = status.disk_version || loadedVersion;
+        const diskBuildLabel = status.disk_build_label || loadedBuildLabel;
+        const diskChangedFile = status.disk_changed_file || loadedChangedFile;
+
+        if (loadedVersion && pageBuildVersion && loadedVersion !== pageBuildVersion) {
+          setStatus(
+            `A newer app build is already running: ${describeBuild(loadedBuildLabel, loadedChangedFile)}. Reload this page after you save any work.`,
+            "update"
+          );
+          setReloadVisible(true);
+          return;
+        }
+
+        if (diskVersion && loadedVersion && diskVersion !== loadedVersion) {
+          setStatus(
+            `Newer code is on disk: ${describeBuild(diskBuildLabel, diskChangedFile)}. Reload this page first; if it still looks old, close and reopen the Plant App launcher.`,
+            "warning"
+          );
+          setReloadVisible(true);
+          return;
+        }
+
+        setStatus(
+          `No newer update found. Running build ${describeBuild(loadedBuildLabel || pageBuildLabel, loadedChangedFile || pageChangedFile)}.`,
+          "ok"
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Update check failed: ${error}`;
+        setStatus(message, "error");
+      } finally {
+        checkButton.disabled = false;
+        checkButton.textContent = "Check for Updates";
+      }
+    });
+  };
+
   const closePanel = () => {
     panel.hidden = true;
     toggle.setAttribute("aria-expanded", "false");
@@ -215,6 +352,7 @@ function initSettingsPanel() {
     });
   });
 
+  initAppUpdateSection();
   applyTheme(initialTheme);
   applyFontScale(initialFontScale);
   refreshPreferences();
