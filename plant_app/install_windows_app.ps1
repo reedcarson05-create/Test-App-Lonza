@@ -7,6 +7,8 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $launcherVbs = Join-Path $projectRoot "launch_plant_desktop_app.vbs"
+$logoPng = Join-Path $projectRoot "static\logo.png"
+$appIcon = Join-Path $projectRoot "static\logo.ico"
 
 if (-not (Test-Path -LiteralPath $launcherVbs)) {
   throw "Missing launcher file: $launcherVbs"
@@ -25,6 +27,93 @@ if (-not (Test-Path -LiteralPath $programsFolder)) {
   New-Item -ItemType Directory -Path $programsFolder | Out-Null
 }
 
+function New-AppIconFromLogo {
+  param(
+    [string]$SourcePng,
+    [string]$IconPath
+  )
+
+  if (-not (Test-Path -LiteralPath $SourcePng)) {
+    return $null
+  }
+
+  Add-Type -AssemblyName System.Drawing
+
+  $source = [System.Drawing.Image]::FromFile($SourcePng)
+  try {
+    $iconSize = 256
+    $canvas = New-Object System.Drawing.Bitmap $iconSize, $iconSize
+    try {
+      $graphics = [System.Drawing.Graphics]::FromImage($canvas)
+      try {
+        $graphics.Clear([System.Drawing.Color]::Transparent)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+
+        $scale = [Math]::Min($iconSize / $source.Width, $iconSize / $source.Height)
+        $drawWidth = [int][Math]::Round($source.Width * $scale)
+        $drawHeight = [int][Math]::Round($source.Height * $scale)
+        $offsetX = [int][Math]::Floor(($iconSize - $drawWidth) / 2)
+        $offsetY = [int][Math]::Floor(($iconSize - $drawHeight) / 2)
+
+        $graphics.DrawImage($source, $offsetX, $offsetY, $drawWidth, $drawHeight)
+      } finally {
+        $graphics.Dispose()
+      }
+
+      $pngStream = New-Object System.IO.MemoryStream
+      try {
+        $canvas.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)
+        $pngBytes = $pngStream.ToArray()
+      } finally {
+        $pngStream.Dispose()
+      }
+    } finally {
+      $canvas.Dispose()
+    }
+
+    $fileStream = [System.IO.File]::Open($IconPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
+    try {
+      $writer = New-Object System.IO.BinaryWriter($fileStream)
+      try {
+        # ICO header + one PNG-backed 256x256 image entry.
+        $writer.Write([UInt16]0)
+        $writer.Write([UInt16]1)
+        $writer.Write([UInt16]1)
+        $writer.Write([byte]0)
+        $writer.Write([byte]0)
+        $writer.Write([byte]0)
+        $writer.Write([byte]0)
+        $writer.Write([UInt16]1)
+        $writer.Write([UInt16]32)
+        $writer.Write([UInt32]$pngBytes.Length)
+        $writer.Write([UInt32]22)
+        $writer.Write($pngBytes)
+      } finally {
+        $writer.Dispose()
+      }
+    } finally {
+      $fileStream.Dispose()
+    }
+  } finally {
+    $source.Dispose()
+  }
+
+  return $IconPath
+}
+
+$shortcutIconLocation = "$env:SystemRoot\System32\SHELL32.dll,220"
+try {
+  $generatedIcon = New-AppIconFromLogo -SourcePng $logoPng -IconPath $appIcon
+  if ($generatedIcon -and (Test-Path -LiteralPath $generatedIcon)) {
+    $shortcutIconLocation = "$generatedIcon,0"
+  }
+} catch {
+  Write-Warning "Could not build the app icon from $logoPng. Using the default Windows icon instead. $($_.Exception.Message)"
+}
+
 function New-AppShortcut {
   param(
     [string]$ShortcutPath
@@ -35,7 +124,7 @@ function New-AppShortcut {
   $shortcut.TargetPath = "$env:SystemRoot\System32\wscript.exe"
   $shortcut.Arguments = "`"$launcherVbs`""
   $shortcut.WorkingDirectory = $projectRoot
-  $shortcut.IconLocation = "$env:SystemRoot\System32\SHELL32.dll,220"
+  $shortcut.IconLocation = $shortcutIconLocation
   $shortcut.Description = "Open the Lonza Plant App desktop window."
   $shortcut.Save()
 }
