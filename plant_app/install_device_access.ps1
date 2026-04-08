@@ -17,8 +17,7 @@ if (-not (Test-Path -LiteralPath $hiddenLauncher)) {
 $startupLines = @(
   "@echo off",
   'set "PLANT_APP_HOST=0.0.0.0"',
-  "set `"PLANT_APP_PORT=$Port`"",
-  'set "PLANT_APP_SQLITE_PATH=plant.db"'
+  "set `"PLANT_APP_PORT=$Port`""
 )
 
 $startupLines += "wscript.exe `"$hiddenLauncher`""

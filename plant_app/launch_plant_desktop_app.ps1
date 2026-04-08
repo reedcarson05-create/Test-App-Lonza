@@ -221,7 +221,6 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
   $pythonExe = Resolve-PythonExe
   $env:PLANT_APP_HOST = "0.0.0.0"
   $env:PLANT_APP_PORT = [string]$Port
-  $env:PLANT_APP_SQLITE_PATH = "plant.db"
 
   Write-LaunchLog "Server not running on port $Port, starting background host with $pythonExe."
   Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
