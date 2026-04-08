@@ -13,12 +13,16 @@ function initLoadingScreen() {
   overlay.setAttribute("aria-hidden", "true");
   overlay.innerHTML = `
     <div class="loading-screen" role="status" aria-live="polite" aria-atomic="true">
-      <p class="loading-screen-kicker">Plant App</p>
-      <h2 class="loading-screen-title">Loading</h2>
+      <div class="loading-screen-header">
+        <p class="loading-screen-kicker">Lonza Plant Operations</p>
+        <span class="loading-screen-badge">Secure Session</span>
+      </div>
+      <h2 class="loading-screen-title">Preparing Workspace</h2>
       <p class="loading-screen-copy" data-loading-message>Opening the next screen...</p>
       <div class="loading-screen-track" aria-hidden="true">
         <span class="loading-screen-bar"></span>
       </div>
+      <p class="loading-screen-caption">Loading the next view and the latest shared resources.</p>
     </div>
   `;
   page.appendChild(overlay);
