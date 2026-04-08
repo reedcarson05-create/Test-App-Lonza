@@ -243,14 +243,14 @@ body.boot-page::before {
 }
 
 .boot-shell {
-  width: min(860px, 100%);
-  padding: 34px;
-  border: 1px solid rgba(128, 255, 143, 0.24);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(11, 23, 14, 0.94), rgba(9, 18, 11, 0.98));
+  width: min(980px, 100%);
+  padding: 40px 42px;
+  border: 1px solid rgba(148, 215, 255, 0.18);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(18, 31, 40, 0.96), rgba(12, 21, 29, 0.98));
   box-shadow:
-    0 0 0 2px rgba(95, 219, 113, 0.08) inset,
-    0 26px 60px rgba(0, 0, 0, 0.36);
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 28px 72px rgba(0, 0, 0, 0.38);
   transition:
     border-color 0.7s ease,
     border-radius 0.7s ease,
@@ -262,9 +262,9 @@ body.boot-page::before {
 .boot-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 20px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
 .boot-logo {
@@ -279,26 +279,32 @@ body.boot-page::before {
 
 .boot-title {
   margin: 0;
-  font-size: clamp(34px, 4.8vw, 58px);
-  line-height: 1.02;
+  font-size: clamp(34px, 4.4vw, 54px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .boot-copy {
-  display: none;
+  display: block;
+  margin: 12px 0 0;
+  max-width: 680px;
+  color: rgba(221, 237, 247, 0.74);
+  font-size: calc(17px * var(--font-scale));
+  line-height: 1.55;
 }
 
 .boot-phase-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 28px;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .boot-phase-pill {
-  min-height: 18px;
-  border: 1px solid rgba(133, 179, 153, 0.24);
-  border-radius: 0;
-  background: rgba(8, 16, 11, 0.54);
+  min-height: 10px;
+  border: 1px solid rgba(223, 245, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
   transition:
     border-color 0.5s ease,
     border-radius 0.5s ease,
@@ -308,33 +314,25 @@ body.boot-page::before {
 }
 
 .boot-phase-pill.is-active {
-  border-color: rgba(130, 255, 140, 0.46);
-  box-shadow: 0 12px 24px rgba(4, 12, 8, 0.26);
-  transform: translateY(-2px);
+  border-color: rgba(223, 245, 255, 0.32);
+  box-shadow: 0 10px 22px rgba(5, 15, 26, 0.28);
+  transform: translateY(-1px);
 }
 
 .boot-loader {
-  margin-top: 30px;
+  margin-top: 24px;
 }
 
 .boot-loader-track {
   position: relative;
-  height: 28px;
+  height: 20px;
   overflow: hidden;
-  border: 2px solid rgba(136, 255, 146, 0.34);
-  border-radius: 0;
-  background:
-    linear-gradient(180deg, rgba(8, 15, 9, 0.94), rgba(5, 10, 6, 0.98)),
-    repeating-linear-gradient(
-      90deg,
-      rgba(121, 255, 137, 0.06) 0,
-      rgba(121, 255, 137, 0.06) 8px,
-      transparent 8px,
-      transparent 12px
-    );
+  border: 1px solid rgba(223, 245, 255, 0.16);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(35, 52, 64, 0.9), rgba(20, 30, 39, 0.94));
   box-shadow:
-    0 0 0 1px rgba(117, 255, 129, 0.08) inset,
-    inset 0 0 16px rgba(65, 173, 69, 0.1);
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    inset 0 0 26px rgba(129, 214, 255, 0.08);
   transition:
     height 0.7s ease,
     border-radius 0.7s ease,
@@ -347,18 +345,11 @@ body.boot-page::before {
   position: relative;
   width: 0;
   height: 100%;
-  border-radius: 0;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      #7cff72 0,
-      #7cff72 18px,
-      #2f5c2f 18px,
-      #2f5c2f 21px
-    );
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4dd7ff, #7bffcf 52%, #ffe38d 100%);
   box-shadow:
-    0 0 18px rgba(124, 255, 114, 0.24),
-    inset 0 0 0 1px rgba(239, 255, 239, 0.12);
+    0 0 28px rgba(77, 215, 255, 0.24),
+    0 0 44px rgba(123, 255, 207, 0.14);
   transition:
     width 0.2s linear,
     border-radius 0.7s ease,
@@ -372,9 +363,9 @@ body.boot-page::before {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 46%),
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
-  opacity: 0.32;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 52%),
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent 74%);
+  opacity: 0.55;
   transition: opacity 0.7s ease;
 }
 
@@ -382,29 +373,23 @@ body.boot-page::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04) 0,
-    rgba(255, 255, 255, 0.04) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.22;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  opacity: 0.5;
   pointer-events: none;
 }
 
 .boot-readout {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .boot-percent {
-  min-width: 84px;
-  color: #9cff9f;
-  font-size: clamp(28px, 4vw, 44px);
+  min-width: 92px;
+  color: #dff5ff;
+  font-size: clamp(24px, 3.2vw, 34px);
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   text-align: right;
   transition: color 0.7s ease;
 }
@@ -1907,52 +1892,155 @@ body.page-loading .app-loading-overlay {
 }
 
 .loading-screen {
-  width: min(420px, 100%);
-  padding: 24px;
-  border-radius: var(--radius-xl);
-  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line) 82%);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--surface-strong) 92%, white 8%), color-mix(in srgb, var(--surface) 78%, var(--brand-soft) 22%));
-  box-shadow: var(--shadow-lg);
+  width: min(560px, 100%);
+  padding: 30px 32px 28px;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--line) 86%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 251, 255, 0.94)),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-strong) 92%, white 8%), color-mix(in srgb, var(--surface) 84%, var(--brand-soft) 16%));
+  box-shadow:
+    0 22px 54px rgba(8, 22, 34, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.88) inset;
+}
+
+.loading-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .loading-screen-kicker {
-  margin-bottom: 8px;
+  margin: 0;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: color-mix(in srgb, var(--brand-dark) 84%, var(--text) 16%);
+}
+
+.loading-screen-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line) 82%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 248, 255, 0.9));
+  color: color-mix(in srgb, var(--brand-dark) 78%, var(--text) 22%);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .loading-screen-title {
-  margin: 0 0 8px;
-  font-size: calc(28px * var(--font-scale));
+  margin: 0 0 10px;
+  font-size: calc(30px * var(--font-scale));
+  line-height: 1.08;
+  color: color-mix(in srgb, var(--text) 92%, var(--brand-dark) 8%);
 }
 
 .loading-screen-copy {
+  margin: 0;
   color: var(--muted);
+  font-size: calc(16px * var(--font-scale));
+  line-height: 1.5;
 }
 
 .loading-screen-track {
-  margin-top: 18px;
-  height: 14px;
+  position: relative;
+  margin-top: 20px;
+  height: 16px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line) 82%);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 76%, white 24%), color-mix(in srgb, var(--surface) 90%, white 10%));
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--line) 86%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(227, 237, 246, 0.94)),
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-soft) 78%, white 22%), color-mix(in srgb, var(--surface) 88%, white 12%));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 0 0 1px rgba(16, 36, 48, 0.04);
+}
+
+.loading-screen-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .loading-screen-bar {
   display: block;
-  width: 34%;
+  position: relative;
+  width: 64%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand-dark), var(--brand-bright), var(--accent));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--brand) 32%, transparent 68%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-dark) 86%, #0e3f56 14%), var(--brand), var(--accent));
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--brand) 22%, transparent 78%),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  animation: loading-screen-slide 1.9s ease-in-out infinite alternate;
+}
+
+.loading-screen-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent 68%);
+  opacity: 0.85;
+}
+
+.loading-screen-caption {
+  margin: 12px 0 0;
+  color: color-mix(in srgb, var(--muted) 86%, var(--text) 14%);
+  font-size: calc(13px * var(--font-scale));
+  letter-spacing: 0.01em;
+}
+
+@keyframes loading-screen-slide {
+  from {
+    transform: translateX(-10%);
+  }
+  to {
+    transform: translateX(10%);
+  }
 }
 
 html[data-theme="dark"] .loading-screen {
-  background: linear-gradient(160deg, rgba(31, 46, 58, 0.98), rgba(18, 29, 37, 0.98));
+  background:
+    linear-gradient(180deg, rgba(24, 37, 47, 0.98), rgba(16, 27, 35, 0.98)),
+    linear-gradient(145deg, rgba(44, 68, 84, 0.26), rgba(17, 29, 37, 0.92));
+  border-color: rgba(148, 190, 214, 0.16);
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.38),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+html[data-theme="dark"] .loading-screen-badge {
+  background: linear-gradient(180deg, rgba(41, 58, 71, 0.94), rgba(29, 43, 54, 0.92));
+  border-color: rgba(148, 190, 214, 0.14);
+  color: #d7edf8;
+}
+
+html[data-theme="dark"] .loading-screen-title {
+  color: #f2f8fc;
+}
+
+html[data-theme="dark"] .loading-screen-copy,
+html[data-theme="dark"] .loading-screen-caption {
+  color: rgba(223, 237, 245, 0.74);
+}
+
+html[data-theme="dark"] .loading-screen-track {
+  border-color: rgba(148, 190, 214, 0.16);
+  background:
+    linear-gradient(180deg, rgba(40, 58, 70, 0.92), rgba(23, 34, 43, 0.94)),
+    linear-gradient(90deg, rgba(24, 37, 45, 0.94), rgba(18, 29, 37, 0.92));
 }
 
 .success-check {

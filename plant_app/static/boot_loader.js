@@ -24,19 +24,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const phases = [
     {
       threshold: 0,
-      stage: "retro",
+      stage: "modern",
+      status: "Preparing Plant App",
+      detail: "Loading shared controls and session services.",
     },
     {
       threshold: 0.4,
-      stage: "y2k",
+      stage: "modern",
+      status: "Loading Shared Resources",
+      detail: "Caching styles, scripts, and the next screen.",
     },
     {
       threshold: 0.68,
-      stage: "web",
+      stage: "modern",
+      status: "Checking Current Data",
+      detail: "Refreshing the latest workspace records.",
     },
     {
       threshold: 0.87,
       stage: "modern",
+      status: "Launching Workspace",
+      detail: "Finalizing the secure handoff to the app.",
     },
   ];
 
@@ -53,8 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ), phases[0]);
 
     root.dataset.bootStage = activePhase.stage;
-    statusNode.textContent = "Loading";
-    detailNode.textContent = "";
+    statusNode.textContent = activePhase.status;
+    detailNode.textContent = activePhase.detail;
 
     phaseNodes.forEach((node) => {
       const threshold = Number(node.dataset.bootPhaseThreshold || "1");
