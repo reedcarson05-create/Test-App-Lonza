@@ -55,7 +55,7 @@ from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS
 
 # Main ASGI application object served by Uvicorn or another ASGI server.
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="lonza-secret-key-change-me")
+app.add_middleware(SessionMiddleware, secret_key="lag-secret-key-change-me")
 
 # Base directory used to resolve the bundled static assets and Jinja templates.
 BASE_DIR = Path(__file__).resolve().parent

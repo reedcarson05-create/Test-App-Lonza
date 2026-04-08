@@ -14,9 +14,9 @@ if (-not (Test-Path -LiteralPath $launcherVbs)) {
   throw "Missing launcher file: $launcherVbs"
 }
 
-$shortcutName = "Lonza Plant App.lnk"
+$shortcutName = "LAG Plant App.lnk"
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) $shortcutName
-$programsFolder = Join-Path ([Environment]::GetFolderPath("Programs")) "Lonza Plant App"
+$programsFolder = Join-Path ([Environment]::GetFolderPath("Programs")) "LAG Plant App"
 $startMenuShortcut = Join-Path $programsFolder $shortcutName
 $startupShortcut = Join-Path ([Environment]::GetFolderPath("Startup")) $shortcutName
 $legacyStartupLauncher = Join-Path ([Environment]::GetFolderPath("Startup")) "Plant App Startup.cmd"
@@ -125,7 +125,7 @@ function New-AppShortcut {
   $shortcut.Arguments = "`"$launcherVbs`""
   $shortcut.WorkingDirectory = $projectRoot
   $shortcut.IconLocation = $shortcutIconLocation
-  $shortcut.Description = "Open the Lonza Plant App desktop window."
+  $shortcut.Description = "Open the LAG Plant App desktop window."
   $shortcut.Save()
 }
 

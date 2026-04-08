@@ -14,7 +14,7 @@ function initLoadingScreen() {
   overlay.innerHTML = `
     <div class="loading-screen" role="status" aria-live="polite" aria-atomic="true">
       <div class="loading-screen-header">
-        <p class="loading-screen-kicker">Lonza Plant Operations</p>
+        <p class="loading-screen-kicker">LAG Plant Operations</p>
         <span class="loading-screen-badge">Secure Session</span>
       </div>
       <h2 class="loading-screen-title">Preparing Workspace</h2>
