@@ -1394,6 +1394,55 @@ td.blank-display {
     0 16px 24px color-mix(in srgb, var(--brand) 24%, transparent 76%);
 }
 
+.settings-build-meta {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.settings-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-update-button {
+  min-height: 42px;
+  padding: 10px 14px;
+  font-size: calc(14px * var(--font-scale));
+}
+
+.settings-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-strong) 82%, white 18%);
+  line-height: 1.45;
+}
+
+.settings-status[data-state="ok"] {
+  border-color: color-mix(in srgb, #2f855a 40%, var(--line) 60%);
+  background: color-mix(in srgb, #d9fbe8 62%, white 38%);
+  color: #21543a;
+}
+
+.settings-status[data-state="update"] {
+  border-color: color-mix(in srgb, var(--brand) 34%, var(--line) 66%);
+  background: color-mix(in srgb, var(--brand-soft) 44%, white 56%);
+}
+
+.settings-status[data-state="warning"] {
+  border-color: color-mix(in srgb, #d69e2e 46%, var(--line) 54%);
+  background: color-mix(in srgb, #fff2cf 72%, white 28%);
+  color: #6a4300;
+}
+
+.settings-status[data-state="error"] {
+  border-color: color-mix(in srgb, #c53030 42%, var(--line) 58%);
+  background: color-mix(in srgb, #ffe2e2 68%, white 32%);
+  color: #7d1f1f;
+}
+
 .table-action {
   display: inline-flex;
   align-items: center;
@@ -1678,6 +1727,11 @@ td.blank-display {
   padding: 18px;
   background: rgba(7, 12, 20, 0.76);
   backdrop-filter: blur(6px);
+}
+
+.camera-modal[hidden],
+.signature-modal[hidden] {
+  display: none !important;
 }
 
 .signature-modal {

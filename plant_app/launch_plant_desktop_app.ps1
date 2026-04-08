@@ -19,6 +19,7 @@ $baseUrl = ""
 $windowUrl = ""
 $healthUrl = ""
 $bootUrl = ""
+$appStatusUrl = ""
 
 function Set-LaunchUrls {
   param(
@@ -30,6 +31,7 @@ function Set-LaunchUrls {
   $script:windowUrl = "$script:baseUrl/boot?launch=$launchStamp"
   $script:healthUrl = "$script:baseUrl/health"
   $script:bootUrl = "$script:baseUrl/boot"
+  $script:appStatusUrl = "$script:baseUrl/app-status"
 }
 
 Set-LaunchUrls -ActivePort $Port
@@ -82,7 +84,8 @@ function Get-PortOwnerProcess {
 function Stop-StaleProjectServer {
   param(
     [int]$LocalPort,
-    [string]$ExpectedRoot
+    [string]$ExpectedRoot,
+    [string]$Reason = "required routes were unavailable"
   )
 
   $owner = Get-PortOwnerProcess -LocalPort $LocalPort
@@ -101,7 +104,7 @@ function Stop-StaleProjectServer {
     throw "Port $LocalPort is already in use by another process and the launcher will not stop it automatically."
   }
 
-  Write-LaunchLog "Stopping stale Plant App server process $($owner.ProcessId) because /boot was unavailable."
+  Write-LaunchLog "Stopping stale Plant App server process $($owner.ProcessId) because $Reason."
   Stop-Process -Id $owner.ProcessId -Force
   Start-Sleep -Milliseconds 700
   return $true
@@ -116,12 +119,13 @@ function Resolve-DesktopPort {
   foreach ($candidate in $candidates) {
     $candidateHealth = "http://127.0.0.1:$candidate/health"
     $candidateBoot = "http://127.0.0.1:$candidate/boot"
+    $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
 
     if (-not (Test-AppServerReady -Url $candidateHealth)) {
       return $candidate
     }
 
-    if (Test-AppServerReady -Url $candidateBoot) {
+    if ((Test-AppServerReady -Url $candidateBoot) -and (Test-AppServerReady -Url $candidateAppStatus)) {
       return $candidate
     }
   }
@@ -188,10 +192,18 @@ function Resolve-PythonExe {
   throw "No suitable Python runtime was found. Install the Plant App dependencies first."
 }
 
-if ((Test-AppServerReady -Url $healthUrl) -and (-not (Test-AppServerReady -Url $bootUrl))) {
+if ((Test-AppServerReady -Url $healthUrl) -and ((-not (Test-AppServerReady -Url $bootUrl)) -or (-not (Test-AppServerReady -Url $appStatusUrl)))) {
+  $staleReasons = @()
+  if (-not (Test-AppServerReady -Url $bootUrl)) {
+    $staleReasons += "/boot was unavailable"
+  }
+  if (-not (Test-AppServerReady -Url $appStatusUrl)) {
+    $staleReasons += "/app-status was unavailable"
+  }
+  $staleReason = if ($staleReasons.Count) { $staleReasons -join " and " } else { "required routes were unavailable" }
   $stoppedStale = $false
   try {
-    $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot
+    $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot -Reason $staleReason
   } catch {
     Write-LaunchLog ("Could not stop the stale server on port {0}: {1}" -f $Port, $_.Exception.Message)
   }
@@ -199,7 +211,7 @@ if ((Test-AppServerReady -Url $healthUrl) -and (-not (Test-AppServerReady -Url $
   if (-not $stoppedStale) {
     $fallbackPort = Resolve-DesktopPort -PreferredPort $Port
     if ($fallbackPort -ne $Port) {
-      Write-LaunchLog "Port $Port is serving an older app host. Switching desktop launch to port $fallbackPort."
+      Write-LaunchLog "Port $Port is serving an older app host ($staleReason). Switching desktop launch to port $fallbackPort."
       Set-LaunchUrls -ActivePort $fallbackPort
     }
   }
@@ -229,6 +241,10 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
 
 if (-not (Test-AppServerReady -Url $bootUrl)) {
   throw "The Plant App server started, but the /boot route is unavailable. Restart the launcher after confirming the background host updated."
+}
+
+if (-not (Test-AppServerReady -Url $appStatusUrl)) {
+  throw "The Plant App server started, but the /app-status route is unavailable. Restart the launcher after confirming the background host updated."
 }
 
 if (-not $SkipBrowser) {

@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import os
 import socket
+from time import perf_counter
 from uuid import uuid4
 
 # FastAPI framework imports used for route declarations, form parsing, and HTML responses.
@@ -58,10 +59,13 @@ app.add_middleware(SessionMiddleware, secret_key="lonza-secret-key-change-me")
 
 # Base directory used to resolve the bundled static assets and Jinja templates.
 BASE_DIR = Path(__file__).resolve().parent
+RUNTIME_DIR = BASE_DIR / "runtime"
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SIGNATURE_DIR = UPLOAD_DIR / "signatures"
 SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
+SIGNATURE_DEBUG_LOG = RUNTIME_DIR / "signature_debug.log"
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 BOOT_TEMPLATE_NAMES = tuple(sorted(path.name for path in (BASE_DIR / "templates").glob("*.html")))
@@ -76,22 +80,53 @@ BOOT_STATIC_FILES = (
 BOOT_MIN_DURATION_MS = 9500
 
 
-def asset_version() -> str:
-    """Return a cache-busting version based on the latest UI asset timestamp."""
-    candidate_paths = (
+def current_app_build() -> dict[str, str]:
+    """Return the latest code/build marker visible on disk for this app."""
+    candidate_paths = [
+        BASE_DIR / "app.py",
+        BASE_DIR / "db.py",
+        BASE_DIR / "stage_defs.py",
         BASE_DIR / "static" / "style.css",
         BASE_DIR / "static" / "settings.js",
-        BASE_DIR / "static" / "boot_loader.js",
         BASE_DIR / "static" / "signature_session.js",
         BASE_DIR / "static" / "form_corrections.js",
-    )
+        BASE_DIR / "static" / "image_upload.js",
+        BASE_DIR / "static" / "logo.png",
+    ]
+    candidate_paths.extend(sorted((BASE_DIR / "templates").glob("*.html")))
+
     latest_stamp = 0
+    latest_path = BASE_DIR / "app.py"
     for path in candidate_paths:
         try:
-            latest_stamp = max(latest_stamp, path.stat().st_mtime_ns)
+            modified = path.stat().st_mtime_ns
         except OSError:
             continue
-    return str(latest_stamp or int(datetime.now().timestamp()))
+        if modified >= latest_stamp:
+            latest_stamp = modified
+            latest_path = path
+
+    if not latest_stamp:
+        latest_stamp = int(datetime.now().timestamp() * 1_000_000_000)
+
+    try:
+        changed_file = latest_path.relative_to(BASE_DIR).as_posix()
+    except ValueError:
+        changed_file = latest_path.name
+
+    return {
+        "version": str(latest_stamp),
+        "build_label": datetime.fromtimestamp(latest_stamp / 1_000_000_000).strftime("%Y-%m-%d %I:%M:%S %p"),
+        "changed_file": changed_file,
+    }
+
+
+LOADED_APP_BUILD = current_app_build()
+
+
+def asset_version() -> str:
+    """Return a cache-busting version based on the newest tracked app file on disk."""
+    return current_app_build()["version"]
 
 
 def warm_boot_cache() -> None:
@@ -228,6 +263,30 @@ def current_signature_data(request: Request) -> str:
 def signature_session_ready(request: Request) -> bool:
     """Return True when the login session already has initials, signed time, and drawing data."""
     return bool(current_signature_initials(request) and current_signature_signed_at(request) and current_signature_data(request))
+
+
+def append_signature_debug_log(event_name: str, request: Request | None = None, **details) -> None:
+    """Append a compact JSON line that helps trace where signature capture gets stuck."""
+    payload = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "event": event_name,
+    }
+    if request is not None:
+        payload["path"] = str(request.url.path)
+        payload["user"] = current_user(request)
+        payload["signature_ready"] = signature_session_ready(request)
+    for key, value in details.items():
+        if value in {None, ""}:
+            continue
+        if isinstance(value, (int, float, bool)):
+            payload[key] = value
+        else:
+            payload[key] = clean_value(value)[:240]
+    try:
+        with SIGNATURE_DEBUG_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except OSError:
+        pass
 
 
 def signature_asset_public_path(file_path: Path) -> str:
@@ -428,6 +487,7 @@ def get_generic_stage(stage_key: str):
 def render_page(request: Request, template_name: str, **context):
     """Render a template with the standard navigation/session context already included."""
     # Shared template values used by most pages for nav badges and defaults.
+    loaded_build = LOADED_APP_BUILD
     page_context = {
         "request": request,
         "user": current_user(request),
@@ -441,6 +501,9 @@ def render_page(request: Request, template_name: str, **context):
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
         "asset_version": asset_version(),
+        "app_loaded_version": loaded_build["version"],
+        "app_loaded_build_label": loaded_build["build_label"],
+        "app_loaded_changed_file": loaded_build["changed_file"],
         "today": today_str(),
         "run": active_run(request),
         "local_access_urls": local_access_urls(request),
@@ -814,6 +877,23 @@ def boot_warm():
     return JSONResponse({"ok": True})
 
 
+@app.get("/app-status")
+def app_status():
+    """Return the build loaded by this server plus the latest code timestamp visible on disk."""
+    current_build = current_app_build()
+    return JSONResponse(
+        {
+            "loaded_version": LOADED_APP_BUILD["version"],
+            "loaded_build_label": LOADED_APP_BUILD["build_label"],
+            "loaded_changed_file": LOADED_APP_BUILD["changed_file"],
+            "disk_version": current_build["version"],
+            "disk_build_label": current_build["build_label"],
+            "disk_changed_file": current_build["changed_file"],
+            "restart_required": current_build["version"] != LOADED_APP_BUILD["version"],
+        }
+    )
+
+
 # ------------------------
 # LOGIN
 # ------------------------
@@ -898,20 +978,53 @@ async def save_signature_session_api(request: Request):
     if redirect:
         return JSONResponse({"error": "Please log in again before saving a signature."}, status_code=401)
 
+    started = perf_counter()
     try:
         payload = await request.json()
     except json.JSONDecodeError:
+        append_signature_debug_log("signature-session-invalid-json", request)
         return JSONResponse({"error": "The signature payload was not valid JSON."}, status_code=400)
 
     initials = clean_value(payload.get("initials", "")).upper()
     signature_data = clean_value(payload.get("signature_data", ""))
     signed_at = clean_value(payload.get("signed_at", ""))
+    append_signature_debug_log(
+        "signature-session-request",
+        request,
+        initials=initials,
+        signed_at=signed_at,
+        signature_length=len(signature_data),
+    )
     if not initials or not signature_data or not signed_at:
+        append_signature_debug_log(
+            "signature-session-missing-fields",
+            request,
+            initials=initials,
+            signed_at=signed_at,
+            signature_length=len(signature_data),
+        )
         return JSONResponse({"error": "Initials, signed time, and a handwritten signature are all required."}, status_code=400)
 
     if not update_signature_session(request, initials, signature_data, signed_at):
+        append_signature_debug_log(
+            "signature-session-save-failed",
+            request,
+            initials=initials,
+            signed_at=signed_at,
+            signature_length=len(signature_data),
+            duration_ms=round((perf_counter() - started) * 1000, 1),
+        )
         return JSONResponse({"error": "The app could not save that signature image. Please try again."}, status_code=400)
 
+    append_signature_debug_log(
+        "signature-session-save-ok",
+        request,
+        initials=current_signature_initials(request),
+        signed_at=current_signature_signed_at(request),
+        signature_ref=current_signature_data(request),
+        signature_length=len(signature_data),
+        duration_ms=round((perf_counter() - started) * 1000, 1),
+    )
     return JSONResponse(
         {
             "ok": True,
@@ -920,6 +1033,36 @@ async def save_signature_session_api(request: Request):
             "signature_data": current_signature_data(request),
         }
     )
+
+
+@app.post("/signature-debug")
+async def signature_debug_api(request: Request):
+    """Capture client-side signature flow breadcrumbs in a server log for desktop debugging."""
+    redirect = require_login(request)
+    if redirect:
+        return PlainTextResponse("", status_code=204)
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        append_signature_debug_log("signature-client-invalid-json", request)
+        return PlainTextResponse("", status_code=204)
+
+    event_name = clean_value(payload.get("event", "")) or "unknown"
+    raw_details = payload.get("details", {})
+    details = {}
+    if isinstance(raw_details, dict):
+        for key, value in raw_details.items():
+            if isinstance(value, (str, int, float, bool)):
+                details[f"client_{clean_value(key)}"] = value
+    append_signature_debug_log(
+        f"signature-client-{event_name}",
+        request,
+        client_page=payload.get("page", ""),
+        client_at=payload.get("at", ""),
+        **details,
+    )
+    return PlainTextResponse("", status_code=204)
 
 
 @app.post("/settings")
