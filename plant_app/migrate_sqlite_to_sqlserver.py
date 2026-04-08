@@ -12,7 +12,7 @@ import pyodbc
 BASE_DIR = Path(__file__).resolve().parent
 SQLITE_PATH = BASE_DIR / "plant.db"
 SQL_SERVER = r"localhost\SQLEXPRESS"
-SQL_DATABASE = "LonzaPlantOpsApp"
+SQL_DATABASE = "LAGPlantOpsApp"
 
 TABLE_ORDER = [
     "users",
