@@ -1,0 +1,43 @@
+<!doctype html>
+<html data-theme="dark" data-boot-stage="retro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loading</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body class="boot-page">
+  <div class="boot-wrap">
+    <section class="boot-shell">
+      <div class="boot-brand">
+        <div class="boot-logo">
+          <img src="/static/logo.png" alt="Lonza">
+        </div>
+      </div>
+
+      <h1 class="boot-title" data-boot-status>Loading</h1>
+      <p class="boot-copy" data-boot-detail aria-hidden="true"></p>
+
+      <div class="boot-phase-row" aria-hidden="true">
+        <div class="boot-phase-pill is-active" data-boot-phase-threshold="0"></div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.4"></div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.68"></div>
+        <div class="boot-phase-pill" data-boot-phase-threshold="0.87"></div>
+      </div>
+
+      <div class="boot-loader">
+        <div class="boot-loader-track">
+          <div class="boot-loader-fill" data-boot-fill></div>
+        </div>
+        <div class="boot-readout">
+          <div class="boot-percent" data-boot-percent>0%</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script id="boot-manifest" type="application/json">{{ boot_manifest | tojson }}</script>
+  <script src="/static/boot_loader.js?v={{ asset_version }}"></script>
+</body>
+</html>

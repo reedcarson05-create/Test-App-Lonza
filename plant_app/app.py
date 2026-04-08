@@ -64,7 +64,113 @@ SIGNATURE_DIR = UPLOAD_DIR / "signatures"
 SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-ASSET_VERSION = "20260406-4"
+BOOT_TEMPLATE_NAMES = tuple(sorted(path.name for path in (BASE_DIR / "templates").glob("*.html")))
+BOOT_STATIC_FILES = (
+    "style.css",
+    "settings.js",
+    "signature_session.js",
+    "form_corrections.js",
+    "image_upload.js",
+    "logo.png",
+)
+BOOT_MIN_DURATION_MS = 9500
+
+
+def asset_version() -> str:
+    """Return a cache-busting version based on the latest UI asset timestamp."""
+    candidate_paths = (
+        BASE_DIR / "static" / "style.css",
+        BASE_DIR / "static" / "settings.js",
+        BASE_DIR / "static" / "boot_loader.js",
+        BASE_DIR / "static" / "signature_session.js",
+        BASE_DIR / "static" / "form_corrections.js",
+    )
+    latest_stamp = 0
+    for path in candidate_paths:
+        try:
+            latest_stamp = max(latest_stamp, path.stat().st_mtime_ns)
+        except OSError:
+            continue
+    return str(latest_stamp or int(datetime.now().timestamp()))
+
+
+def warm_boot_cache() -> None:
+    """Prime templates, static metadata, and common database reads before the login page opens."""
+    for template_name in BOOT_TEMPLATE_NAMES:
+        try:
+            templates.env.get_template(template_name)
+        except Exception:
+            continue
+
+    for static_name in BOOT_STATIC_FILES:
+        try:
+            (BASE_DIR / "static" / static_name).stat()
+        except OSError:
+            continue
+
+    asset_version()
+    try:
+        list_runs(limit=12)
+    except Exception:
+        pass
+    try:
+        last_12_hour_activity(limit=36)
+    except Exception:
+        pass
+
+
+def build_boot_manifest(request: Request) -> dict:
+    """Return the startup preload plan shown by the animated boot screen."""
+    version = asset_version()
+    login_url = "/?fresh=1"
+    tasks = [
+        {
+            "label": "Loading system stylesheet",
+            "url": f"/static/style.css?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching shared app controls",
+            "url": f"/static/settings.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching signature capture tools",
+            "url": f"/static/signature_session.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching correction editor tools",
+            "url": f"/static/form_corrections.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Caching image upload helpers",
+            "url": f"/static/image_upload.js?v={version}",
+            "kind": "text",
+        },
+        {
+            "label": "Loading plant branding assets",
+            "url": f"/static/logo.png?v={version}",
+            "kind": "image",
+        },
+        {
+            "label": "Warming templates and database reads",
+            "url": "/boot/warm",
+            "kind": "json",
+        },
+        {
+            "label": "Preparing the operator login screen",
+            "url": login_url,
+            "kind": "text",
+        },
+    ]
+    return {
+        "target_url": login_url,
+        "min_duration_ms": BOOT_MIN_DURATION_MS,
+        "tasks": tasks,
+        "local_port": request.url.port or configured_port(),
+    }
 
 
 def configured_host() -> str:
@@ -334,7 +440,7 @@ def render_page(request: Request, template_name: str, **context):
         "settings_theme": current_theme(request),
         "settings_font_scale": current_font_scale(request),
         "settings_persist": logged_in(request),
-        "asset_version": ASSET_VERSION,
+        "asset_version": asset_version(),
         "today": today_str(),
         "run": active_run(request),
         "local_access_urls": local_access_urls(request),
@@ -435,9 +541,10 @@ def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "
     return labels.get(entry_table, entry_table.replace("_", " ").title())
 
 
-def process_dashboard_rows():
+def process_dashboard_rows(rows=None):
     """Filter recent activity down to the standalone extraction and filtration sections."""
-    return [row for row in last_12_hour_activity() if row["section"] in {"Extraction", "Filtration"}]
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    return [row for row in source_rows if row["section"] in {"Extraction", "Filtration"}]
 
 
 def build_filtration_row_map(rows):
@@ -579,10 +686,11 @@ def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
     }
 
 
-def process_dashboard_items():
+def process_dashboard_items(rows=None):
     """Prepare recent extraction/filtration rows with the edit links used by the dashboard."""
     items = []
-    for row in process_dashboard_rows():
+    source_rows = rows if rows is not None else process_dashboard_rows()
+    for row in source_rows:
         # Edit links depend on section because each stage has a dedicated correction route.
         href = ""
         if row["section"] == "Extraction":
@@ -593,11 +701,12 @@ def process_dashboard_items():
     return items
 
 
-def dashboard_batch_packs():
+def dashboard_batch_packs(rows=None):
     """Group recent batch-pack activity by batch number for the review dashboard."""
     # `packs` is keyed by batch number so multiple saved sheets collapse into one dashboard card.
     packs = {}
-    for row in last_12_hour_activity():
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    for row in source_rows:
         batch_number = row["batch_number"] or "No batch"
         pack = packs.setdefault(
             batch_number,
@@ -680,6 +789,31 @@ def health():
     return "OK"
 
 
+@app.get("/boot", response_class=HTMLResponse)
+def boot_page(request: Request):
+    """Show the startup animation, clear any stale session, and preload shared app resources."""
+    clear_signature_session(request)
+    request.session.clear()
+    response = templates.TemplateResponse(
+        "boot.html",
+        {
+            "request": request,
+            "boot_manifest": build_boot_manifest(request),
+            "asset_version": asset_version(),
+        },
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/boot/warm")
+def boot_warm():
+    """Warm shared templates and database queries so the first operator interaction feels lighter."""
+    warm_boot_cache()
+    return JSONResponse({"ok": True})
+
+
 # ------------------------
 # LOGIN
 # ------------------------
@@ -687,10 +821,14 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def login_page(request: Request):
     """Render the login form or jump straight home when a session already exists."""
-    if logged_in(request):
+    fresh_login = request.query_params.get("fresh") == "1"
+    if fresh_login:
+        clear_signature_session(request)
+        request.session.clear()
+    elif logged_in(request):
         return RedirectResponse("/home", status_code=303)
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         "login.html",
         {
             "request": request,
@@ -698,11 +836,15 @@ def login_page(request: Request):
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
-            "asset_version": ASSET_VERSION,
+            "asset_version": asset_version(),
             "local_access_urls": local_access_urls(request),
             "local_port": request.url.port or configured_port(),
         },
     )
+    if fresh_login:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.post("/login")
@@ -733,7 +875,7 @@ def login(
             "settings_theme": "light",
             "settings_font_scale": "1",
             "settings_persist": False,
-            "asset_version": ASSET_VERSION,
+            "asset_version": asset_version(),
             "local_access_urls": local_access_urls(request),
             "local_port": request.url.port or configured_port(),
         },
@@ -1013,7 +1155,8 @@ def process_dashboard(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "process_dashboard.html", stage_links=PROCESS_STAGE_LINKS, items=process_dashboard_items())
+    activity_rows = process_dashboard_rows(last_12_hour_activity())
+    return render_page(request, "process_dashboard.html", stage_links=PROCESS_STAGE_LINKS, items=process_dashboard_items(activity_rows))
 
 
 # ------------------------
@@ -1626,7 +1769,8 @@ def dashboard(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "dashboard.html", rows=last_12_hour_activity(), batch_packs=dashboard_batch_packs())
+    activity_rows = last_12_hour_activity()
+    return render_page(request, "dashboard.html", rows=activity_rows, batch_packs=dashboard_batch_packs(activity_rows))
 
 
 @app.get("/change-history", response_class=HTMLResponse)

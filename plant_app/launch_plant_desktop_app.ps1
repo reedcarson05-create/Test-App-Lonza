@@ -14,8 +14,25 @@ if (-not (Test-Path -LiteralPath $runtimeDir)) {
 }
 
 $logFile = Join-Path $runtimeDir "desktop_app.log"
-$windowUrl = "http://127.0.0.1:$Port"
-$healthUrl = "$windowUrl/health"
+$launchStamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$baseUrl = ""
+$windowUrl = ""
+$healthUrl = ""
+$bootUrl = ""
+
+function Set-LaunchUrls {
+  param(
+    [int]$ActivePort
+  )
+
+  $script:Port = $ActivePort
+  $script:baseUrl = "http://127.0.0.1:$ActivePort"
+  $script:windowUrl = "$script:baseUrl/boot?launch=$launchStamp"
+  $script:healthUrl = "$script:baseUrl/health"
+  $script:bootUrl = "$script:baseUrl/boot"
+}
+
+Set-LaunchUrls -ActivePort $Port
 
 function Write-LaunchLog {
   param(
@@ -37,6 +54,79 @@ function Test-AppServerReady {
   } catch {
     return $false
   }
+}
+
+function Get-PortOwnerProcess {
+  param(
+    [int]$LocalPort
+  )
+
+  try {
+    $connection = Get-NetTCPConnection -LocalPort $LocalPort -State Listen -ErrorAction Stop |
+      Select-Object -First 1
+  } catch {
+    return $null
+  }
+
+  if (-not $connection) {
+    return $null
+  }
+
+  try {
+    return Get-CimInstance Win32_Process -Filter "ProcessId = $($connection.OwningProcess)" -ErrorAction Stop
+  } catch {
+    return $null
+  }
+}
+
+function Stop-StaleProjectServer {
+  param(
+    [int]$LocalPort,
+    [string]$ExpectedRoot
+  )
+
+  $owner = Get-PortOwnerProcess -LocalPort $LocalPort
+  if (-not $owner) {
+    return $false
+  }
+
+  $commandLine = [string]$owner.CommandLine
+  $normalizedRoot = $ExpectedRoot.ToLowerInvariant()
+  $looksLikeProjectServer = (
+    $commandLine.ToLowerInvariant().Contains($normalizedRoot) -and
+    $commandLine.ToLowerInvariant().Contains("app.py")
+  )
+
+  if (-not $looksLikeProjectServer) {
+    throw "Port $LocalPort is already in use by another process and the launcher will not stop it automatically."
+  }
+
+  Write-LaunchLog "Stopping stale Plant App server process $($owner.ProcessId) because /boot was unavailable."
+  Stop-Process -Id $owner.ProcessId -Force
+  Start-Sleep -Milliseconds 700
+  return $true
+}
+
+function Resolve-DesktopPort {
+  param(
+    [int]$PreferredPort
+  )
+
+  $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  foreach ($candidate in $candidates) {
+    $candidateHealth = "http://127.0.0.1:$candidate/health"
+    $candidateBoot = "http://127.0.0.1:$candidate/boot"
+
+    if (-not (Test-AppServerReady -Url $candidateHealth)) {
+      return $candidate
+    }
+
+    if (Test-AppServerReady -Url $candidateBoot) {
+      return $candidate
+    }
+  }
+
+  throw "No available desktop launch port was found. Close any old Plant App windows and try again."
 }
 
 function Resolve-BrowserExe {
@@ -98,6 +188,23 @@ function Resolve-PythonExe {
   throw "No suitable Python runtime was found. Install the Plant App dependencies first."
 }
 
+if ((Test-AppServerReady -Url $healthUrl) -and (-not (Test-AppServerReady -Url $bootUrl))) {
+  $stoppedStale = $false
+  try {
+    $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot
+  } catch {
+    Write-LaunchLog ("Could not stop the stale server on port {0}: {1}" -f $Port, $_.Exception.Message)
+  }
+
+  if (-not $stoppedStale) {
+    $fallbackPort = Resolve-DesktopPort -PreferredPort $Port
+    if ($fallbackPort -ne $Port) {
+      Write-LaunchLog "Port $Port is serving an older app host. Switching desktop launch to port $fallbackPort."
+      Set-LaunchUrls -ActivePort $fallbackPort
+    }
+  }
+}
+
 if (-not (Test-AppServerReady -Url $healthUrl)) {
   $pythonExe = Resolve-PythonExe
   $env:PLANT_APP_HOST = "0.0.0.0"
@@ -120,11 +227,16 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
   throw "The Plant App server did not become ready on $windowUrl."
 }
 
+if (-not (Test-AppServerReady -Url $bootUrl)) {
+  throw "The Plant App server started, but the /boot route is unavailable. Restart the launcher after confirming the background host updated."
+}
+
 if (-not $SkipBrowser) {
   $browserExe = Resolve-BrowserExe
   $browserArguments = @(
     "--new-window",
     "--app=$windowUrl",
+    "--disable-http-cache",
     "--window-size=1460,960"
   )
 
