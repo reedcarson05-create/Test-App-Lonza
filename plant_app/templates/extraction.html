@@ -33,12 +33,12 @@
   <!-- Extraction entry and correction template used by both create and edit routes. -->
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png" class="logo" alt="LAG">{% if is_edit %}Edit Extraction Entry{% else %}Extraction Data Entry{% endif %}</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Extraction Entry{% else %}Extraction Data Entry{% endif %}</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/process-dashboard">Current Work</a>
         <a class="pill" href="/logout">Logout</a>
-      <span class="pill">No Batch</span>
+      <span class="pill">Standalone Machine</span>
       </div>
     </div>
 

@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!fillNode || !percentNode || !statusNode || !detailNode) return;
 
   const targetUrl = manifest.target_url || "/?fresh=1";
-  const minDurationMs = Math.max(Number(manifest.min_duration_ms) || 9500, 4200);
+  const minDurationMs = Math.max(Number(manifest.min_duration_ms) || 1200, 900);
   const tasks = Array.isArray(manifest.tasks) ? manifest.tasks : [];
   const phases = [
     {
@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
         redirected = true;
         window.setTimeout(() => {
           window.location.replace(targetUrl);
-        }, 420);
+        }, 120);
       }
       return;
     }

@@ -8,16 +8,15 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 <body class="login-page" data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="false">
-  <!-- Login screen for authenticating operators before they enter plant data. -->
   <div class="wrap narrow">
     <div class="card login-card">
-      <div class="login-logo"><img src="/static/logo.png" alt="LAG"></div>
+      <div class="login-logo"><img src="/static/logo.png?v={{ asset_version }}" alt="LAG"></div>
       <p class="eyebrow center">Plant Operations</p>
       <h1>Operator Login</h1>
-      <p class="muted center">Secure sign-in for batch setup, process sheets, and correction history.</p>
+      <p class="muted center">Secure sign-in for run setup, machine entries, and audit history.</p>
       <div class="login-meta">
-        <span class="info-chip">Batch Setup</span>
-        <span class="info-chip">Process Sheets</span>
+        <span class="info-chip">Run Setup</span>
+        <span class="info-chip">Machine Entries</span>
         <span class="info-chip">Change History</span>
       </div>
       {% if error %}<div class="alert">{{ error }}</div>{% endif %}

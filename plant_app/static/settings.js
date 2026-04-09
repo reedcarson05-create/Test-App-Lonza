@@ -51,8 +51,8 @@ function initLoadingScreen() {
     if (buttonText.includes("login") || action === "/login") {
       return "Signing in...";
     }
-    if (buttonText.includes("finalize")) {
-      return "Finalizing the batch pack...";
+    if (buttonText.includes("finalize") || buttonText.includes("close run")) {
+      return "Closing the run...";
     }
     if (buttonText.includes("save") || buttonText.includes("confirm")) {
       return "Saving your changes...";

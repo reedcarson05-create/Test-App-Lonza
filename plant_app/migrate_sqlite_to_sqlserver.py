@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 from pathlib import Path
 
 import pyodbc
 
+from db import build_sql_connection_string, resolve_sql_database
+
 
 BASE_DIR = Path(__file__).resolve().parent
 SQLITE_PATH = BASE_DIR / "plant.db"
-SQL_SERVER = r"localhost\SQLEXPRESS"
-SQL_DATABASE = "LAGPlantOpsApp"
 
 TABLE_ORDER = [
     "users",
@@ -37,13 +38,10 @@ def sqlite_conn() -> sqlite3.Connection:
 
 
 def sqlserver_conn():
+    explicit_database = os.getenv("PLANT_APP_SQL_DATABASE", "").strip()
+    target_database = explicit_database or resolve_sql_database()
     return pyodbc.connect(
-        "DRIVER={ODBC Driver 18 for SQL Server};"
-        f"SERVER={SQL_SERVER};"
-        f"DATABASE={SQL_DATABASE};"
-        "Trusted_Connection=yes;"
-        "Encrypt=yes;"
-        "TrustServerCertificate=yes;"
+        build_sql_connection_string(target_database)
     )
 
 

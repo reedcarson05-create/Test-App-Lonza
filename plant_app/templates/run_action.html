@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Runs</title>
+  <title>{{ page_title }}</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
@@ -33,63 +33,65 @@
   </div>
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Runs</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{{ action_title }} Runs</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
-        <a class="pill" href="/runs/blend">Blend</a>
-        <a class="pill" href="/runs/split">Split</a>
+        <a class="pill" href="/run/select">Runs</a>
         <a class="pill" href="/runs/print">Print</a>
         <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
       </div>
     </div>
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Create Or Reopen Runs</h2>
-        <span class="info-chip">{{ open_runs|length }} Open Runs</span>
+        <h2>{{ page_heading }}</h2>
+        <span class="info-chip">{{ runs|length }} Available Runs</span>
       </div>
-      <p class="muted">Run number is the main identifier. Creating a run only needs that one value, and open runs are listed below for quick reuse.</p>
-      {% include "partials/create_run_form.html" %}
+      <p class="muted">{{ page_copy }}</p>
+      {% if result_message %}
+      <div class="banner success-banner">{{ result_message }}</div>
+      {% endif %}
+      {% if error_message %}
+      <div class="alert">{{ error_message }}</div>
+      {% endif %}
     </div>
 
-    {% set action_links = [
-      {"label": "Blend Runs", "href": "/runs/blend"},
-      {"label": "Split Runs", "href": "/runs/split"},
-      {"label": "Print Runs", "href": "/runs/print", "ghost": True}
-    ] %}
-    <div class="card">
-      <div class="section-title">
-        <h2>Run Actions</h2>
-        <span class="info-chip">Shared selection workflows</span>
+    <form method="post" action="/runs/{{ action_name }}" class="stack-gap">
+      <div class="card">
+        <div class="section-title">
+          <h2>Select Runs</h2>
+          <span class="info-chip">Multi-select enabled</span>
+        </div>
+        {% include "partials/run_selection_table.html" %}
+        <div class="actions">
+          <button class="btn" type="submit">{{ submit_label }}</button>
+          <a class="btn ghost" href="/home">Back Home</a>
+        </div>
       </div>
-      {% include "partials/action_link_grid.html" %}
-    </div>
+    </form>
 
+    {% if selected_runs %}
     <div class="card">
       <div class="section-title">
-        <h2>Recent Runs</h2>
-        <span class="info-chip">{{ runs|length }} Loaded</span>
+        <h2>Selected Runs</h2>
+        <span class="info-chip">{{ selected_runs|length }} Chosen</span>
       </div>
-      <div class="table-wrap">
-        <table class="table">
-          <tr><th>Run</th><th>Product</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Open</th></tr>
-          {% for run_item in runs %}
-          <tr>
-            <td><strong>{{ run_label(run_item) }}</strong></td>
-            <td>{{ run_item['product_name'] or '' }}</td>
-            <td>{{ run_item['status'] or '' }}</td>
-            <td>{{ run_item['blend_number'] or '' }}</td>
-            <td>{{ run_item['split_batch_number'] or '' }}</td>
-            <td>{{ run_item['updated_at'] or '' }}</td>
-            <td><a class="table-action" href="/run/use/{{ run_item['id'] }}">Use Run</a></td>
-          </tr>
-          {% endfor %}
-          {% if not runs %}
-          <tr><td colspan="7" class="muted center">No runs have been created yet.</td></tr>
-          {% endif %}
-        </table>
+      <div class="section-grid">
+        {% for run_item in selected_runs %}
+        <div class="summary-card">
+          <h3>Run {{ run_label(run_item) }}</h3>
+          <p>{{ run_item['product_name'] or 'No product assigned yet.' }}</p>
+          <div class="summary-line">
+            <span class="pill">{{ run_item['status'] or 'Open' }}</span>
+            {% if run_item['blend_number'] %}<span class="pill">Blend {{ run_item['blend_number'] }}</span>{% endif %}
+            {% if run_item['split_batch_number'] %}<span class="pill">Split {{ run_item['split_batch_number'] }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
       </div>
     </div>
+    {% endif %}
   </div>
   <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>

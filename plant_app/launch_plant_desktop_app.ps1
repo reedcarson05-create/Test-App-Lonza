@@ -58,6 +58,27 @@ function Test-AppServerReady {
   }
 }
 
+function Get-AppServerStatus {
+  param(
+    [string]$Url
+  )
+
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+    if ($response.StatusCode -ne 200) {
+      return $null
+    }
+
+    if (-not $response.Content) {
+      return $null
+    }
+
+    return ($response.Content | ConvertFrom-Json)
+  } catch {
+    return $null
+  }
+}
+
 function Get-PortOwnerProcess {
   param(
     [int]$LocalPort
@@ -116,21 +137,54 @@ function Resolve-DesktopPort {
   )
 
   $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  $firstAvailablePort = $null
   foreach ($candidate in $candidates) {
     $candidateHealth = "http://127.0.0.1:$candidate/health"
     $candidateBoot = "http://127.0.0.1:$candidate/boot"
     $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
 
     if (-not (Test-AppServerReady -Url $candidateHealth)) {
-      return $candidate
+      if ($null -eq $firstAvailablePort) {
+        $firstAvailablePort = $candidate
+      }
+      continue
     }
 
     if ((Test-AppServerReady -Url $candidateBoot) -and (Test-AppServerReady -Url $candidateAppStatus)) {
-      return $candidate
+      $status = Get-AppServerStatus -Url $candidateAppStatus
+      if ($status -and (-not $status.restart_required)) {
+        return $candidate
+      }
     }
   }
 
+  if ($null -ne $firstAvailablePort) {
+    return $firstAvailablePort
+  }
+
   throw "No available desktop launch port was found. Close any old Plant App windows and try again."
+}
+
+function Resolve-ReusableDesktopPort {
+  param(
+    [int]$PreferredPort
+  )
+
+  $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  foreach ($candidate in $candidates) {
+    $candidateHealth = "http://127.0.0.1:$candidate/health"
+    $candidateBoot = "http://127.0.0.1:$candidate/boot"
+    $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
+
+    if ((Test-AppServerReady -Url $candidateHealth) -and (Test-AppServerReady -Url $candidateBoot) -and (Test-AppServerReady -Url $candidateAppStatus)) {
+      $status = Get-AppServerStatus -Url $candidateAppStatus
+      if ($status -and (-not $status.restart_required)) {
+        return $candidate
+      }
+    }
+  }
+
+  return $null
 }
 
 function Resolve-BrowserExe {
@@ -192,27 +246,41 @@ function Resolve-PythonExe {
   throw "No suitable Python runtime was found. Install the Plant App dependencies first."
 }
 
-if ((Test-AppServerReady -Url $healthUrl) -and ((-not (Test-AppServerReady -Url $bootUrl)) -or (-not (Test-AppServerReady -Url $appStatusUrl)))) {
+if (Test-AppServerReady -Url $healthUrl) {
   $staleReasons = @()
   if (-not (Test-AppServerReady -Url $bootUrl)) {
     $staleReasons += "/boot was unavailable"
   }
   if (-not (Test-AppServerReady -Url $appStatusUrl)) {
     $staleReasons += "/app-status was unavailable"
-  }
-  $staleReason = if ($staleReasons.Count) { $staleReasons -join " and " } else { "required routes were unavailable" }
-  $stoppedStale = $false
-  try {
-    $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot -Reason $staleReason
-  } catch {
-    Write-LaunchLog ("Could not stop the stale server on port {0}: {1}" -f $Port, $_.Exception.Message)
+  } else {
+    $currentStatus = Get-AppServerStatus -Url $appStatusUrl
+    if ($currentStatus -and $currentStatus.restart_required) {
+      $loadedBuild = [string]$currentStatus.loaded_build_label
+      $diskBuild = [string]$currentStatus.disk_build_label
+      if ($loadedBuild -and $diskBuild) {
+        $staleReasons += "the running app build ($loadedBuild) was older than disk ($diskBuild)"
+      } else {
+        $staleReasons += "the running app build was older than disk"
+      }
+    }
   }
 
-  if (-not $stoppedStale) {
-    $fallbackPort = Resolve-DesktopPort -PreferredPort $Port
-    if ($fallbackPort -ne $Port) {
-      Write-LaunchLog "Port $Port is serving an older app host ($staleReason). Switching desktop launch to port $fallbackPort."
-      Set-LaunchUrls -ActivePort $fallbackPort
+  if ($staleReasons.Count) {
+    $staleReason = $staleReasons -join " and "
+    $stoppedStale = $false
+    try {
+      $stoppedStale = Stop-StaleProjectServer -LocalPort $Port -ExpectedRoot $projectRoot -Reason $staleReason
+    } catch {
+      Write-LaunchLog ("Could not stop the stale server on port {0}: {1}" -f $Port, $_.Exception.Message)
+    }
+
+    if (-not $stoppedStale) {
+      $fallbackPort = Resolve-DesktopPort -PreferredPort $Port
+      if ($fallbackPort -ne $Port) {
+        Write-LaunchLog "Port $Port is serving an older app host ($staleReason). Switching desktop launch to port $fallbackPort."
+        Set-LaunchUrls -ActivePort $fallbackPort
+      }
     }
   }
 }
@@ -231,6 +299,14 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
       break
     }
     Start-Sleep -Milliseconds 250
+  }
+}
+
+if (-not (Test-AppServerReady -Url $healthUrl)) {
+  $reusablePort = Resolve-ReusableDesktopPort -PreferredPort $Port
+  if ($reusablePort -and ($reusablePort -ne $Port)) {
+    Write-LaunchLog "Fresh restart on port $Port failed. Reusing active Plant App server on port $reusablePort."
+    Set-LaunchUrls -ActivePort $reusablePort
   }
 }
 

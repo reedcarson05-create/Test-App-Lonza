@@ -1,4 +1,4 @@
-"""FastAPI application for operator login, batch setup, data entry, and correction flows."""
+"""FastAPI application for operator login, run setup, data entry, and correction flows."""
 
 # Standard-library imports used for path resolution, timestamp helpers, and JSON sheet payloads.
 import base64
@@ -25,10 +25,13 @@ from db import (
     get_user_initials,  # Loads the initials displayed and reused in forms.
     get_user_preferences,  # Loads persisted per-user UI preferences.
     update_user_preferences,  # Saves persisted per-user UI preferences.
-    create_run,  # Creates a new batch/run record.
-    get_run,  # Fetches a single batch/run record by id.
-    list_runs,  # Lists recent runs for the batch selection screen.
+    create_run,  # Creates a new run record.
+    get_run,  # Fetches a single run record by id.
+    list_runs,  # Lists recent runs for the run selection screen.
+    list_open_runs,  # Lists open runs for the home quick-access panels.
+    get_runs_by_ids,  # Loads selected runs for multi-run actions and audit printing.
     mark_run_complete,  # Finalizes a run after review.
+    apply_run_group_action,  # Applies shared split/blend labels across selected runs.
     update_run,  # Saves edits to the active run header data.
     get_extraction_entry,  # Loads a saved extraction entry for corrections.
     update_extraction,  # Persists extraction corrections.
@@ -68,7 +71,12 @@ SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 SIGNATURE_DEBUG_LOG = RUNTIME_DIR / "signature_debug.log"
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-BOOT_TEMPLATE_NAMES = tuple(sorted(path.name for path in (BASE_DIR / "templates").glob("*.html")))
+BOOT_TEMPLATE_NAMES = tuple(
+    sorted(
+        path.relative_to(BASE_DIR / "templates").as_posix()
+        for path in (BASE_DIR / "templates").glob("**/*.html")
+    )
+)
 BOOT_STATIC_FILES = (
     "style.css",
     "settings.js",
@@ -77,7 +85,13 @@ BOOT_STATIC_FILES = (
     "image_upload.js",
     "logo.png",
 )
-BOOT_MIN_DURATION_MS = 9500
+BOOT_MIN_DURATION_MS = 1200
+RUN_STAGE_KEYS = tuple(stage_key for stage_key in GENERIC_STAGE_DEFS if stage_key != "filtration_cycles")
+MACHINE_DEFINITIONS = (
+    {"section": "Extraction", "title": "Extraction", "href": "/stage/extraction"},
+    {"section": "Filtration", "title": "Filtration", "href": "/stage/filtration"},
+    {"section": "Evaporation", "title": "Evaporation", "href": "/stage/evaporation"},
+)
 
 
 def current_app_build() -> dict[str, str]:
@@ -93,7 +107,7 @@ def current_app_build() -> dict[str, str]:
         BASE_DIR / "static" / "image_upload.js",
         BASE_DIR / "static" / "logo.png",
     ]
-    candidate_paths.extend(sorted((BASE_DIR / "templates").glob("*.html")))
+    candidate_paths.extend(sorted((BASE_DIR / "templates").glob("**/*.html")))
 
     latest_stamp = 0
     latest_path = BASE_DIR / "app.py"
@@ -386,6 +400,23 @@ def current_run_id(request: Request):
     return request.session.get("run_id")
 
 
+def run_display_number(record) -> str:
+    """Return the primary run identifier shown across the UI."""
+    if not record:
+        return ""
+
+    run_number = clean_value(record.get("run_number", ""))
+    if run_number:
+        return run_number
+
+    batch_number = clean_value(record.get("batch_number", ""))
+    if batch_number:
+        return batch_number
+
+    record_id = record.get("id") or record.get("run_id")
+    return str(record_id) if record_id else ""
+
+
 def today_str() -> str:
     """Return today's date in the same format used by the HTML forms."""
     return datetime.now().strftime("%Y-%m-%d")
@@ -473,7 +504,7 @@ def require_login(request: Request):
 
 
 def require_run(request: Request):
-    """Redirect users to run selection until an active batch/run is chosen."""
+    """Redirect users to run selection until an active run is chosen."""
     if not current_run_id(request):
         return RedirectResponse("/run/select", status_code=303)
     return None
@@ -511,6 +542,8 @@ def render_page(request: Request, template_name: str, **context):
         "blank_display": blank_display,
         "blank_stamp": blank_stamp,
         "is_blank_value": is_blank_value,
+        "run_display_number": run_display_number,
+        "activity_open_href": activity_open_href,
     }
     page_context.update(context)
     return templates.TemplateResponse(template_name, page_context)
@@ -598,10 +631,157 @@ def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "
         "extraction_entries": "Extraction",
         "filtration_entries": "Filtration",
         "evaporation_entries": "Evaporation",
-        "sheet_entries": "Batch Sheet",
-        "production_runs": "Batch",
+        "sheet_entries": "Run Sheet",
+        "production_runs": "Run",
     }
     return labels.get(entry_table, entry_table.replace("_", " ").title())
+
+
+def selected_run_ids_from_form(form) -> list[int]:
+    """Read unique selected run ids from a checkbox form."""
+    selected_ids: list[int] = []
+    for raw_value in form.getlist("selected_run_ids"):
+        try:
+            run_id = int(str(raw_value).strip())
+        except (TypeError, ValueError):
+            continue
+        if run_id > 0 and run_id not in selected_ids:
+            selected_ids.append(run_id)
+    return selected_ids
+
+
+def run_action_label(action_name: str) -> str:
+    """Build a deterministic timestamp-based group label for blend/split actions."""
+    return f"{action_name.upper()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+
+def activity_open_href(row: dict) -> str:
+    """Return the quickest reopen link for a recent activity row."""
+    section = clean_value(row.get("section", ""))
+    run_id = row.get("run_id")
+    stage_key = clean_value(row.get("stage_key", ""))
+
+    if section in {"Extraction", "Filtration"}:
+        return "/process-dashboard"
+    if section == "Evaporation" and run_id:
+        return f"/run/use/{run_id}?next=/stage/evaporation"
+    if row.get("entry_table") == "sheet_entries" and run_id and stage_key:
+        return f"/run/use/{run_id}?next=/stage/generic/{stage_key}"
+    if run_id:
+        return f"/run/use/{run_id}"
+    return "/dashboard"
+
+
+def activity_is_active(row: dict) -> bool:
+    """Treat rows without an end time or with an open run as active/in-use items."""
+    if row.get("section") in {"Extraction", "Filtration", "Evaporation"}:
+        return clean_value(row.get("end_label", "")) == ""
+    return clean_value(row.get("status", "")) == "Open"
+
+
+def machine_status_cards(rows=None, current_run=None):
+    """Build the home-page machine quick-access cards from recent live activity."""
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    cards = []
+    for machine in MACHINE_DEFINITIONS:
+        latest_row = next((row for row in source_rows if row["section"] == machine["section"]), None)
+        is_currently_active = bool(latest_row and activity_is_active(latest_row))
+        if latest_row:
+            detail_parts = [latest_row["activity_time"]]
+            if run_display_number(latest_row):
+                detail_parts.insert(0, f"Run {run_display_number(latest_row)}")
+            status_label = "In Use" if is_currently_active else "Recently Used"
+            href = activity_open_href(latest_row)
+            button_label = "Open Machine"
+            detail = " | ".join(part for part in detail_parts if part)
+        else:
+            status_label = "Not Used"
+            href = machine["href"] if machine["section"] in {"Extraction", "Filtration"} else (
+                "/stage/evaporation" if current_run else "/run/select"
+            )
+            button_label = "Start Entry" if machine["section"] in {"Extraction", "Filtration"} else (
+                "Open Machine" if current_run else "Choose Run"
+            )
+            detail = "Auto-populated as not in use until an operator starts this machine."
+
+        cards.append(
+            {
+                **machine,
+                "status_label": status_label,
+                "detail": detail,
+                "href": href,
+                "button_label": button_label,
+                "is_active": is_currently_active,
+            }
+        )
+    return cards
+
+
+def in_use_items(rows=None):
+    """Return the most relevant active items to surface on the homepage."""
+    source_rows = rows if rows is not None else last_12_hour_activity(limit=40)
+    items = []
+    seen_keys = set()
+    for row in source_rows:
+        if not activity_is_active(row):
+            continue
+        key = (row["entry_table"], row["record_id"])
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        items.append(
+            {
+                "title": display_sheet_name(row["entry_table"], row["section"]),
+                "run_label": run_display_number(row),
+                "activity_time": row["activity_time"],
+                "comments": clean_value(row.get("comments", "")),
+                "href": activity_open_href(row),
+                "status_label": "In Use" if activity_is_active(row) else "Saved",
+            }
+        )
+        if len(items) >= 10:
+            break
+    return items
+
+
+def run_record_groups(rows=None):
+    """Group run-linked records by run number for the dashboard screen."""
+    groups = {}
+    source_rows = rows if rows is not None else last_12_hour_activity()
+    for row in source_rows:
+        if not row.get("run_id"):
+            continue
+        run_key = run_display_number(row) or f"Run {row['run_id']}"
+        group = groups.setdefault(
+            run_key,
+            {
+                "run_key": run_key,
+                "entries": [],
+                "latest_time": row["activity_time"],
+                "blend_numbers": set(),
+                "statuses": set(),
+            },
+        )
+        group["entries"].append(
+            {
+                **dict(row),
+                "edit_href": activity_open_href(row),
+                "display_section": display_sheet_name(row["entry_table"], row["section"]),
+            }
+        )
+        if row["activity_time"] > group["latest_time"]:
+            group["latest_time"] = row["activity_time"]
+        if row.get("blend_number"):
+            group["blend_numbers"].add(row["blend_number"])
+        if row.get("status"):
+            group["statuses"].add(row["status"])
+
+    results = sorted(groups.values(), key=lambda group: group["latest_time"], reverse=True)
+    for group in results:
+        group["blend_numbers"] = ", ".join(sorted(group["blend_numbers"]))
+        group["statuses"] = ", ".join(sorted(group["statuses"]))
+        group["entry_count"] = len(group["entries"])
+    return results
 
 
 def process_dashboard_rows(rows=None):
@@ -729,7 +909,7 @@ def build_evaporation_rows(form):
 
 def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
     """Map the evaporation form fields into the database payload expected by `insert_evaporation`."""
-    # Unlike extraction/filtration, evaporation is always tied to a selected batch run.
+    # Unlike extraction/filtration, evaporation is always tied to a selected run.
     return {
         "run_id": run_id,
         "operator_initials": operator_initials,
@@ -765,58 +945,19 @@ def process_dashboard_items(rows=None):
 
 
 def dashboard_batch_packs(rows=None):
-    """Group recent batch-pack activity by batch number for the review dashboard."""
-    # `packs` is keyed by batch number so multiple saved sheets collapse into one dashboard card.
-    packs = {}
-    source_rows = rows if rows is not None else last_12_hour_activity()
-    for row in source_rows:
-        batch_number = row["batch_number"] or "No batch"
-        pack = packs.setdefault(
-            batch_number,
-            {
-                "batch_number": batch_number,
-                "entries": [],
-                "latest_time": row["activity_time"],
-                "run_numbers": set(),
-                "blend_numbers": set(),
-            },
-        )
-        edit_href = ""
-        if row["section"] == "Evaporation":
-            edit_href = f"/edit/evaporation/{row['record_id']}"
-        elif row["entry_table"] == "sheet_entries":
-            edit_href = f"/edit/generic/{row['record_id']}"
-        # Each entry remains available individually so the dashboard can still open the right correction page.
-        pack["entries"].append(
-            {
-                **dict(row),
-                "edit_href": edit_href,
-                "display_section": display_sheet_name(row["entry_table"], row["section"]),
-            }
-        )
-        if row["activity_time"] > pack["latest_time"]:
-            pack["latest_time"] = row["activity_time"]
-        if row["run_number"]:
-            pack["run_numbers"].add(row["run_number"])
-        if row["blend_number"]:
-            pack["blend_numbers"].add(row["blend_number"])
-
-    results = sorted(packs.values(), key=lambda pack: pack["latest_time"], reverse=True)
-    for pack in results:
-        pack["run_numbers"] = ", ".join(sorted(pack["run_numbers"]))
-        pack["blend_numbers"] = ", ".join(sorted(pack["blend_numbers"]))
-        pack["entry_count"] = len(pack["entries"])
-    return results
+    """Backward-compatible wrapper for the dashboard's run-record groupings."""
+    return run_record_groups(rows)
 
 
 def build_batch_review(run_id: int):
-    """Gather the latest saved batch-pack sheets so the final review page can summarize them."""
+    """Gather the latest saved run-linked sheets so the review page can summarize them."""
     run = get_run(run_id)
     evaporation_entry, evaporation_rows = get_latest_evaporation_for_run(run_id)
 
     # Generic stage entries are discovered from configuration instead of hard-coded one by one.
     generic_entries = []
-    for stage_key, stage in GENERIC_STAGE_DEFS.items():
+    for stage_key in RUN_STAGE_KEYS:
+        stage = GENERIC_STAGE_DEFS[stage_key]
         entry = get_latest_sheet_entry_for_run_stage(run_id, stage_key)
         if not entry:
             continue
@@ -832,13 +973,63 @@ def build_batch_review(run_id: int):
             }
         )
 
-    # This return object is passed straight into `batch_review.html`.
+    # This return object is passed straight into the run review template.
     return {
         "run": run,
         "evaporation_entry": evaporation_entry,
         "evaporation_rows": evaporation_rows,
         "generic_entries": generic_entries,
         "has_entries": bool(evaporation_entry or generic_entries),
+    }
+
+
+def existing_open_run_by_number(run_number: str):
+    """Reuse an already-open run when the operator enters the same run number again."""
+    normalized = clean_value(run_number).lower()
+    if not normalized:
+        return None
+
+    for run in list_open_runs(limit=200):
+        if run_display_number(run).lower() == normalized:
+            return run
+    return None
+
+
+def build_print_packets(selected_runs):
+    """Build the audit-print payload for one or more selected runs."""
+    packets = []
+    for run in selected_runs:
+        review = build_batch_review(run["id"])
+        packets.append(
+            {
+                "run": review["run"],
+                "run_label": run_display_number(review["run"]),
+                "evaporation_entry": review["evaporation_entry"],
+                "evaporation_rows": review["evaporation_rows"],
+                "generic_entries": review["generic_entries"],
+                "has_entries": review["has_entries"],
+            }
+        )
+    return packets
+
+
+def run_action_page_context(action_name: str, selected_run_ids: list[int] | None = None, message: str = "", error: str = "") -> dict:
+    """Build shared context for the split/blend selection pages."""
+    selected_ids = selected_run_ids or []
+    selected_runs = get_runs_by_ids(selected_ids)
+    action_title = action_name.title()
+    return {
+        "action_name": action_name,
+        "action_title": action_title,
+        "page_title": f"{action_title} Runs",
+        "page_heading": f"{action_title} Runs",
+        "page_copy": f"Choose one or more runs, then confirm {action_name} to apply the shared {action_name} action.",
+        "runs": list_runs(limit=120),
+        "selected_run_ids": selected_ids,
+        "selected_runs": selected_runs,
+        "result_message": message,
+        "error_message": error,
+        "submit_label": action_title,
     }
 
 
@@ -1142,12 +1333,20 @@ async def upload_image(request: Request, files: list[UploadFile] = File(...)):
 
 @app.get("/home", response_class=HTMLResponse)
 def home(request: Request):
-    """Render the landing page for starting work, resuming a batch, or reviewing data."""
+    """Render the fast home screen for run creation, active runs, and machine access."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
-    return render_page(request, "home.html")
+    activity_rows = last_12_hour_activity(limit=48)
+    current_run = active_run(request)
+    return render_page(
+        request,
+        "home.html",
+        open_runs=list_open_runs(limit=80),
+        machine_cards=machine_status_cards(activity_rows, current_run),
+        in_use_items=in_use_items(activity_rows),
+    )
 
 
 # ------------------------
@@ -1156,54 +1355,63 @@ def home(request: Request):
 
 @app.get("/run/select", response_class=HTMLResponse)
 def run_select_page(request: Request):
-    """Render the run selection and creation page with recent saved runs."""
+    """Render the simplified run creation screen with quick access to recent runs."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
-    return render_page(request, "run_select.html", runs=list_runs())
+    return render_page(
+        request,
+        "run_select.html",
+        runs=list_runs(limit=80),
+        open_runs=list_open_runs(limit=80),
+        create_error="",
+    )
 
 
 @app.post("/run/select")
 async def run_select(
     request: Request,
-    batch_number: str = Form(""),
-    split_batch_number: str = Form(""),
-    blend_number: str = Form(""),
     run_number: str = Form(""),
-    batch_type: str = Form("standard"),
-    reused_batch: str = Form("0"),
-    product_name: str = Form(""),
-    shift_name: str = Form(""),
-    notes: str = Form(""),
 ):
-    """Create a new production run from the batch setup form and store it in session."""
+    """Create or reopen a run using only the run number."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
-    form = await request.form()
-    save_signature_session(request, form)
+    normalized_run_number = clean_value(run_number)
+    if not normalized_run_number:
+        return render_page(
+            request,
+            "run_select.html",
+            runs=list_runs(limit=80),
+            open_runs=list_open_runs(limit=80),
+            create_error="Run number is required.",
+        )
+
+    existing_run = existing_open_run_by_number(normalized_run_number)
+    if existing_run:
+        request.session["run_id"] = existing_run["id"]
+        return RedirectResponse("/home", status_code=303)
 
     try:
-        # The run header is saved first so every later batch-pack sheet can point back to this id.
         run_id = create_run(
-            batch_number=batch_number,
-            split_batch_number=split_batch_number,
-            blend_number=blend_number,
-            run_number=run_number,
-            batch_type=batch_type,
-            reused_batch=1 if reused_batch == "1" else 0,
-            product_name=product_name,
-            shift_name=shift_name,
+            batch_number=normalized_run_number,
+            split_batch_number="",
+            blend_number="",
+            run_number=normalized_run_number,
+            batch_type="standard",
+            reused_batch=0,
+            product_name="",
+            shift_name="",
             operator_id=current_user(request),
-            notes=notes,
+            notes="",
         )
     except Exception as exc:
         return PlainTextResponse(f"Run save failed: {type(exc).__name__}: {exc}", status_code=500)
 
     request.session["run_id"] = run_id
-    return RedirectResponse("/stages", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 @app.get("/run/use/{run_id}")
@@ -1214,12 +1422,16 @@ def use_run(request: Request, run_id: int):
         return redirect
 
     request.session["run_id"] = run_id
-    return RedirectResponse("/stages", status_code=303)
+    next_path = clean_value(request.query_params.get("next", ""))
+    if next_path.startswith("/"):
+        return RedirectResponse(next_path, status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
+@app.get("/run/edit", response_class=HTMLResponse)
 @app.get("/batch/edit", response_class=HTMLResponse)
 def batch_edit_page(request: Request):
-    """Render the batch header edit form for the currently selected run."""
+    """Render the run detail form for the currently selected run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1231,22 +1443,17 @@ def batch_edit_page(request: Request):
     return render_page(request, "batch_edit.html")
 
 
+@app.post("/run/edit")
 @app.post("/batch/edit")
 async def batch_edit_submit(
     request: Request,
-    batch_number: str = Form(""),
-    split_batch_number: str = Form(""),
-    blend_number: str = Form(""),
     run_number: str = Form(""),
-    batch_type: str = Form("standard"),
-    reused_batch: str = Form("0"),
     product_name: str = Form(""),
-    shift_name: str = Form(""),
     notes: str = Form(""),
     final_edit_initials: str = Form(""),
     final_edit_notes: str = Form(""),
 ):
-    """Persist edits to the run header and record the change in the audit log."""
+    """Persist run detail edits and record the change in the audit log."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1258,18 +1465,19 @@ async def batch_edit_submit(
     form = await request.form()
     save_signature_session(request, form)
     final_edit_initials = (final_edit_initials or current_signature_initials(request) or current_initials(request)).strip().upper()
+    current_run = active_run(request)
+    normalized_run_number = clean_value(run_number) or run_display_number(current_run)
 
-    # These fields mirror the run-setup form, with two extra final-review accountability fields.
     update_run(
         run_id=current_run_id(request),
-        batch_number=batch_number,
-        split_batch_number=split_batch_number,
-        blend_number=blend_number,
-        run_number=run_number,
-        batch_type=batch_type,
-        reused_batch=1 if reused_batch == "1" else 0,
+        batch_number=normalized_run_number,
+        split_batch_number=current_run.get("split_batch_number", ""),
+        blend_number=current_run.get("blend_number", ""),
+        run_number=normalized_run_number,
+        batch_type=current_run.get("batch_type", "standard"),
+        reused_batch=current_run.get("reused_batch", 0),
         product_name=product_name,
-        shift_name=shift_name,
+        shift_name=current_run.get("shift_name", ""),
         notes=notes,
         final_edit_initials=final_edit_initials,
         final_edit_notes=final_edit_notes,
@@ -1281,10 +1489,161 @@ async def batch_edit_submit(
         action_type="update",
         changed_by=current_user(request),
         old_data="",
-        new_data="batch edited and initialed",
+        new_data="run details updated",
     )
 
-    return RedirectResponse("/stages", status_code=303)
+    return RedirectResponse("/home", status_code=303)
+
+
+@app.post("/run/close/{run_id}")
+def close_run(request: Request, run_id: int):
+    """Close a run directly from a quick action without reopening each machine."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    mark_run_complete(run_id, current_user(request))
+    insert_audit(
+        table_name="production_runs",
+        record_id=run_id,
+        action_type="finalize",
+        changed_by=current_user(request),
+        old_data="",
+        new_data="run closed from quick action",
+    )
+    if current_run_id(request) == run_id:
+        request.session.pop("run_id", None)
+    return RedirectResponse("/home", status_code=303)
+
+
+@app.get("/runs/blend", response_class=HTMLResponse)
+def blend_runs_page(request: Request):
+    """Render the multi-run blend workflow."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    return render_page(request, "run_action.html", **run_action_page_context("blend"))
+
+
+@app.post("/runs/blend")
+async def blend_runs_submit(request: Request):
+    """Apply a shared blend label to the selected runs."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    selected_run_ids = selected_run_ids_from_form(form)
+    if not selected_run_ids:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("blend", error="Select at least one run to blend."),
+        )
+
+    blend_label = run_action_label("blend")
+    apply_run_group_action(selected_run_ids, "blend", blend_label)
+    request.session["run_id"] = selected_run_ids[0]
+    return render_page(
+        request,
+        "run_action.html",
+        **run_action_page_context(
+            "blend",
+            selected_run_ids=selected_run_ids,
+            message=f"Blend {blend_label} saved for {len(selected_run_ids)} selected run(s).",
+        ),
+    )
+
+
+@app.get("/runs/split", response_class=HTMLResponse)
+def split_runs_page(request: Request):
+    """Render the multi-run split workflow."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    return render_page(request, "run_action.html", **run_action_page_context("split"))
+
+
+@app.post("/runs/split")
+async def split_runs_submit(request: Request):
+    """Apply a shared split label to the selected runs."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    selected_run_ids = selected_run_ids_from_form(form)
+    if not selected_run_ids:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("split", error="Select at least one run to split."),
+        )
+
+    split_label = run_action_label("split")
+    apply_run_group_action(selected_run_ids, "split", split_label)
+    request.session["run_id"] = selected_run_ids[0]
+    return render_page(
+        request,
+        "run_action.html",
+        **run_action_page_context(
+            "split",
+            selected_run_ids=selected_run_ids,
+            message=f"Split {split_label} saved for {len(selected_run_ids)} selected run(s).",
+        ),
+    )
+
+
+@app.get("/runs/print", response_class=HTMLResponse)
+def run_print_page(request: Request):
+    """Render the audit print selection page for single or multi-run printing."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    return render_page(
+        request,
+        "run_print.html",
+        runs=list_runs(limit=120),
+        selected_run_ids=[],
+        selected_runs=[],
+        print_packets=[],
+        error_message="",
+    )
+
+
+@app.post("/runs/print")
+async def run_print_submit(request: Request):
+    """Build the audit print preview for the selected runs."""
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    selected_run_ids = selected_run_ids_from_form(form)
+    selected_runs = get_runs_by_ids(selected_run_ids)
+    if not selected_runs:
+        return render_page(
+            request,
+            "run_print.html",
+            runs=list_runs(limit=120),
+            selected_run_ids=[],
+            selected_runs=[],
+            print_packets=[],
+            error_message="Select at least one run to print.",
+        )
+
+    return render_page(
+        request,
+        "run_print.html",
+        runs=list_runs(limit=120),
+        selected_run_ids=selected_run_ids,
+        selected_runs=selected_runs,
+        print_packets=build_print_packets(selected_runs),
+        error_message="",
+    )
 
 
 # ------------------------
@@ -1308,7 +1667,7 @@ def process_dashboard(request: Request):
 
 @app.get("/stages", response_class=HTMLResponse)
 def stages(request: Request):
-    """Render the batch stage picker for the currently selected run."""
+    """Render the run-linked sheet picker for the currently selected run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1320,9 +1679,10 @@ def stages(request: Request):
     return render_page(request, "stages.html", stage_links=STAGE_LINKS)
 
 
+@app.get("/run/review", response_class=HTMLResponse)
 @app.get("/batch/review", response_class=HTMLResponse)
 def batch_review_page(request: Request):
-    """Render the final batch-pack review page for the active run."""
+    """Render the run review page for the active run."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1335,9 +1695,10 @@ def batch_review_page(request: Request):
     return render_page(request, "batch_review.html", **review)
 
 
+@app.post("/run/review/finalize")
 @app.post("/batch/review/finalize")
 async def finalize_batch_review(request: Request):
-    """Mark the active run complete once at least one batch-pack entry exists."""
+    """Mark the active run complete once at least one run-linked record exists."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1351,7 +1712,7 @@ async def finalize_batch_review(request: Request):
 
     review = build_batch_review(current_run_id(request))
     if not review["has_entries"]:
-        return PlainTextResponse("Add at least one batch data entry before finalizing the batch pack.", status_code=400)
+        return PlainTextResponse("Add at least one run record before closing the run.", status_code=400)
 
     mark_run_complete(current_run_id(request), current_user(request))
     insert_audit(
@@ -1360,7 +1721,7 @@ async def finalize_batch_review(request: Request):
         action_type="finalize",
         changed_by=current_user(request),
         old_data="",
-        new_data="batch pack reviewed and finalized",
+        new_data="run review completed and run closed",
     )
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -1522,7 +1883,7 @@ async def submit_evaporation(request: Request):
 
 @app.get("/stage/generic/{stage_key}", response_class=HTMLResponse)
 def generic_stage_page(request: Request, stage_key: str):
-    """Render a generic batch-pack sheet driven entirely by `stage_defs.py`."""
+    """Render a generic run sheet driven entirely by `stage_defs.py`."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1827,7 +2188,7 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
 
 @app.get("/edit/generic/{entry_id}", response_class=HTMLResponse)
 def edit_generic_page(request: Request, entry_id: int):
-    """Render the generic batch-pack correction form for a saved entry."""
+    """Render the generic run-sheet correction form for a saved entry."""
     redirect = require_login(request)
     if redirect:
         return redirect
@@ -1907,13 +2268,13 @@ async def edit_generic_submit(request: Request, entry_id: int):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    """Render the grouped batch-pack dashboard used to reopen saved batch sheets."""
+    """Render the grouped run-record dashboard used to reopen saved run sheets."""
     redirect = require_login(request)
     if redirect:
         return redirect
 
     activity_rows = last_12_hour_activity()
-    return render_page(request, "dashboard.html", rows=activity_rows, batch_packs=dashboard_batch_packs(activity_rows))
+    return render_page(request, "dashboard.html", rows=activity_rows, run_groups=run_record_groups(activity_rows))
 
 
 @app.get("/change-history", response_class=HTMLResponse)

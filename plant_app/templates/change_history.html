@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
+{% from "partials/template_helpers.html" import run_label %}
 <body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
@@ -30,96 +31,87 @@
       </div>
     </div>
   </div>
-  <!-- Correction history view for all saved field-level edits. -->
   <div class="wrap">
-  <div class="nav">
-    <!-- Shared nav for moving back into work screens from the history page. -->
-    <div class="brand"><img src="/static/logo.png" class="logo" alt="LAG">Change History</div>
-    <div class="navlinks">
-      <a class="pill" href="/home">Home</a>
-      <a class="pill" href="/change-history">Current Work</a>
-      <a class="pill" href="/logout">Logout</a>
-      <span class="pill">User: {{ user }}</span>
+    <div class="nav">
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Change History</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/dashboard">Run Records</a>
+        <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
     </div>
-  </div>
 
-  <div class="card page-intro">
-    <!-- Overview card describing what this audit page is showing. -->
-    <div class="section-title">
-      <h2>Supervisor Change Log</h2>
-      <span class="info-chip">{{ changes|length }} Total Corrections</span>
+    <div class="card page-intro">
+      <div class="section-title">
+        <h2>Supervisor Change Log</h2>
+        <span class="info-chip">{{ changes|length }} Total Corrections</span>
+      </div>
+      <p class="muted">Review field-level corrections, who made them, and the values that changed.</p>
+      {% if run %}
+      <div class="banner">
+        Active Run:
+        <strong>{{ run_label(run) }}</strong>
+        {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+      </div>
+      {% endif %}
     </div>
-    <p class="muted">Use this page to review field-level corrections, including the original value, corrected value, initials, employee number, and time of change.</p>
+
     {% if run %}
-    <div class="banner">
-      Active Batch:
-      <strong>{{ run['batch_number'] or 'No batch' }}</strong>
-      {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
-      {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+    <div class="card">
+      <div class="section-title">
+        <h2>Active Run Changes</h2>
+        <span class="info-chip">{{ active_changes|length }} Active Corrections</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <tr><th>Changed</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
+          {% for item in active_changes %}
+          <tr>
+            <td>{{ item['created_at'] }}</td>
+            <td>{{ item['display_sheet'] }}</td>
+            <td>{{ item['field_name'] }}</td>
+            <td>{{ item['original_value'] or '' }}</td>
+            <td>{{ item['corrected_value'] or item['field_value'] or '' }}</td>
+            <td>{{ item['change_initials'] }}</td>
+            <td>{{ item['changed_by_employee'] }}</td>
+          </tr>
+          {% endfor %}
+          {% if not active_changes %}
+          <tr><td colspan="7" class="muted center">No field corrections have been logged for the active run yet.</td></tr>
+          {% endif %}
+        </table>
+      </div>
     </div>
     {% endif %}
-  </div>
 
-  {% if run %}
-  <div class="card">
-    <!-- Run-scoped correction history for the batch currently open in session. -->
-    <div class="section-title">
-      <h2>Active Batch Changes</h2>
-      <span class="info-chip">{{ active_changes|length }} Active Corrections</span>
-    </div>
-    <p class="muted table-note">These are the most recent field corrections tied to the batch that is currently open.</p>
-    <div class="table-wrap">
-      <table class="table">
-        <tr><th>Changed</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
-        {% for c in active_changes %}
-        <tr>
-          <td>{{ c['created_at'] }}</td>
-          <td>{{ c['display_sheet'] }}</td>
-          <td>{{ c['field_name'] }}</td>
-          <td>{{ c['original_value'] or '' }}</td>
-          <td>{{ c['corrected_value'] or c['field_value'] or '' }}</td>
-          <td>{{ c['change_initials'] }}</td>
-          <td>{{ c['changed_by_employee'] }}</td>
-        </tr>
-        {% endfor %}
-        {% if not active_changes %}
-        <tr><td colspan="7" class="muted center">No field corrections have been logged for the active batch yet.</td></tr>
-        {% endif %}
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  <div class="card">
-    <!-- Plant-wide correction history across all saved entries. -->
-    <div class="section-title">
-      <h2>Recent Change History</h2>
-      <span class="info-chip">All Sheets</span>
-    </div>
-    <p class="muted table-note">Latest corrections across all entries.</p>
-    <div class="table-wrap">
-      <table class="table">
-        <tr><th>Changed</th><th>Batch</th><th>Run</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
-        {% for c in changes %}
-        <tr>
-          <td>{{ c['created_at'] }}</td>
-          <td>{{ c['batch_number'] or 'No batch' }}</td>
-          <td>{{ c['run_number'] or '' }}</td>
-          <td>{{ c['display_sheet'] }}</td>
-          <td>{{ c['field_name'] }}</td>
-          <td>{{ c['original_value'] or '' }}</td>
-          <td>{{ c['corrected_value'] or c['field_value'] or '' }}</td>
-          <td>{{ c['change_initials'] }}</td>
-          <td>{{ c['changed_by_employee'] }}</td>
-        </tr>
-        {% endfor %}
-        {% if not changes %}
-        <tr><td colspan="9" class="muted center">No field corrections have been logged yet.</td></tr>
-        {% endif %}
-      </table>
+    <div class="card">
+      <div class="section-title">
+        <h2>Recent Change History</h2>
+        <span class="info-chip">All Sheets</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <tr><th>Changed</th><th>Run</th><th>Sheet</th><th>Field</th><th>Original</th><th>Corrected</th><th>Initials</th><th>Employee</th></tr>
+          {% for item in changes %}
+          <tr>
+            <td>{{ item['created_at'] }}</td>
+            <td>{{ item['run_number'] or item['batch_number'] or '' }}</td>
+            <td>{{ item['display_sheet'] }}</td>
+            <td>{{ item['field_name'] }}</td>
+            <td>{{ item['original_value'] or '' }}</td>
+            <td>{{ item['corrected_value'] or item['field_value'] or '' }}</td>
+            <td>{{ item['change_initials'] }}</td>
+            <td>{{ item['changed_by_employee'] }}</td>
+          </tr>
+          {% endfor %}
+          {% if not changes %}
+          <tr><td colspan="8" class="muted center">No field corrections have been logged yet.</td></tr>
+          {% endif %}
+        </table>
+      </div>
     </div>
   </div>
-</div>
-<script src="/static/settings.js?v={{ asset_version }}"></script>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>
 </html>

@@ -1,0 +1,28 @@
+{% from "partials/template_helpers.html" import run_label %}
+<div class="table-wrap">
+  <table class="table run-selection-table">
+    <tr>
+      <th>Select</th>
+      <th>Run</th>
+      <th>Product</th>
+      <th>Status</th>
+      <th>Blend</th>
+      <th>Split</th>
+      <th>Updated</th>
+    </tr>
+    {% for run_item in runs %}
+    <tr class="{% if run_item['id'] in selected_run_ids %}is-selected{% endif %}">
+      <td><input type="checkbox" name="selected_run_ids" value="{{ run_item['id'] }}" {% if run_item['id'] in selected_run_ids %}checked{% endif %}></td>
+      <td><strong>{{ run_label(run_item) }}</strong></td>
+      <td>{{ run_item['product_name'] or '' }}</td>
+      <td>{{ run_item['status'] or '' }}</td>
+      <td>{{ run_item['blend_number'] or '' }}</td>
+      <td>{{ run_item['split_batch_number'] or '' }}</td>
+      <td>{{ run_item['updated_at'] or '' }}</td>
+    </tr>
+    {% endfor %}
+    {% if not runs %}
+    <tr><td colspan="7" class="muted center">No runs are available yet.</td></tr>
+    {% endif %}
+  </table>
+</div>
