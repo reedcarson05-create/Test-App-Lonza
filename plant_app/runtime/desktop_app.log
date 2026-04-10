@@ -269,3 +269,4 @@
 [2026-04-10 11:20:40] Port 8000 is serving an older app host (the running app build (2026-04-10 10:38:25 AM) was older than disk (2026-04-10 11:18:55 AM)). Switching desktop launch to port 8011.
 [2026-04-10 11:20:43] Server not running on port 8011, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe.
 [2026-04-10 11:20:44] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-10 11:28:09] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
