@@ -1,4 +1,4 @@
-"""Central stage metadata used to build the batch-pack navigation and generic sheets."""
+"""Central stage metadata used to build run-sheet navigation and generic sheets."""
 
 # Shared temperature label reused across multiple stage tables.
 DEG_F = "\u00B0F"
@@ -18,9 +18,9 @@ def table(title: str, prefix: str, rows: int, columns: list[tuple[str, str]]):
     return {"title": title, "prefix": prefix, "rows": rows, "columns": columns}
 
 
-# Full configuration for every batch-pack stage rendered through `generic_sheet.html`.
+# Full configuration for every run-linked stage rendered through `generic_sheet.html`.
 GENERIC_STAGE_DEFS = {
-    # Three repeated filtration cycle tables captured as a generic batch-pack sheet.
+    # Three repeated filtration cycle tables kept available for standalone use later.
     "filtration_cycles": {
         "title": "Filtration Cycles",
         "sheet_name": "Filtration",
@@ -344,11 +344,10 @@ GENERIC_STAGE_DEFS = {
     },
 }
 
-# Navigation used on the batch stage selection screen.
+# Navigation used on the run sheet selection screen.
 STAGE_LINKS = [
     # Evaporation uses its own dedicated template instead of the generic sheet renderer.
     {"title": "Evaporation", "href": "/stage/evaporation"},
-    {"title": "Filtration Cycles", "href": "/stage/generic/filtration_cycles"},
     {"title": "Clarifier", "href": "/stage/generic/clarifier"},
     {"title": "Concentration", "href": "/stage/generic/concentration"},
     {"title": "Reconcentration", "href": "/stage/generic/reconcentration"},

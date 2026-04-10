@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Data Point Sheets</title>
+  <title>Run Sheets</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
+{% from "partials/template_helpers.html" import run_label %}
 <body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
@@ -30,50 +31,43 @@
       </div>
     </div>
   </div>
-  <!-- Batch stage picker that links the active run to evaporation and generic batch-pack sheets. -->
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png" class="logo" alt="LAG">Data Point Sheets</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Run Sheets</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
-        <a class="pill" href="/dashboard">Current Work</a>
+        <a class="pill" href="/run/select">Runs</a>
+        <a class="pill" href="/run/review">Review</a>
         <a class="pill" href="/logout">Logout</a>
-        <span class="pill">User: {{ user }}</span>
       </div>
     </div>
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Batch Work Area</h2>
-        <span class="info-chip">Batch-Linked Sheets</span>
+        <h2>Run Work Area</h2>
+        <span class="info-chip">Run {{ run_label(run) }}</span>
       </div>
-      {% if run %}
       <div class="banner">
-        {% if run['batch_number'] %}Batch: <strong>{{ run['batch_number'] }}</strong>{% else %}<strong>No batch</strong>{% endif %}
-        {% if run['run_number'] %}| Run {{ run['run_number'] }}{% endif %}
-        {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
-        {% if run['split_batch_number'] %}| Split {{ run['split_batch_number'] }}{% endif %}
-        {% if run['product_name'] %}| {{ run['product_name'] }}{% endif %}
-        {% if run['shift_name'] %}| {{ run['shift_name'] }} shift{% endif %}
+        {% if run['product_name'] %}Product: <strong>{{ run['product_name'] }}</strong>{% else %}No product assigned{% endif %}
+        {% if run['blend_number'] %} | Blend {{ run['blend_number'] }}{% endif %}
+        {% if run['split_batch_number'] %} | Split {{ run['split_batch_number'] }}{% endif %}
+        {% if run['status'] %} | Status: {{ run['status'] }}{% endif %}
       </div>
-      {% else %}
-      <div class="banner">No run is active yet.</div>
-      {% endif %}
-      <p class="muted">Follow the steps below: make sure the batch is right, open the sheet you need, then review the pack when you are done.</p>
-      <div class="action-grid">
-        <a class="btn" href="/run/select">{% if run %}Change Batch{% else %}Set Batch{% endif %}</a>
-        {% if run %}<a class="btn ghost" href="/batch/edit">Edit Batch</a>{% endif %}
-        <a class="btn ghost" href="/dashboard">Open Batch Pack Dashboard</a>
-        <a class="btn ghost" href="/batch/review">Review Batch Pack</a>
-      </div>
+      <p class="muted">Use these run-linked sheets for the active run. Filtration stays standalone and is available from the home page.</p>
+      {% set action_links = [
+        {"label": "Change Run", "href": "/run/select", "ghost": True},
+        {"label": "Edit Run", "href": "/run/edit", "ghost": True},
+        {"label": "Print", "href": "/runs/print", "ghost": True},
+        {"label": "Review", "href": "/run/review"}
+      ] %}
+      {% include "partials/action_link_grid.html" %}
     </div>
 
     <div class="card">
       <div class="section-title">
-        <h2>Select A Sheet</h2>
+        <h2>Select A Run Sheet</h2>
         <span class="info-chip">{{ stage_links|length }} Sheets</span>
       </div>
-      <p class="muted">Each sheet below saves into the active batch pack.</p>
       <div class="action-grid stage-buttons">
         {% for stage in stage_links %}
         <a class="btn" href="{{ stage['href'] }}">{{ stage['title'] }}</a>

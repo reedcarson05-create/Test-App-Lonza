@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dashboard</title>
+  <title>Run Records Dashboard</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
+{% from "partials/template_helpers.html" import run_label, activity_href %}
 <body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
@@ -30,107 +31,91 @@
     </div>
   </div>
 </div>
-<!-- Grouped batch-pack dashboard used to reopen previously saved batch sheets. -->
 <div class="wrap">
   <div class="nav">
-    <!-- Shared nav plus current user badge. -->
-    <div class="brand"><img src="/static/logo.png" class="logo" alt="LAG">Dashboard</div>
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Run Records</div>
     <div class="navlinks">
       <a class="pill" href="/home">Home</a>
-      <a class="pill" href="/dashboard">Current Work</a>
+      <a class="pill" href="/runs/print">Print</a>
       <a class="pill" href="/logout">Logout</a>
       <span class="pill">User: {{ user }}</span>
     </div>
   </div>
 
   <div class="card page-intro">
-    <!-- Dashboard summary explaining how grouped batch packs behave. -->
     <div class="section-title">
-      <h2>Batch Pack Dashboard</h2>
-      <span class="info-chip">{{ batch_packs|length }} Batch Packs</span>
+      <h2>Run Records Dashboard</h2>
+      <span class="info-chip">{{ run_groups|length }} Run Groups</span>
     </div>
-    <p class="muted">Everything saved with the same batch number stays grouped together here. Open a correction from this page instead of creating another copy of the same sheet.</p>
+    <p class="muted">Use this dashboard to reopen run-linked records and review recent activity across the plant.</p>
   </div>
 
   <div class="card">
-    <!-- Batch-grouped view used to find and reopen batch-pack corrections. -->
     <div class="section-title">
-      <h2>Grouped Batch Packs</h2>
-      <span class="info-chip">Organized By Batch</span>
+      <h2>Grouped Run Records</h2>
+      <span class="info-chip">Organized By Run</span>
     </div>
     <div class="stack-gap">
-      {% for pack in batch_packs %}
+      {% for group in run_groups %}
       <div class="batch-pack">
         <div class="batch-pack-head">
           <div>
-            <h3>Batch {{ pack['batch_number'] }}</h3>
+            <h3>Run {{ group['run_key'] }}</h3>
             <p class="muted">
-              {% if pack['run_numbers'] %}Run: {{ pack['run_numbers'] }}{% else %}No run{% endif %}
-              {% if pack['blend_numbers'] %} | Blend: {{ pack['blend_numbers'] }}{% endif %}
+              {% if group['blend_numbers'] %}Blend: {{ group['blend_numbers'] }} | {% endif %}
+              Status: {{ group['statuses'] or 'Open' }}
             </p>
           </div>
           <div class="summary-line">
-            <span class="info-chip">{{ pack['entry_count'] }} Entries</span>
-            <span class="pill">Last Saved: {{ pack['latest_time'] }}</span>
+            <span class="info-chip">{{ group['entry_count'] }} Records</span>
+            <span class="pill">Last Saved: {{ group['latest_time'] }}</span>
           </div>
         </div>
         <div class="table-wrap">
           <table class="table">
-            <tr><th>Saved</th><th>Stage</th><th>Operator</th><th>Start</th><th>End</th><th>Comments</th><th>Open</th></tr>
-            {% for r in pack['entries'] %}
+            <tr><th>Saved</th><th>Record</th><th>Operator</th><th>Comments</th><th>Open</th></tr>
+            {% for row in group['entries'] %}
             <tr>
-              <td>{{ r['activity_time'] }}</td>
-              <td>{{ r['display_section'] }}</td>
-              <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
-              <td>{{ r['start_label'] or '' }}</td>
-              <td>{{ r['end_label'] or '' }}</td>
-              <td>{{ r['comments'] or '' }}</td>
-              <td>{% if r['edit_href'] %}<a class="table-action" href="{{ r['edit_href'] }}">Correct Entry</a>{% else %}<span class="muted">Open from process dashboard</span>{% endif %}</td>
+              <td>{{ row['activity_time'] }}</td>
+              <td>{{ row['display_section'] }}</td>
+              <td>{{ row['employee'] }}{% if row['operator_initials'] %} ({{ row['operator_initials'] }}){% endif %}</td>
+              <td>{{ row['comments'] or '' }}</td>
+              <td><a class="table-action" href="{{ row['edit_href'] }}">Open</a></td>
             </tr>
             {% endfor %}
           </table>
         </div>
       </div>
       {% endfor %}
+      {% if not run_groups %}
+      <div class="summary-card">
+        <h3>No Run Records Yet</h3>
+        <p>Saved run-linked records will appear here automatically.</p>
+      </div>
+      {% endif %}
     </div>
   </div>
 
   <div class="card">
-    <!-- Flat recent-activity table across all sections for quick scanning. -->
     <div class="section-title">
-      <h2>Last 12 Hours</h2>
-      <span class="info-chip">{{ rows|length }} Total Entries</span>
+      <h2>Recent Activity</h2>
+      <span class="info-chip">{{ rows|length }} Entries</span>
     </div>
-    <p class="muted table-note">Flat recent-activity view across all stages.</p>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Saved</th><th>Stage</th><th>Operator</th><th>Run</th><th>Batch</th><th>Blend</th><th>Start</th><th>End</th><th>Comments</th><th>Open</th></tr>
-        {% for r in rows %}
+        <tr><th>Saved</th><th>Record</th><th>Run</th><th>Status</th><th>Comments</th><th>Open</th></tr>
+        {% for row in rows %}
         <tr>
-          <td>{{ r['activity_time'] }}</td>
-          <td>{{ r['display_section'] if r['display_section'] is defined else r['section'] }}</td>
-          <td>{{ r['employee'] }}{% if r['operator_initials'] %} ({{ r['operator_initials'] }}){% endif %}</td>
-          <td>{{ r['run_number'] or '' }}</td>
-          <td>{{ r['batch_number'] or 'No batch' }}</td>
-          <td>{{ r['blend_number'] or '' }}</td>
-          <td>{{ r['start_label'] or '' }}</td>
-          <td>{{ r['end_label'] or '' }}</td>
-          <td>{{ r['comments'] or '' }}</td>
-          <td>
-            {% if r['section'] == 'Extraction' or r['section'] == 'Filtration' %}
-            <a class="table-action" href="/process-dashboard">Correct From Process Dashboard</a>
-            {% elif r['section'] == 'Evaporation' %}
-            <a class="table-action" href="/edit/evaporation/{{ r['record_id'] }}">Correct Entry</a>
-            {% elif r['entry_table'] == 'sheet_entries' %}
-            <a class="table-action" href="/edit/generic/{{ r['record_id'] }}">Correct Entry</a>
-            {% else %}
-            <span class="muted">-</span>
-            {% endif %}
-          </td>
+          <td>{{ row['activity_time'] }}</td>
+          <td>{{ row['section'] }}</td>
+          <td>{{ run_label(row) or 'Standalone' }}</td>
+          <td>{{ row['status'] or '' }}</td>
+          <td>{{ row['comments'] or '' }}</td>
+          <td><a class="table-action" href="{{ activity_href(row) }}">Open</a></td>
         </tr>
         {% endfor %}
         {% if not rows %}
-        <tr><td colspan="10" class="muted center">No activity has been saved in the last 12 hours.</td></tr>
+        <tr><td colspan="6" class="muted center">No activity has been saved yet.</td></tr>
         {% endif %}
       </table>
     </div>

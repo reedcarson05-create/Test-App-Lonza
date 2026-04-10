@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
+{% from "partials/template_helpers.html" import run_label, display_or_blank, blank_class %}
 <body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
@@ -30,16 +31,16 @@
     </div>
   </div>
 </div>
-<!-- Generic batch-pack template driven entirely by the stage definitions in `stage_defs.py`. -->
+<!-- Generic run-sheet template driven entirely by the stage definitions in `stage_defs.py`. -->
 <div class="wrap">
   <div class="nav">
-    <!-- Shared nav plus current batch badge for batch-pack work. -->
-    <div class="brand"><img src="/static/logo.png" class="logo" alt="LAG">{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</div>
+    <!-- Shared nav plus current run badge for run-linked work. -->
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</div>
     <div class="navlinks">
       <a class="pill" href="/home">Home</a>
       <a class="pill" href="/stages">Current Work</a>
       <a class="pill" href="/logout">Logout</a>
-      <span class="pill">Batch: {% if run and run['batch_number'] %}{{ run['batch_number'] }}{% else %}No batch{% endif %}</span>
+      <span class="pill">Run: {% if run %}{{ run_label(run) }}{% else %}No run{% endif %}</span>
     </div>
   </div>
 
@@ -47,7 +48,7 @@
     <!-- Intro card explains whether the operator is creating, viewing, or correcting a sheet. -->
     <div class="card page-intro">
       <h2>{% if is_edit %}Correct Saved {{ stage['title'] }} Data{% elif view_only %}Saved {{ stage['title'] }} Data{% else %}Enter {{ stage['title'] }} Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Use this correction page to fix saved batch-pack data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is already saved to the active batch pack. The saved values stay here and can only be changed from the correction tab.{% else %}Fill in the sheet below and save it when you are done.{% endif %}</p>
+      <p class="muted">{% if is_edit %}Use this correction page to fix saved run records. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is already saved to the active run record. The saved values stay here and can only be changed from the correction tab.{% else %}Fill in the sheet below and save it when you are done.{% endif %}</p>
     </div>
     <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
       {% if signature_session_ready %}
@@ -57,7 +58,7 @@
       {% endif %}
     </div>
     {% if view_only and not is_edit %}
-    <div class="banner">This {{ stage['title'] }} entry is already saved to the active batch pack.</div>
+    <div class="banner">This {{ stage['title'] }} entry is already saved to the active run record.</div>
     {% endif %}
     <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
     <div class="card">
@@ -85,8 +86,8 @@
           <input
             name="{{ field[0] }}"
             type="{{ 'text' if view_only and not is_edit else field[2] }}"
-            value="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none %}{{ blank_display(entry_values.get(field[0]), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field[0]) is not none %}{{ entry_values.get(field[0]) }}{% elif field[0] == 'entry_date' or field[0] == 'startup_date' %}{{ today }}{% elif field[0] == 'operator_initials' %}{{ initials }}{% endif %}"
-            class="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none and is_blank_value(entry_values.get(field[0])) %}blank-display{% endif %}">
+            value="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none %}{{ display_or_blank(entry_values.get(field[0]), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field[0]) is not none %}{{ entry_values.get(field[0]) }}{% elif field[0] == 'entry_date' or field[0] == 'startup_date' %}{{ today }}{% elif field[0] == 'operator_initials' %}{{ initials }}{% endif %}"
+            class="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none %}{{ blank_class(entry_values.get(field[0])) }}{% endif %}">
           {% endif %}
         </div>
         {% endfor %}
@@ -107,7 +108,7 @@
           {% for row in range(table['rows']) %}
           <tr>
             {% for column in table['columns'] %}
-            <td><input name="{{ table['prefix'] }}_{{ row + 1 }}_{{ column[0] }}" value="{% if view_only and not is_edit and entry_values %}{{ blank_display(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], ''), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% else %}{{ entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '') if entry_values else '' }}{% endif %}" class="{% if view_only and not is_edit and entry_values and is_blank_value(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '')) %}blank-display{% endif %}"></td>
+            <td><input name="{{ table['prefix'] }}_{{ row + 1 }}_{{ column[0] }}" value="{% if view_only and not is_edit and entry_values %}{{ display_or_blank(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], ''), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% else %}{{ entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '') if entry_values else '' }}{% endif %}" class="{% if view_only and not is_edit and entry_values %}{{ blank_class(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '')) }}{% endif %}"></td>
             {% endfor %}
           </tr>
           {% endfor %}
@@ -147,7 +148,7 @@
       {% if view_only and not is_edit and edit_href %}
       <a class="btn" href="{{ edit_href }}">Correct Saved Entry</a>
       {% endif %}
-      <a class="btn ghost" href="/batch/edit">Edit Batch</a>
+      <a class="btn ghost" href="/run/edit">Edit Run</a>
       <a class="btn ghost" href="/stages">Back</a>
     </div>
   </form>

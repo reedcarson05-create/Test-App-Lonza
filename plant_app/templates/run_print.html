@@ -1,0 +1,134 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Runs</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+  <div class="settings-root print-hidden">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="nav print-hidden">
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Print Runs</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/run/select">Runs</a>
+        <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <div class="card page-intro print-hidden">
+      <div class="section-title">
+        <h2>Run Selection And Audit Print</h2>
+        <span class="info-chip">{{ runs|length }} Available Runs</span>
+      </div>
+      <p class="muted">Choose a single run, multiple runs, or grouped blend/split runs, then build a print-ready audit summary.</p>
+      {% if error_message %}
+      <div class="alert">{{ error_message }}</div>
+      {% endif %}
+    </div>
+
+    <form method="post" action="/runs/print" class="stack-gap print-hidden">
+      <div class="card">
+        <div class="section-title">
+          <h2>Select Runs To Print</h2>
+          <span class="info-chip">Single or multiple runs</span>
+        </div>
+        {% include "partials/run_selection_table.html" %}
+        <div class="actions">
+          <button class="btn" type="submit">Build Print Preview</button>
+          <a class="btn ghost" href="/home">Back Home</a>
+        </div>
+      </div>
+    </form>
+
+    {% if print_packets %}
+    <div class="card print-toolbar print-hidden">
+      <div class="section-title">
+        <h2>Print Preview</h2>
+        <span class="info-chip">{{ print_packets|length }} Run Packets</span>
+      </div>
+      <p class="muted">This preview is ready for audits. Use the Print button when it looks right.</p>
+      <div class="actions">
+        <button class="btn" type="button" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    {% for packet in print_packets %}
+    <section class="card print-packet">
+      <div class="section-title">
+        <h2>Run {{ packet['run_label'] }}</h2>
+        <span class="info-chip">{{ packet['run']['status'] or 'Open' }}</span>
+      </div>
+      <div class="banner">
+        {% if packet['run']['product_name'] %}Product: <strong>{{ packet['run']['product_name'] }}</strong>{% else %}No product assigned{% endif %}
+        {% if packet['run']['blend_number'] %} | Blend {{ packet['run']['blend_number'] }}{% endif %}
+        {% if packet['run']['split_batch_number'] %} | Split {{ packet['run']['split_batch_number'] }}{% endif %}
+      </div>
+      {% if packet['run']['notes'] %}
+      <p><strong>Notes:</strong> {{ packet['run']['notes'] }}</p>
+      {% endif %}
+
+      {% if packet['evaporation_entry'] %}
+      <div class="table-wrap">
+        <table class="table">
+          <tr><th colspan="6">Evaporation</th></tr>
+          <tr><th>Date</th><th>Operator</th><th>Evaporator</th><th>Start</th><th>Stop</th><th>Comments</th></tr>
+          <tr>
+            <td>{{ packet['evaporation_entry']['entry_date'] or '' }}</td>
+            <td>{{ packet['evaporation_entry']['operator_initials'] or packet['evaporation_entry']['employee'] or '' }}</td>
+            <td>{{ packet['evaporation_entry']['evaporator_no'] or '' }}</td>
+            <td>{{ packet['evaporation_entry']['startup_time'] or '' }}</td>
+            <td>{{ packet['evaporation_entry']['shutdown_time'] or '' }}</td>
+            <td>{{ packet['evaporation_entry']['comments'] or '' }}</td>
+          </tr>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="table-wrap">
+        <table class="table">
+          <tr><th>Run-linked record</th><th>Status</th><th>Saved data</th></tr>
+          {% for entry in packet['generic_entries'] %}
+          <tr>
+            <td>{{ entry['title'] }}</td>
+            <td>Saved</td>
+            <td>{{ entry['entry']['created_at'] or '' }}</td>
+          </tr>
+          {% endfor %}
+          {% if not packet['generic_entries'] and not packet['evaporation_entry'] %}
+          <tr><td colspan="3" class="muted center">No run-linked records have been saved for this run yet.</td></tr>
+          {% endif %}
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+    {% endif %}
+  </div>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
+</body>
+</html>
