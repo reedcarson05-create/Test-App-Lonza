@@ -260,12 +260,21 @@ def get_conn():
         _active_backend = "sqlite"
         return _open_sqlite_conn()
 
+    # When SQL Server is only the default and no shared SQL target was configured,
+    # prefer the bundled SQLite database so the desktop app still boots locally.
+    if (not _sql_configuration_present()) and _sqlite_available():
+        _active_backend = "sqlite"
+        return _open_sqlite_conn()
+
     try:
         conn = _connect_sql_server()
         _active_backend = "sqlserver"
         return conn
     except pyodbc.Error:
-        if requested_backend == "sqlserver" or not _sqlite_available():
+        allow_sqlite_fallback = _sqlite_available() and (
+            requested_backend != "sqlserver" or not _sql_configuration_present()
+        )
+        if not allow_sqlite_fallback:
             raise
         _active_backend = "sqlite"
         return _open_sqlite_conn()
