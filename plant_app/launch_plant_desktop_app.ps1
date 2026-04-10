@@ -171,16 +171,12 @@ function Resolve-ReusableDesktopPort {
   )
 
   $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
-  $healthyFallbackPort = $null
   foreach ($candidate in $candidates) {
     $candidateHealth = "http://127.0.0.1:$candidate/health"
     $candidateBoot = "http://127.0.0.1:$candidate/boot"
     $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
 
     if ((Test-AppServerReady -Url $candidateHealth) -and (Test-AppServerReady -Url $candidateBoot) -and (Test-AppServerReady -Url $candidateAppStatus)) {
-      if ($null -eq $healthyFallbackPort) {
-        $healthyFallbackPort = $candidate
-      }
       $status = Get-AppServerStatus -Url $candidateAppStatus
       if ($status -and (-not $status.restart_required)) {
         return $candidate
@@ -188,7 +184,7 @@ function Resolve-ReusableDesktopPort {
     }
   }
 
-  return $healthyFallbackPort
+  return $null
 }
 
 function Resolve-BrowserExe {
