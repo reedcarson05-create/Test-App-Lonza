@@ -212,3 +212,13 @@
 [2026-04-09 11:40:14] Server not running on port 8012, starting background host with C:\Users\Sam\AppData\Local\Python\bin\python.exe.
 [2026-04-09 11:40:16] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> f6ef1673280ac34467ec95882768d8906b134a6c
+[2026-04-09 22:00:52] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-09 22:00:58] Port 8000 is serving an older app host (/boot was unavailable and /app-status was unavailable). Switching desktop launch to port 8012.
+[2026-04-09 22:01:01] Server not running on port 8012, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe.
+[2026-04-09 22:01:02] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-10 09:32:15] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-10 09:32:15] Port 8000 is serving an older app host (/boot was unavailable and /app-status was unavailable). Switching desktop launch to port 8012.
+[2026-04-10 09:32:16] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-10 09:33:20] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-10 09:33:20] Port 8000 is serving an older app host (/boot was unavailable and /app-status was unavailable). Switching desktop launch to port 8012.
+[2026-04-10 09:33:20] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe

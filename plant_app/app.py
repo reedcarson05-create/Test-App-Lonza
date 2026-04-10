@@ -236,7 +236,10 @@ def configured_port() -> int:
         return 8000
     return port if 1 <= port <= 65535 else 8000
 
-# Ensure the local SQLite schema exists before any request handlers run.
+# Keep direct IDE launches aligned with the desktop launcher unless a different backend is explicitly set.
+os.environ.setdefault("PLANT_APP_DB_BACKEND", "sqlserver")
+
+# Ensure the configured database backend is reachable before any request handlers run.
 init_db()
 
 

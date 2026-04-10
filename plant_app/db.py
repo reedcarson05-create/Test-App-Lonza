@@ -259,9 +259,6 @@ def get_conn():
     if requested_backend == "sqlite":
         _active_backend = "sqlite"
         return _open_sqlite_conn()
-    if requested_backend == "auto" and not _sql_configuration_present() and _sqlite_available():
-        _active_backend = "sqlite"
-        return _open_sqlite_conn()
 
     try:
         conn = _connect_sql_server()
