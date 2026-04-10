@@ -62,7 +62,6 @@ function Resolve-PythonExe {
 $pythonExe = Resolve-PythonExe
 $env:PLANT_APP_HOST = $HostAddress
 $env:PLANT_APP_PORT = [string]$Port
-$env:PLANT_APP_DB_BACKEND = "sqlserver"
 
 $startedAt = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -LiteralPath $logFile -Value "`n[$startedAt] Starting Plant App on $HostAddress`:$Port"
