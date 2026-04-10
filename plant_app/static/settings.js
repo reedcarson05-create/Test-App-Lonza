@@ -4,6 +4,206 @@ document.addEventListener("DOMContentLoaded", () => {
   initSettingsPanel();
 });
 
+const DEMO_MODE_STORAGE_KEY = "plantAppDemoMode";
+const DEMO_CORE_ROUTES = [
+  "/home",
+  "/run/select",
+  "/runs/blend",
+  "/runs/split",
+  "/runs/print",
+  "/process-dashboard",
+  "/stage/extraction",
+  "/stage/filtration",
+  "/stages",
+  "/stage/evaporation",
+  "/run/edit",
+  "/run/review",
+  "/dashboard",
+  "/change-history",
+];
+const DEMO_RUN_REQUIRED_ROUTES = [
+  "/stages",
+  "/stage/evaporation",
+  "/run/edit",
+  "/run/review",
+];
+let demoModeFrameHandle = 0;
+let demoModeTimerHandles = [];
+
+function queueDemoModeTimer(callback, delayMs) {
+  const handle = window.setTimeout(() => {
+    demoModeTimerHandles = demoModeTimerHandles.filter((timerHandle) => timerHandle !== handle);
+    callback();
+  }, delayMs);
+  demoModeTimerHandles.push(handle);
+  return handle;
+}
+
+function clearDemoModeTimers() {
+  demoModeTimerHandles.forEach((handle) => window.clearTimeout(handle));
+  demoModeTimerHandles = [];
+}
+
+function cancelDemoModeAnimation() {
+  clearDemoModeTimers();
+  if (demoModeFrameHandle) {
+    window.cancelAnimationFrame(demoModeFrameHandle);
+    demoModeFrameHandle = 0;
+  }
+}
+
+function readDemoModeState() {
+  try {
+    const rawState = window.localStorage.getItem(DEMO_MODE_STORAGE_KEY);
+    if (!rawState) return null;
+    const parsedState = JSON.parse(rawState);
+    if (!parsedState || !parsedState.active || !Array.isArray(parsedState.routes)) {
+      return null;
+    }
+    return parsedState;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeDemoModeState(state) {
+  window.localStorage.setItem(DEMO_MODE_STORAGE_KEY, JSON.stringify(state));
+}
+
+function clearDemoModeState() {
+  window.localStorage.removeItem(DEMO_MODE_STORAGE_KEY);
+}
+
+function normalizeDemoRoute(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value, window.location.href);
+    if (url.origin !== window.location.origin) return "";
+    return url.pathname;
+  } catch (error) {
+    return "";
+  }
+}
+
+function isDemoModeRouteCandidate(route) {
+  if (!route) return false;
+  if (route === "/" || route === "/logout") return false;
+  if (route.startsWith("/run/use/")) return false;
+  if (route.startsWith("/edit/")) return false;
+  if (route.startsWith("/submit/")) return false;
+  if (route.startsWith("/upload-")) return false;
+  if (route.startsWith("/signature")) return false;
+  if (route.startsWith("/boot")) return false;
+  if (route.startsWith("/health")) return false;
+  if (route.startsWith("/app-status")) return false;
+  if (route.startsWith("/settings")) return false;
+
+  return (
+    DEMO_CORE_ROUTES.includes(route) ||
+    route.startsWith("/stage/generic/")
+  );
+}
+
+function uniqueDemoRoutes(routes) {
+  const seenRoutes = new Set();
+  const uniqueRoutes = [];
+  routes.forEach((route) => {
+    if (!isDemoModeRouteCandidate(route) || seenRoutes.has(route)) return;
+    seenRoutes.add(route);
+    uniqueRoutes.push(route);
+  });
+  return uniqueRoutes;
+}
+
+function discoverDemoRoutes() {
+  return uniqueDemoRoutes(
+    Array.from(document.querySelectorAll("a[href]")).map((link) => normalizeDemoRoute(link.getAttribute("href") || ""))
+  );
+}
+
+function buildInitialDemoRoutes(currentRoute) {
+  const discoveredRoutes = discoverDemoRoutes();
+  const hasActiveRunContext = Boolean(
+    currentRoute.startsWith("/stage/generic/") ||
+    DEMO_RUN_REQUIRED_ROUTES.includes(currentRoute) ||
+    discoveredRoutes.some((route) => DEMO_RUN_REQUIRED_ROUTES.includes(route) || route.startsWith("/stage/generic/"))
+  );
+
+  const seedRoutes = DEMO_CORE_ROUTES.filter((route) => hasActiveRunContext || !DEMO_RUN_REQUIRED_ROUTES.includes(route));
+  return uniqueDemoRoutes([currentRoute, ...seedRoutes, ...discoveredRoutes]);
+}
+
+function mergeDemoRoutes(existingRoutes, discoveredRoutes) {
+  return uniqueDemoRoutes([...(existingRoutes || []), ...(discoveredRoutes || [])]);
+}
+
+function describeDemoRoute(route) {
+  if (!route) return "next screen";
+
+  const exactLabels = {
+    "/home": "Home",
+    "/run/select": "Run Selection",
+    "/runs/blend": "Blend Runs",
+    "/runs/split": "Split Runs",
+    "/runs/print": "Run Print",
+    "/process-dashboard": "Process Dashboard",
+    "/stage/extraction": "Extraction",
+    "/stage/filtration": "Filtration",
+    "/stages": "Run Sheets",
+    "/stage/evaporation": "Evaporation",
+    "/run/edit": "Run Edit",
+    "/batch/edit": "Run Edit",
+    "/run/review": "Run Review",
+    "/batch/review": "Run Review",
+    "/dashboard": "Run Dashboard",
+    "/change-history": "Change History",
+  };
+
+  if (exactLabels[route]) {
+    return exactLabels[route];
+  }
+
+  if (route.startsWith("/stage/generic/")) {
+    const stageKey = route.split("/").pop() || "stage";
+    return stageKey
+      .split("-")
+      .join(" ")
+      .split("_")
+      .join(" ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  return route.replaceAll("/", " ").trim() || "next screen";
+}
+
+function demoModeScrollDuration(maxScroll) {
+  return Math.min(14000, Math.max(4800, 4200 + maxScroll * 1.1));
+}
+
+function animateDemoScroll(targetScrollTop, durationMs, onComplete) {
+  const startScrollTop = window.scrollY || 0;
+  const startedAt = performance.now();
+
+  const step = (now) => {
+    const progress = Math.min((now - startedAt) / durationMs, 1);
+    const easedProgress = progress < 0.5
+      ? 2 * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    window.scrollTo(0, startScrollTop + ((targetScrollTop - startScrollTop) * easedProgress));
+
+    if (progress < 1 && readDemoModeState()?.active) {
+      demoModeFrameHandle = window.requestAnimationFrame(step);
+      return;
+    }
+
+    demoModeFrameHandle = 0;
+    onComplete();
+  };
+
+  demoModeFrameHandle = window.requestAnimationFrame(step);
+}
+
 function initLoadingScreen() {
   const page = document.body;
   if (!page) return;
@@ -125,6 +325,7 @@ function initSettingsPanel() {
   const pageBuildVersion = page.dataset.appVersion || "";
   const pageBuildLabel = page.dataset.appBuildLabel || "";
   const pageChangedFile = page.dataset.appChangedFile || "";
+  let demoControls = null;
 
   const applyTheme = (theme) => {
     root.dataset.theme = theme === "dark" ? "dark" : "light";
@@ -320,6 +521,185 @@ function initSettingsPanel() {
     toggle.setAttribute("aria-expanded", "true");
   };
 
+  const initDemoModeSection = () => {
+    if (!shouldPersist || panel.querySelector("[data-demo-mode-group]")) return null;
+
+    const group = document.createElement("div");
+    group.className = "settings-group settings-demo-group";
+    group.dataset.demoModeGroup = "true";
+    group.innerHTML = `
+      <span class="settings-label">Demo Mode</span>
+      <p class="settings-copy muted small">Automatically tours the app, scrolls each screen slowly, and moves through the major pages for presentations.</p>
+      <div class="settings-update-actions settings-demo-actions">
+        <button class="btn settings-update-button settings-demo-button" type="button" data-demo-mode-start>Start Demo Mode</button>
+        <button class="btn ghost settings-update-button settings-demo-button" type="button" data-demo-mode-stop hidden>Stop Demo</button>
+      </div>
+      <p class="settings-status muted small" data-demo-mode-status aria-live="polite"></p>
+    `;
+    panel.appendChild(group);
+
+    const startButton = group.querySelector("[data-demo-mode-start]");
+    const stopButton = group.querySelector("[data-demo-mode-stop]");
+    const statusNode = group.querySelector("[data-demo-mode-status]");
+
+    const badge = document.createElement("div");
+    badge.className = "settings-demo-badge";
+    badge.hidden = true;
+    badge.innerHTML = `
+      <div class="settings-demo-badge-copy" data-demo-mode-badge-copy></div>
+      <button class="btn ghost settings-demo-badge-button" type="button" data-demo-mode-badge-stop>Stop Demo</button>
+    `;
+    page.appendChild(badge);
+
+    const badgeCopy = badge.querySelector("[data-demo-mode-badge-copy]");
+    const badgeStopButton = badge.querySelector("[data-demo-mode-badge-stop]");
+
+    const setStatus = (message, state = "") => {
+      statusNode.textContent = message;
+      statusNode.dataset.state = state;
+      if (badgeCopy) {
+        badgeCopy.textContent = message;
+      }
+    };
+
+    const syncDemoUi = (state = readDemoModeState(), message = "") => {
+      const activeState = state && state.active ? state : null;
+      const currentRoute = normalizeDemoRoute(window.location.href);
+
+      startButton.hidden = Boolean(activeState);
+      stopButton.hidden = !activeState;
+      badge.hidden = !activeState;
+
+      if (!activeState) {
+        setStatus(message || "Start Demo Mode to slowly walk through the major pages. Press Escape any time to stop it.", "idle");
+        return;
+      }
+
+      const currentIndex = Math.max(0, activeState.routes.indexOf(currentRoute));
+      const pageNumber = currentIndex + 1;
+      const totalPages = activeState.routes.length;
+      const label = describeDemoRoute(currentRoute);
+      setStatus(
+        message || `Demo mode is active. Page ${pageNumber} of ${totalPages}: ${label}. Press Escape or Stop Demo to end the tour.`,
+        "update"
+      );
+    };
+
+    const stopDemo = (message = "Demo mode stopped.") => {
+      cancelDemoModeAnimation();
+      clearDemoModeState();
+      syncDemoUi(null, message);
+      if (typeof window.hidePlantLoading === "function") {
+        window.hidePlantLoading();
+      }
+    };
+
+    const moveToNextDemoRoute = (state) => {
+      const currentRoute = normalizeDemoRoute(window.location.href);
+      const currentIndex = state.routes.indexOf(currentRoute);
+      const nextRoute = state.routes[currentIndex + 1];
+
+      if (!nextRoute) {
+        stopDemo("Demo mode finished. Open Settings to run it again.");
+        return;
+      }
+
+      const nextLabel = describeDemoRoute(nextRoute);
+      if (typeof window.showPlantLoading === "function") {
+        window.showPlantLoading(`Opening ${nextLabel}...`);
+      }
+
+      queueDemoModeTimer(() => {
+        window.location.assign(nextRoute);
+      }, 650);
+    };
+
+    const runDemoForCurrentPage = () => {
+      const state = readDemoModeState();
+      if (!state || !state.active) {
+        syncDemoUi(null);
+        return;
+      }
+
+      cancelDemoModeAnimation();
+
+      const currentRoute = normalizeDemoRoute(window.location.href);
+      state.routes = mergeDemoRoutes(state.routes, discoverDemoRoutes());
+      if (!state.routes.includes(currentRoute)) {
+        state.routes.push(currentRoute);
+      }
+      state.currentIndex = Math.max(0, state.routes.indexOf(currentRoute));
+      state.currentRoute = currentRoute;
+      state.lastStartedAt = Date.now();
+      writeDemoModeState(state);
+      syncDemoUi(state);
+
+      try {
+        window.history.scrollRestoration = "manual";
+      } catch (error) {
+        // Ignore browsers that do not allow manual scroll restoration.
+      }
+
+      window.scrollTo(0, 0);
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+      queueDemoModeTimer(() => {
+        const liveState = readDemoModeState();
+        if (!liveState || !liveState.active) return;
+
+        if (maxScroll <= 80) {
+          queueDemoModeTimer(() => {
+            const nextState = readDemoModeState();
+            if (!nextState || !nextState.active) return;
+            moveToNextDemoRoute(nextState);
+          }, 2400);
+          return;
+        }
+
+        animateDemoScroll(maxScroll, demoModeScrollDuration(maxScroll), () => {
+          queueDemoModeTimer(() => {
+            const nextState = readDemoModeState();
+            if (!nextState || !nextState.active) return;
+            moveToNextDemoRoute(nextState);
+          }, 1500);
+        });
+      }, 900);
+    };
+
+    const startDemo = () => {
+      const currentRoute = normalizeDemoRoute(window.location.href);
+      const state = {
+        active: true,
+        routes: buildInitialDemoRoutes(currentRoute),
+        currentIndex: 0,
+        currentRoute,
+        startedAt: Date.now(),
+      };
+      writeDemoModeState(state);
+      closePanel();
+      syncDemoUi(state, "Demo mode is starting...");
+      runDemoForCurrentPage();
+    };
+
+    startButton.addEventListener("click", startDemo);
+    stopButton.addEventListener("click", () => {
+      stopDemo("Demo mode stopped.");
+    });
+    badgeStopButton.addEventListener("click", () => {
+      stopDemo("Demo mode stopped.");
+    });
+
+    syncDemoUi();
+    if (readDemoModeState()?.active) {
+      runDemoForCurrentPage();
+    }
+
+    return {
+      isActive: () => Boolean(readDemoModeState()?.active),
+      stop: stopDemo,
+    };
+  };
+
   toggle.addEventListener("click", () => {
     if (panel.hidden) {
       openPanel();
@@ -338,6 +718,9 @@ function initSettingsPanel() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (demoControls?.isActive()) {
+        demoControls.stop("Demo mode stopped.");
+      }
       closePanel();
     }
   });
@@ -356,6 +739,12 @@ function initSettingsPanel() {
     });
   });
 
+  if (!shouldPersist && readDemoModeState()?.active) {
+    cancelDemoModeAnimation();
+    clearDemoModeState();
+  }
+
+  demoControls = initDemoModeSection();
   initAppUpdateSection();
   applyTheme(initialTheme);
   applyFontScale(initialFontScale);
