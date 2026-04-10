@@ -27,6 +27,9 @@ const DEMO_RUN_REQUIRED_ROUTES = [
   "/run/edit",
   "/run/review",
 ];
+const DEMO_SCROLL_PIXELS_PER_SECOND = 110;
+const DEMO_PAGE_SETTLE_MS = 1400;
+const DEMO_SHORT_PAGE_PAUSE_MS = 2800;
 let demoModeFrameHandle = 0;
 let demoModeTimerHandles = [];
 
@@ -177,7 +180,7 @@ function describeDemoRoute(route) {
 }
 
 function demoModeScrollDuration(maxScroll) {
-  return Math.min(14000, Math.max(4800, 4200 + maxScroll * 1.1));
+  return Math.max(1, Math.round((maxScroll / DEMO_SCROLL_PIXELS_PER_SECOND) * 1000));
 }
 
 function animateDemoScroll(targetScrollTop, durationMs, onComplete) {
@@ -186,11 +189,7 @@ function animateDemoScroll(targetScrollTop, durationMs, onComplete) {
 
   const step = (now) => {
     const progress = Math.min((now - startedAt) / durationMs, 1);
-    const easedProgress = progress < 0.5
-      ? 2 * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-    window.scrollTo(0, startScrollTop + ((targetScrollTop - startScrollTop) * easedProgress));
+    window.scrollTo(0, startScrollTop + ((targetScrollTop - startScrollTop) * progress));
 
     if (progress < 1 && readDemoModeState()?.active) {
       demoModeFrameHandle = window.requestAnimationFrame(step);
@@ -529,7 +528,7 @@ function initSettingsPanel() {
     group.dataset.demoModeGroup = "true";
     group.innerHTML = `
       <span class="settings-label">Demo Mode</span>
-      <p class="settings-copy muted small">Automatically tours the app, scrolls each screen slowly, and moves through the major pages for presentations.</p>
+      <p class="settings-copy muted small">Automatically tours the app at a steady slow pace, scrolls each screen, and keeps looping through the major pages until you stop it.</p>
       <div class="settings-update-actions settings-demo-actions">
         <button class="btn settings-update-button settings-demo-button" type="button" data-demo-mode-start>Start Demo Mode</button>
         <button class="btn ghost settings-update-button settings-demo-button" type="button" data-demo-mode-stop hidden>Stop Demo</button>
@@ -571,16 +570,17 @@ function initSettingsPanel() {
       badge.hidden = !activeState;
 
       if (!activeState) {
-        setStatus(message || "Start Demo Mode to slowly walk through the major pages. Press Escape any time to stop it.", "idle");
+        setStatus(message || "Start Demo Mode to slowly walk through the major pages in a continuous loop. Press Escape any time to stop it.", "idle");
         return;
       }
 
       const currentIndex = Math.max(0, activeState.routes.indexOf(currentRoute));
       const pageNumber = currentIndex + 1;
       const totalPages = activeState.routes.length;
+      const cycleNumber = Math.max(1, (activeState.loopCount || 0) + 1);
       const label = describeDemoRoute(currentRoute);
       setStatus(
-        message || `Demo mode is active. Page ${pageNumber} of ${totalPages}: ${label}. Press Escape or Stop Demo to end the tour.`,
+        message || `Demo mode is active. Cycle ${cycleNumber}, page ${pageNumber} of ${totalPages}: ${label}. Press Escape or Stop Demo to end the tour.`,
         "update"
       );
     };
@@ -597,10 +597,26 @@ function initSettingsPanel() {
     const moveToNextDemoRoute = (state) => {
       const currentRoute = normalizeDemoRoute(window.location.href);
       const currentIndex = state.routes.indexOf(currentRoute);
-      const nextRoute = state.routes[currentIndex + 1];
+      let nextIndex = currentIndex + 1;
+      let loopCount = state.loopCount || 0;
+      if (nextIndex >= state.routes.length) {
+        nextIndex = 0;
+        loopCount += 1;
+      }
 
-      if (!nextRoute) {
-        stopDemo("Demo mode finished. Open Settings to run it again.");
+      const nextRoute = state.routes[nextIndex];
+      if (!nextRoute) return;
+
+      state.loopCount = loopCount;
+      state.currentIndex = nextIndex;
+      writeDemoModeState(state);
+
+      if (nextRoute === currentRoute) {
+        syncDemoUi(state, `Demo mode is continuing with ${describeDemoRoute(currentRoute)}.`);
+        queueDemoModeTimer(() => {
+          window.scrollTo(0, 0);
+          runDemoForCurrentPage();
+        }, DEMO_PAGE_SETTLE_MS);
         return;
       }
 
@@ -652,7 +668,7 @@ function initSettingsPanel() {
             const nextState = readDemoModeState();
             if (!nextState || !nextState.active) return;
             moveToNextDemoRoute(nextState);
-          }, 2400);
+          }, DEMO_SHORT_PAGE_PAUSE_MS);
           return;
         }
 
@@ -661,7 +677,7 @@ function initSettingsPanel() {
             const nextState = readDemoModeState();
             if (!nextState || !nextState.active) return;
             moveToNextDemoRoute(nextState);
-          }, 1500);
+          }, DEMO_PAGE_SETTLE_MS);
         });
       }, 900);
     };
@@ -674,6 +690,7 @@ function initSettingsPanel() {
         currentIndex: 0,
         currentRoute,
         startedAt: Date.now(),
+        loopCount: 0,
       };
       writeDemoModeState(state);
       closePanel();
