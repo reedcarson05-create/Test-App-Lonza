@@ -1428,6 +1428,61 @@ td.blank-display {
   color: #7d1f1f;
 }
 
+.settings-demo-actions {
+  align-items: stretch;
+}
+
+.settings-demo-button {
+  flex: 1 1 132px;
+}
+
+.settings-demo-badge {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--brand) 34%, var(--line) 66%);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 92%, white 8%), color-mix(in srgb, var(--brand-soft) 28%, white 72%));
+  box-shadow: var(--panel-shadow);
+}
+
+.settings-demo-badge[hidden] {
+  display: none;
+}
+
+.settings-demo-badge-copy {
+  flex: 1 1 auto;
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.settings-demo-badge-button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .settings-demo-badge {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-demo-badge-button {
+    width: 100%;
+  }
+}
+
 .table-action {
   display: inline-flex;
   align-items: center;

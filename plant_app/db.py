@@ -8,7 +8,7 @@ from pathlib import Path
 import pyodbc
 
 DEFAULT_SQL_DRIVER = "ODBC Driver 18 for SQL Server"
-DEFAULT_SQL_SERVER = r"localhost\SQLEXPRESS"
+DEFAULT_SQL_SERVER = "localhost"
 PREFERRED_SQL_DRIVERS = (
     "ODBC Driver 18 for SQL Server",
     "ODBC Driver 17 for SQL Server",
@@ -17,8 +17,8 @@ PREFERRED_SQL_DRIVERS = (
     "SQL Server Native Client 11.0",
     "SQL Server",
 )
-PREFERRED_SQL_DATABASE = "LAGPlantOpsApp"
-FALLBACK_SQL_DATABASE = "PlantOpsApp"
+PREFERRED_SQL_DATABASE = "LonzaPlantOpsApp"
+FALLBACK_SQL_DATABASE = "LAGPlantOpsApp"
 SQLITE_FALLBACK_PATH = Path(__file__).resolve().parent / "plant.db"
 _resolved_sql_database: str | None = None
 _active_backend: str | None = None
@@ -77,13 +77,13 @@ def _supports_secure_connection_flags(driver: str) -> bool:
 
 
 def _requested_backend() -> str:
-    """Return the preferred backend mode: auto, sqlserver, or sqlite."""
-    requested = _env_text("PLANT_APP_DB_BACKEND", "auto").lower()
+    """Return the preferred backend mode, defaulting globally to SQL Server."""
+    requested = _env_text("PLANT_APP_DB_BACKEND", "sqlserver").lower()
     if requested in {"sqlite", "sqlite3"}:
         return "sqlite"
     if requested in {"sql", "sqlserver", "mssql"}:
         return "sqlserver"
-    return "auto"
+    return "sqlserver"
 
 
 def _sql_configuration_present() -> bool:
@@ -259,9 +259,6 @@ def get_conn():
     if requested_backend == "sqlite":
         _active_backend = "sqlite"
         return _open_sqlite_conn()
-    if requested_backend == "auto" and not _sql_configuration_present() and _sqlite_available():
-        _active_backend = "sqlite"
-        return _open_sqlite_conn()
 
     try:
         conn = _connect_sql_server()
@@ -272,6 +269,18 @@ def get_conn():
             raise
         _active_backend = "sqlite"
         return _open_sqlite_conn()
+
+
+def backend_status() -> dict[str, str]:
+    """Return the configured and active database targets for diagnostics."""
+    configured_database = os.getenv("PLANT_APP_SQL_DATABASE", "").strip() or _resolved_sql_database or PREFERRED_SQL_DATABASE
+    return {
+        "requested_backend": _requested_backend(),
+        "active_backend": _active_backend or "uninitialized",
+        "sql_server": _sql_server_target(),
+        "sql_database": configured_database,
+        "sqlite_fallback_path": str(SQLITE_FALLBACK_PATH),
+    }
 
 
 def now_stamp() -> str:

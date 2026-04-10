@@ -21,6 +21,7 @@ from starlette.middleware.sessions import SessionMiddleware
 # Database helpers used by routes to create, read, update, and audit plant records.
 from db import (
     init_db,  # Builds tables and applies lightweight schema migrations at startup.
+    backend_status,  # Reports which database backend and target this server is using.
     validate_user,  # Authenticates an employee number and password pair.
     get_user_initials,  # Loads the initials displayed and reused in forms.
     get_user_preferences,  # Loads persisted per-user UI preferences.
@@ -236,7 +237,7 @@ def configured_port() -> int:
         return 8000
     return port if 1 <= port <= 65535 else 8000
 
-# Ensure the local SQLite schema exists before any request handlers run.
+# Ensure the configured database backend is reachable before any request handlers run.
 init_db()
 
 
@@ -1072,6 +1073,7 @@ def boot_warm():
 def app_status():
     """Return the build loaded by this server plus the latest code timestamp visible on disk."""
     current_build = current_app_build()
+    db_status = backend_status()
     return JSONResponse(
         {
             "loaded_version": LOADED_APP_BUILD["version"],
@@ -1081,6 +1083,10 @@ def app_status():
             "disk_build_label": current_build["build_label"],
             "disk_changed_file": current_build["changed_file"],
             "restart_required": current_build["version"] != LOADED_APP_BUILD["version"],
+            "requested_backend": db_status["requested_backend"],
+            "active_backend": db_status["active_backend"],
+            "sql_server": db_status["sql_server"],
+            "sql_database": db_status["sql_database"],
         }
     )
 
