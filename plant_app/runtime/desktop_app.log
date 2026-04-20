@@ -312,3 +312,5 @@
 [2026-04-10 11:42:51] Port 8000 is serving an older app host (/app-status was unavailable). Switching desktop launch to port 8013.
 [2026-04-10 11:42:51] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> 1f41d109fce70fe0011f0a470b89c4c2b53071a9
+[2026-04-20 09:40:48] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe.
+[2026-04-20 09:40:50] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
