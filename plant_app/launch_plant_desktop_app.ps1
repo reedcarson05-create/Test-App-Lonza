@@ -20,6 +20,8 @@ $windowUrl = ""
 $healthUrl = ""
 $bootUrl = ""
 $appStatusUrl = ""
+$startupStdOutLog = ""
+$startupStdErrLog = ""
 
 function Set-LaunchUrls {
   param(
@@ -32,6 +34,8 @@ function Set-LaunchUrls {
   $script:healthUrl = "$script:baseUrl/health"
   $script:bootUrl = "$script:baseUrl/boot"
   $script:appStatusUrl = "$script:baseUrl/app-status"
+  $script:startupStdOutLog = Join-Path $runtimeDir "startup-$ActivePort.out.log"
+  $script:startupStdErrLog = Join-Path $runtimeDir "startup-$ActivePort.err.log"
 }
 
 Set-LaunchUrls -ActivePort $Port
@@ -43,6 +47,50 @@ function Write-LaunchLog {
 
   $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
   Add-Content -LiteralPath $logFile -Value "[$stamp] $Message"
+}
+
+function Reset-StartupLogs {
+  foreach ($startupLog in @($startupStdOutLog, $startupStdErrLog)) {
+    Set-Content -LiteralPath $startupLog -Value ""
+  }
+}
+
+function Get-StartupLogTail {
+  param(
+    [string]$Path,
+    [int]$LineCount = 12
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return ""
+  }
+
+  try {
+    $lines = Get-Content -LiteralPath $Path -Tail $LineCount -ErrorAction Stop |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ }
+    return ($lines -join " | ")
+  } catch {
+    return ""
+  }
+}
+
+function Write-StartupFailureDetails {
+  if (-not $startupStdOutLog -or -not $startupStdErrLog) {
+    return
+  }
+
+  Write-LaunchLog "Startup logs for port ${Port}: stdout=$startupStdOutLog stderr=$startupStdErrLog"
+
+  $stderrTail = Get-StartupLogTail -Path $startupStdErrLog
+  if ($stderrTail) {
+    Write-LaunchLog "Startup stderr tail: $stderrTail"
+  }
+
+  $stdoutTail = Get-StartupLogTail -Path $startupStdOutLog
+  if ($stdoutTail) {
+    Write-LaunchLog "Startup stdout tail: $stdoutTail"
+  }
 }
 
 function Test-AppServerReady {
@@ -290,8 +338,17 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
   $env:PLANT_APP_HOST = "0.0.0.0"
   $env:PLANT_APP_PORT = [string]$Port
 
-  Write-LaunchLog "Server not running on port $Port, starting background host with $pythonExe."
-  Start-Process -FilePath $pythonExe -ArgumentList "app.py" -WorkingDirectory $projectRoot -WindowStyle Hidden | Out-Null
+  Reset-StartupLogs
+  Write-LaunchLog "Server not running on port $Port, starting background host with $pythonExe. Logs: stdout=$startupStdOutLog stderr=$startupStdErrLog"
+  $serverProcess = Start-Process `
+    -FilePath $pythonExe `
+    -ArgumentList "app.py" `
+    -WorkingDirectory $projectRoot `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $startupStdOutLog `
+    -RedirectStandardError $startupStdErrLog `
+    -PassThru
+  Write-LaunchLog "Background host started with PID $($serverProcess.Id)."
 
   $deadline = (Get-Date).AddSeconds(20)
   while ((Get-Date) -lt $deadline) {
@@ -303,6 +360,7 @@ if (-not (Test-AppServerReady -Url $healthUrl)) {
 }
 
 if (-not (Test-AppServerReady -Url $healthUrl)) {
+  Write-StartupFailureDetails
   $reusablePort = Resolve-ReusableDesktopPort -PreferredPort $Port
   if ($reusablePort -and ($reusablePort -ne $Port)) {
     Write-LaunchLog "Fresh restart on port $Port failed. Reusing active Plant App server on port $reusablePort."
