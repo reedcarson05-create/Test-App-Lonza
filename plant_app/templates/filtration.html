@@ -30,22 +30,21 @@
       </div>
     </div>
   </div>
-  <!-- Filtration entry and correction template used by both create and edit routes. -->
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Filtration Entry{% else %}Filtration Data Entry{% endif %}</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Filtration Entry{% else %}Microflow Filtration Data Entry{% endif %}</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/process-dashboard">Current Work</a>
         <a class="pill" href="/logout">Logout</a>
-      <span class="pill">Standalone Machine</span>
+        <span class="pill">Standalone Machine</span>
       </div>
     </div>
 
   <form method="post" action="{{ form_action or '/submit/filtration' }}" class="stack-gap">
     <div class="card page-intro">
-      <h2>{% if is_edit %}Correct Saved Filtration Data{% else %}Enter Filtration Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the form below and save when the record is ready.{% endif %}</p>
+      <h2>{% if is_edit %}Correct Saved Filtration Data{% else %}Enter Microflow Filtration Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the highlighted Microflow Filtration fields and add reading rows only as needed.{% endif %}</p>
     </div>
     <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
       {% if signature_session_ready %}
@@ -57,39 +56,81 @@
     <div class="card">
       <h2>Header Information</h2>
       <div class="grid three-up">
-        <div><label>Process Area</label><input value="Filtration" disabled></div>
+        <div><label>Process Area</label><input value="Microflow Filtration" disabled></div>
         <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
+        <div><label>Cycle Volume Set Point (gal)</label><input name="cycle_volume_set_point" value="{{ entry['cycle_volume_set_point'] if entry else '' }}"></div>
+        <div>
+          <label>Zero Refract</label>
+          <select name="zero_refract">
+            <option value=""></option>
+            <option value="Y" {% if entry and entry['zero_refract'] == 'Y' %}selected{% endif %}>Y</option>
+            <option value="N" {% if entry and entry['zero_refract'] == 'N' %}selected{% endif %}>N</option>
+          </select>
+        </div>
         <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ entry['operator_initials'] if entry and entry['operator_initials'] else initials }}"></div>
-        <div><label>Clarification Sequential No.</label><input name="clarification_sequential_no" value="{{ entry['clarification_sequential_no'] if entry else '' }}"></div>
-        <div><label>Retentate Flow Set Point (gpm)</label><input name="retentate_flow_set_point" value="{{ entry['retentate_flow_set_point'] if entry else '' }}"></div>
-        <div><label>Zero Refract</label><select name="zero_refract"><option value=""></option><option {% if entry and entry['zero_refract'] == 'Y' %}selected{% endif %}>Y</option><option {% if entry and entry['zero_refract'] == 'N' %}selected{% endif %}>N</option></select></div>
-        <div><label>Start-up Time</label><input type="time" name="startup_time" value="{{ entry['startup_time'] if entry else '' }}"></div>
-        <div><label>Shut-down Time</label><input type="time" name="shutdown_time" value="{{ entry['shutdown_time'] if entry else '' }}"></div>
       </div>
     </div>
 
+    {% for cycle in filtration_cycles %}
+    {% set prefix = cycle['prefix'] %}
     <div class="card">
-      <h2>Filtration Readings</h2>
+      <h2>Cycle {{ cycle['number'] }}</h2>
+      <div class="grid four-up">
+        <div><label>Cycle #</label><input name="{{ prefix }}_cycle_number" value="{{ entry_payload.get(prefix ~ '_cycle_number', cycle['number']) }}"></div>
+        <div><label>RI to Sewer</label><input name="{{ prefix }}_ri_to_sewer" value="{{ entry_payload.get(prefix ~ '_ri_to_sewer', '') }}"></div>
+        <div><label>Total Filtrate Volume</label><input name="{{ prefix }}_total_filtrate_volume" value="{{ entry_payload.get(prefix ~ '_total_filtrate_volume', '') }}"></div>
+        <div><label>Cleaning Method</label><input name="{{ prefix }}_cleaning_method" value="{{ entry_payload.get(prefix ~ '_cleaning_method', '') }}"></div>
+      </div>
       <div class="table-wrap">
-        <table class="table entry-table">
-          <tr><th>Time</th><th>Feed RI (%)</th><th>Retentate RI (%)</th><th>Permeate RI (%)</th><th>Perm Flow C (gpm)</th><th>Perm Flow D (gpm)</th></tr>
-          <tr><td><input name="row1_time" value="{{ row_map['main_1']['row_time'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_feed_ri" value="{{ row_map['main_1']['feed_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_retentate_ri" value="{{ row_map['main_1']['retentate_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_permeate_ri" value="{{ row_map['main_1']['permeate_ri'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_perm_flow_c" value="{{ row_map['main_1']['perm_flow_c'] if row_map and row_map.get('main_1') else '' }}"></td><td><input name="row1_perm_flow_d" value="{{ row_map['main_1']['perm_flow_d'] if row_map and row_map.get('main_1') else '' }}"></td></tr>
-          <tr><td><input name="row2_time" value="{{ row_map['main_2']['row_time'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_feed_ri" value="{{ row_map['main_2']['feed_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_retentate_ri" value="{{ row_map['main_2']['retentate_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_permeate_ri" value="{{ row_map['main_2']['permeate_ri'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_perm_flow_c" value="{{ row_map['main_2']['perm_flow_c'] if row_map and row_map.get('main_2') else '' }}"></td><td><input name="row2_perm_flow_d" value="{{ row_map['main_2']['perm_flow_d'] if row_map and row_map.get('main_2') else '' }}"></td></tr>
-          <tr><td><input name="row3_time" value="{{ row_map['main_3']['row_time'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_feed_ri" value="{{ row_map['main_3']['feed_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_retentate_ri" value="{{ row_map['main_3']['retentate_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_permeate_ri" value="{{ row_map['main_3']['permeate_ri'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_perm_flow_c" value="{{ row_map['main_3']['perm_flow_c'] if row_map and row_map.get('main_3') else '' }}"></td><td><input name="row3_perm_flow_d" value="{{ row_map['main_3']['perm_flow_d'] if row_map and row_map.get('main_3') else '' }}"></td></tr>
+        <table class="table entry-table" data-repeat-table data-repeat-prefix="{{ prefix }}" data-repeat-max-rows="{{ cycle['max_rows'] }}">
+          <tr>
+            <th>Time</th>
+            <th>Operator Initials</th>
+            <th>FIC1 (gpm)</th>
+            <th>TIT1 (&lt;140F)</th>
+            <th>TIT2 (&lt;140F)</th>
+            <th>DPT</th>
+            <th>DPM</th>
+            <th>Perm Total</th>
+            <th>F12 (gpm)</th>
+            <th>Permeate RI</th>
+            <th>Retentate RI</th>
+            <th>QIC1 NTU Turbidity</th>
+            <th>Pressure pt1</th>
+            <th>Pressure pt2</th>
+            <th>Pressure pt3</th>
+          </tr>
+          <tbody data-repeat-body>
+          {% for row_no in range(1, cycle['render_rows'] + 1) %}
+          {% set row = row_map.get(prefix ~ '_' ~ row_no) if row_map else none %}
+          <tr>
+            <td><input name="{{ prefix }}_{{ row_no }}_time" data-repeat-field="time" value="{{ row['row_time'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_operator_initials" data-repeat-field="operator_initials" value="{{ row['operator_initials'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_fic1_gpm" data-repeat-field="fic1_gpm" value="{{ row['fic1_gpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit1" data-repeat-field="tit1" value="{{ row['tit1'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit2" data-repeat-field="tit2" value="{{ row['tit2'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpt" data-repeat-field="dpt" value="{{ row['dpt'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpm" data-repeat-field="dpm" value="{{ row['dpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_perm_total" data-repeat-field="perm_total" value="{{ row['perm_total'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_f12_gpm" data-repeat-field="f12_gpm" value="{{ row['f12_gpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_permeate_ri" data-repeat-field="permeate_ri" value="{{ row['permeate_ri'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_retentate_ri" data-repeat-field="retentate_ri" value="{{ row['retentate_ri'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_qic1_ntu_turbidity" data-repeat-field="qic1_ntu_turbidity" value="{{ row['qic1_ntu_turbidity'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt1" data-repeat-field="pressure_pt1" value="{{ row['pressure_pt1'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt2" data-repeat-field="pressure_pt2" value="{{ row['pressure_pt2'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt3" data-repeat-field="pressure_pt3" value="{{ row['pressure_pt3'] if row else '' }}"></td>
+          </tr>
+          {% endfor %}
+          </tbody>
         </table>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>Diafiltration</h2>
-      <div class="table-wrap">
-        <table class="table entry-table">
-          <tr><th>Time</th><th>Feed RI (%)</th><th>Retentate RI (%)</th><th>Permeate RI (%)</th></tr>
-          <tr><td><input name="dia_row1_time" value="{{ row_map['dia_1']['row_time'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_feed_ri" value="{{ row_map['dia_1']['feed_ri'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_retentate_ri" value="{{ row_map['dia_1']['retentate_ri'] if row_map and row_map.get('dia_1') else '' }}"></td><td><input name="dia_row1_permeate_ri" value="{{ row_map['dia_1']['permeate_ri'] if row_map and row_map.get('dia_1') else '' }}"></td></tr>
-          <tr><td><input name="dia_row2_time" value="{{ row_map['dia_2']['row_time'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_feed_ri" value="{{ row_map['dia_2']['feed_ri'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_retentate_ri" value="{{ row_map['dia_2']['retentate_ri'] if row_map and row_map.get('dia_2') else '' }}"></td><td><input name="dia_row2_permeate_ri" value="{{ row_map['dia_2']['permeate_ri'] if row_map and row_map.get('dia_2') else '' }}"></td></tr>
-        </table>
+      {% if not is_edit %}
+      <div class="table-actions">
+        <button class="btn ghost" type="button" data-add-row>Add Row</button>
       </div>
+      {% endif %}
     </div>
+    {% endfor %}
 
     <div class="card">
       <div class="grid two-up">
@@ -120,6 +161,7 @@
   </form>
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/dynamic_rows.js?v={{ asset_version }}"></script>
 <script src="/static/image_upload.js?v={{ asset_version }}"></script>
 <script src="/static/signature_session.js?v={{ asset_version }}"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}

@@ -66,28 +66,38 @@
       <h2>{{ stage['sheet_name'] }}</h2>
       <div class="grid three-up">
         {% for field in stage['headers'] %}
+        {% set field_name = field[0] %}
+        {% set field_label = field[1] %}
+        {% set field_type = field[2] %}
+        {% set field_options = field[3] if field|length > 3 else [] %}
+        {% set field_default = field_default_value(field, run) %}
+        {% set field_value = entry_values.get(field_name) if entry_values and entry_values.get(field_name) is not none else field_default %}
         <div>
-          <label>{{ field[1] }}</label>
-          {% if field[2] == 'select' %}
-          <select name="{{ field[0] }}">
+          <label>{{ field_label }}</label>
+          {% if field_type == 'select' %}
+          <select name="{{ field_name }}">
             <option value=""></option>
-            {% if 'zero_refract' in field[0] or field[0] == 'cooler_isolated' %}
-            <option value="Y" {% if entry_values and entry_values.get(field[0]) == 'Y' %}selected{% endif %}>Y</option>
-            <option value="N" {% if entry_values and entry_values.get(field[0]) == 'N' %}selected{% endif %}>N</option>
-            {% elif field[0] == 'bed' %}
-            <option value="A" {% if entry_values and entry_values.get(field[0]) == 'A' %}selected{% endif %}>A</option>
-            <option value="B" {% if entry_values and entry_values.get(field[0]) == 'B' %}selected{% endif %}>B</option>
+            {% if field_options %}
+            {% for option in field_options %}
+            <option value="{{ option }}" {% if field_value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+            {% elif 'zero_refract' in field_name or field_name == 'cooler_isolated' %}
+            <option value="Y" {% if field_value == 'Y' %}selected{% endif %}>Y</option>
+            <option value="N" {% if field_value == 'N' %}selected{% endif %}>N</option>
+            {% elif field_name == 'bed' %}
+            <option value="A" {% if field_value == 'A' %}selected{% endif %}>A</option>
+            <option value="B" {% if field_value == 'B' %}selected{% endif %}>B</option>
             {% else %}
-            <option value="Yes" {% if entry_values and entry_values.get(field[0]) == 'Yes' %}selected{% endif %}>Yes</option>
-            <option value="No" {% if entry_values and entry_values.get(field[0]) == 'No' %}selected{% endif %}>No</option>
+            <option value="Yes" {% if field_value == 'Yes' %}selected{% endif %}>Yes</option>
+            <option value="No" {% if field_value == 'No' %}selected{% endif %}>No</option>
             {% endif %}
           </select>
           {% else %}
           <input
-            name="{{ field[0] }}"
-            type="{{ 'text' if view_only and not is_edit else field[2] }}"
-            value="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none %}{{ display_or_blank(entry_values.get(field[0]), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field[0]) is not none %}{{ entry_values.get(field[0]) }}{% elif field[0] == 'entry_date' or field[0] == 'startup_date' %}{{ today }}{% elif field[0] == 'operator_initials' %}{{ initials }}{% endif %}"
-            class="{% if view_only and not is_edit and entry_values and entry_values.get(field[0]) is not none %}{{ blank_class(entry_values.get(field[0])) }}{% endif %}">
+            name="{{ field_name }}"
+            type="{{ 'text' if view_only and not is_edit else field_type }}"
+            value="{% if view_only and not is_edit and entry_values and entry_values.get(field_name) is not none %}{{ display_or_blank(entry_values.get(field_name), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field_name) is not none %}{{ entry_values.get(field_name) }}{% elif field_name == 'entry_date' or field_name == 'startup_date' %}{{ today }}{% elif field_name == 'operator_initials' %}{{ initials }}{% else %}{{ field_default }}{% endif %}"
+            class="{% if view_only and not is_edit and entry_values and entry_values.get(field_name) is not none %}{{ blank_class(entry_values.get(field_name)) }}{% endif %}">
           {% endif %}
         </div>
         {% endfor %}
@@ -99,21 +109,48 @@
       <!-- Repeating table rows come from each table definition in `stage_defs.py`. -->
       <h2>{{ table['title'] }}</h2>
       <div class="table-wrap">
-        <table class="table entry-table">
+        <table class="table entry-table" data-repeat-table data-repeat-prefix="{{ table['prefix'] }}" data-repeat-max-rows="{{ table['rows'] }}">
           <tr>
             {% for column in table['columns'] %}
             <th>{{ column[1] }}</th>
             {% endfor %}
           </tr>
-          {% for row in range(table['rows']) %}
+          <tbody data-repeat-body>
+          {% for row in range(table['render_rows'] or 1) %}
           <tr>
             {% for column in table['columns'] %}
-            <td><input name="{{ table['prefix'] }}_{{ row + 1 }}_{{ column[0] }}" value="{% if view_only and not is_edit and entry_values %}{{ display_or_blank(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], ''), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% else %}{{ entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '') if entry_values else '' }}{% endif %}" class="{% if view_only and not is_edit and entry_values %}{{ blank_class(entry_values.get(table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column[0], '')) }}{% endif %}"></td>
+            {% set column_name = column[0] %}
+            {% set column_type = column[2] if column|length > 2 else 'text' %}
+            {% set column_options = column[3] if column|length > 3 else [] %}
+            {% set column_default = column[4] if column|length > 4 else '' %}
+            {% set cell_name = table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column_name %}
+            {% set cell_saved = entry_values.get(cell_name, '') if entry_values else '' %}
+            {% set cell_value = cell_saved if entry_values else column_default %}
+            <td>
+              {% if view_only and not is_edit %}
+              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ display_or_blank(cell_saved, entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}" class="{{ blank_class(cell_saved) }}">
+              {% elif column_type == 'select' %}
+              <select name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}">
+                <option value=""></option>
+                {% for option in column_options %}
+                <option value="{{ option }}" {% if cell_value == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+              {% else %}
+              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ cell_value }}">
+              {% endif %}
+            </td>
             {% endfor %}
           </tr>
           {% endfor %}
+          </tbody>
         </table>
       </div>
+      {% if not is_edit and not view_only %}
+      <div class="table-actions">
+        <button class="btn ghost" type="button" data-add-row>Add Row</button>
+      </div>
+      {% endif %}
     </div>
     {% endfor %}
 
@@ -154,6 +191,7 @@
   </form>
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/dynamic_rows.js?v={{ asset_version }}"></script>
 <script src="/static/image_upload.js?v={{ asset_version }}"></script>
 <script src="/static/signature_session.js?v={{ asset_version }}"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}

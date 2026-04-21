@@ -98,6 +98,7 @@ BEGIN
         employee NVARCHAR(50) NOT NULL,
         operator_initials NVARCHAR(20) NULL,
         entry_date NVARCHAR(50) NULL,
+        cycle_volume_set_point NVARCHAR(100) NULL,
         clarification_sequential_no NVARCHAR(50) NULL,
         retentate_flow_set_point NVARCHAR(50) NULL,
         zero_refract NVARCHAR(50) NULL,
@@ -107,6 +108,7 @@ BEGIN
         stop_time NVARCHAR(50) NULL,
         comments NVARCHAR(MAX) NULL,
         photo_path NVARCHAR(500) NULL,
+        payload_json NVARCHAR(MAX) NULL,
         version_no INT NOT NULL CONSTRAINT DF_filtration_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
         created_at NVARCHAR(50) NOT NULL
@@ -122,11 +124,23 @@ BEGIN
         row_group NVARCHAR(50) NULL,
         row_no INT NULL,
         row_time NVARCHAR(50) NULL,
+        operator_initials NVARCHAR(50) NULL,
+        fic1_gpm NVARCHAR(50) NULL,
+        tit1 NVARCHAR(50) NULL,
+        tit2 NVARCHAR(50) NULL,
+        dpt NVARCHAR(50) NULL,
+        dpm NVARCHAR(50) NULL,
+        perm_total NVARCHAR(50) NULL,
+        f12_gpm NVARCHAR(50) NULL,
         feed_ri NVARCHAR(50) NULL,
         retentate_ri NVARCHAR(50) NULL,
         permeate_ri NVARCHAR(50) NULL,
         perm_flow_c NVARCHAR(50) NULL,
-        perm_flow_d NVARCHAR(50) NULL
+        perm_flow_d NVARCHAR(50) NULL,
+        qic1_ntu_turbidity NVARCHAR(50) NULL,
+        pressure_pt1 NVARCHAR(50) NULL,
+        pressure_pt2 NVARCHAR(50) NULL,
+        pressure_pt3 NVARCHAR(50) NULL
     );
 END
 GO

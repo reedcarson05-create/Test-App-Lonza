@@ -928,6 +928,10 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.four-up {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .quick-start-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
@@ -1187,7 +1191,8 @@ fieldset[disabled] textarea {
   background: color-mix(in srgb, var(--surface-soft) 92%, white 8%);
 }
 
-.entry-table input {
+.entry-table input,
+.entry-table select {
   min-width: 120px;
 }
 
@@ -1741,6 +1746,7 @@ td.blank-display {
 
 .table-actions {
   min-width: 260px;
+  margin-top: 12px;
 }
 
 .inline-form {

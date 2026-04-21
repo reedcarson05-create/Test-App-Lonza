@@ -309,11 +309,66 @@ def rows_to_dicts(columns: list[str], rows) -> list[dict]:
     return [row_to_dict(columns, row) for row in rows]
 
 
+def column_exists(conn, cur, table_name: str, column_name: str) -> bool:
+    """Return True when a table already has the requested column."""
+    if _is_sqlite_connection(conn):
+        cur.execute(f"PRAGMA table_info({table_name})")
+        return any(row[1] == column_name for row in cur.fetchall())
+
+    cur.execute(
+        """
+        SELECT 1
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = 'dbo'
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        """,
+        (table_name, column_name),
+    )
+    return cur.fetchone() is not None
+
+
+def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_type: str, sqlserver_type: str) -> None:
+    """Add a nullable column when an existing installation is behind the app schema."""
+    if column_exists(conn, cur, table_name, column_name):
+        return
+
+    if _is_sqlite_connection(conn):
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}")
+    else:
+        cur.execute(f"ALTER TABLE dbo.{table_name} ADD {column_name} {sqlserver_type} NULL")
+
+
+def ensure_schema_migrations(conn) -> None:
+    """Apply small additive schema updates needed by newer forms."""
+    cur = conn.cursor()
+    additions = (
+        ("filtration_entries", "cycle_volume_set_point", "TEXT", "NVARCHAR(100)"),
+        ("filtration_entries", "payload_json", "TEXT", "NVARCHAR(MAX)"),
+        ("filtration_rows", "operator_initials", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "fic1_gpm", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "tit1", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "tit2", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "dpt", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "dpm", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "perm_total", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "f12_gpm", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "qic1_ntu_turbidity", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "pressure_pt1", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "pressure_pt2", "TEXT", "NVARCHAR(50)"),
+        ("filtration_rows", "pressure_pt3", "TEXT", "NVARCHAR(50)"),
+    )
+    for table_name, column_name, sqlite_type, sqlserver_type in additions:
+        add_column_if_missing(conn, cur, table_name, column_name, sqlite_type, sqlserver_type)
+    conn.commit()
+
+
 def init_db() -> None:
     """Validate that the configured database backend is reachable."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT 1")
+    ensure_schema_migrations(conn)
     conn.close()
 
 
@@ -659,6 +714,7 @@ def insert_filtration(employee: str, data: dict) -> int:
         employee,
         data.get("operator_initials", ""),
         data.get("entry_date", ""),
+        data.get("cycle_volume_set_point", ""),
         data.get("clarification_sequential_no", ""),
         data.get("retentate_flow_set_point", ""),
         data.get("zero_refract", ""),
@@ -668,6 +724,7 @@ def insert_filtration(employee: str, data: dict) -> int:
         data.get("stop_time", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
+        data.get("payload_json", "{}"),
         data.get("version_no", 1),
         data.get("previous_entry_id"),
         now_stamp(),
@@ -676,23 +733,25 @@ def insert_filtration(employee: str, data: dict) -> int:
         cur.execute("""
             INSERT INTO filtration_entries (
                 run_id, employee, operator_initials, entry_date,
+                cycle_volume_set_point,
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
-                comments, photo_path, version_no, previous_entry_id, created_at
+                comments, photo_path, payload_json, version_no, previous_entry_id, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.lastrowid)
     else:
         cur.execute("""
             INSERT INTO filtration_entries (
                 run_id, employee, operator_initials, entry_date,
+                cycle_volume_set_point,
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
-                comments, photo_path, version_no, previous_entry_id, created_at
+                comments, photo_path, payload_json, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.fetchone()[0])
 
@@ -701,19 +760,33 @@ def insert_filtration(employee: str, data: dict) -> int:
         cur.execute("""
             INSERT INTO filtration_rows (
                 filtration_entry_id, row_group, row_no, row_time,
-                feed_ri, retentate_ri, permeate_ri, perm_flow_c, perm_flow_d
+                operator_initials, fic1_gpm, tit1, tit2, dpt, dpm, perm_total, f12_gpm,
+                feed_ri, retentate_ri, permeate_ri, perm_flow_c, perm_flow_d,
+                qic1_ntu_turbidity, pressure_pt1, pressure_pt2, pressure_pt3
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             entry_id,
             row.get("row_group", "main"),
             row.get("row_no", 1),
             row.get("row_time", ""),
+            row.get("operator_initials", ""),
+            row.get("fic1_gpm", ""),
+            row.get("tit1", ""),
+            row.get("tit2", ""),
+            row.get("dpt", ""),
+            row.get("dpm", ""),
+            row.get("perm_total", ""),
+            row.get("f12_gpm", ""),
             row.get("feed_ri", ""),
             row.get("retentate_ri", ""),
             row.get("permeate_ri", ""),
             row.get("perm_flow_c", ""),
             row.get("perm_flow_d", ""),
+            row.get("qic1_ntu_turbidity", ""),
+            row.get("pressure_pt1", ""),
+            row.get("pressure_pt2", ""),
+            row.get("pressure_pt3", ""),
         ))
 
     conn.commit()
@@ -927,8 +1000,9 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
     cur.execute("""
         UPDATE filtration_entries
         SET employee = ?, operator_initials = ?, entry_date = ?, clarification_sequential_no = ?,
-            retentate_flow_set_point = ?, zero_refract = ?, startup_time = ?, shutdown_time = ?,
+            cycle_volume_set_point = ?, retentate_flow_set_point = ?, zero_refract = ?, startup_time = ?, shutdown_time = ?,
             start_time = ?, stop_time = ?, comments = ?, photo_path = ?,
+            payload_json = ?,
             version_no = COALESCE(version_no, 1) + 1
         WHERE id = ?
     """, (
@@ -936,6 +1010,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         data.get("operator_initials", ""),
         data.get("entry_date", ""),
         data.get("clarification_sequential_no", ""),
+        data.get("cycle_volume_set_point", ""),
         data.get("retentate_flow_set_point", ""),
         data.get("zero_refract", ""),
         data.get("startup_time", ""),
@@ -944,6 +1019,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         data.get("stop_time", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
+        data.get("payload_json", "{}"),
         entry_id,
     ))
     # Rebuild the child rows from the submitted form so the saved set always matches the current screen.
@@ -952,19 +1028,33 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         cur.execute("""
             INSERT INTO filtration_rows (
                 filtration_entry_id, row_group, row_no, row_time,
-                feed_ri, retentate_ri, permeate_ri, perm_flow_c, perm_flow_d
+                operator_initials, fic1_gpm, tit1, tit2, dpt, dpm, perm_total, f12_gpm,
+                feed_ri, retentate_ri, permeate_ri, perm_flow_c, perm_flow_d,
+                qic1_ntu_turbidity, pressure_pt1, pressure_pt2, pressure_pt3
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             entry_id,
             row.get("row_group", "main"),
             row.get("row_no", 1),
             row.get("row_time", ""),
+            row.get("operator_initials", ""),
+            row.get("fic1_gpm", ""),
+            row.get("tit1", ""),
+            row.get("tit2", ""),
+            row.get("dpt", ""),
+            row.get("dpm", ""),
+            row.get("perm_total", ""),
+            row.get("f12_gpm", ""),
             row.get("feed_ri", ""),
             row.get("retentate_ri", ""),
             row.get("permeate_ri", ""),
             row.get("perm_flow_c", ""),
             row.get("perm_flow_d", ""),
+            row.get("qic1_ntu_turbidity", ""),
+            row.get("pressure_pt1", ""),
+            row.get("pressure_pt2", ""),
+            row.get("pressure_pt3", ""),
         ))
     conn.commit()
     conn.close()

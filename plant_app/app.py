@@ -81,6 +81,7 @@ BOOT_TEMPLATE_NAMES = tuple(
 BOOT_STATIC_FILES = (
     "style.css",
     "settings.js",
+    "dynamic_rows.js",
     "signature_session.js",
     "form_corrections.js",
     "image_upload.js",
@@ -103,6 +104,7 @@ def current_app_build() -> dict[str, str]:
         BASE_DIR / "stage_defs.py",
         BASE_DIR / "static" / "style.css",
         BASE_DIR / "static" / "settings.js",
+        BASE_DIR / "static" / "dynamic_rows.js",
         BASE_DIR / "static" / "signature_session.js",
         BASE_DIR / "static" / "form_corrections.js",
         BASE_DIR / "static" / "image_upload.js",
@@ -516,6 +518,52 @@ def get_generic_stage(stage_key: str):
     return GENERIC_STAGE_DEFS.get(stage_key)
 
 
+def field_default_value(field, run=None) -> str:
+    """Return the default value for a generic sheet field when no saved value exists."""
+    field_name = field[0]
+    configured_default = field[4] if len(field) > 4 else ""
+    if configured_default:
+        return configured_default
+
+    if run:
+        if field_name in {"run_number", "production_number"}:
+            return run_display_number(run)
+        if field_name == "run_blend_number":
+            return clean_value(run.get("blend_number", "")) or run_display_number(run)
+    return ""
+
+
+def generic_table_render_rows(table: dict, payload: dict) -> int:
+    """Show only populated rows by default, while keeping saved rows visible."""
+    if not payload:
+        return max(1, int(table.get("initial_rows", 1)))
+
+    prefix = f"{table['prefix']}_"
+    populated_rows: set[int] = set()
+    for row_index in range(1, int(table.get("rows", 1)) + 1):
+        row_prefix = f"{prefix}{row_index}_"
+        for column in table["columns"]:
+            value = payload.get(f"{row_prefix}{column[0]}", "")
+            if clean_value(value):
+                populated_rows.add(row_index)
+                break
+
+    if populated_rows:
+        return min(max(populated_rows), int(table.get("rows", 1)))
+    return max(1, int(table.get("initial_rows", 1)))
+
+
+def generic_stage_for_render(stage: dict, payload: dict | None = None) -> dict:
+    """Return a shallow stage copy with table row counts tailored to saved data."""
+    payload = payload or {}
+    prepared_stage = {**stage}
+    prepared_tables = []
+    for table in stage.get("tables", []):
+        prepared_tables.append({**table, "render_rows": generic_table_render_rows(table, payload)})
+    prepared_stage["tables"] = prepared_tables
+    return prepared_stage
+
+
 def render_page(request: Request, template_name: str, **context):
     """Render a template with the standard navigation/session context already included."""
     # Shared template values used by most pages for nav badges and defaults.
@@ -544,6 +592,7 @@ def render_page(request: Request, template_name: str, **context):
         "blank_stamp": blank_stamp,
         "is_blank_value": is_blank_value,
         "run_display_number": run_display_number,
+        "field_default_value": field_default_value,
         "activity_open_href": activity_open_href,
     }
     page_context.update(context)
@@ -792,12 +841,64 @@ def process_dashboard_rows(rows=None):
 
 
 def build_filtration_row_map(rows):
-    """Convert filtration child rows into template-friendly keys such as main_1 or dia_2."""
+    """Convert filtration child rows into template-friendly keys such as cycle1_1."""
     row_map = {}
     for row in rows:
-        prefix = "dia" if row["row_group"] == "dia" else "main"
+        prefix = row.get("row_group") or "main"
         row_map[f"{prefix}_{row['row_no']}"] = row
     return row_map
+
+
+def parse_payload_json(entry) -> dict:
+    """Safely parse a saved JSON payload column."""
+    if not entry:
+        return {}
+    try:
+        return json.loads(entry.get("payload_json") or "{}")
+    except (TypeError, ValueError):
+        return {}
+
+
+def filtration_cycle_render_rows(row_map: dict, prefix: str) -> int:
+    """Return the visible Microflow row count for one cycle."""
+    row_numbers = []
+    for key, row in row_map.items():
+        if not key.startswith(f"{prefix}_"):
+            continue
+        values = (
+            row.get("row_time", ""),
+            row.get("operator_initials", ""),
+            row.get("fic1_gpm", ""),
+            row.get("tit1", ""),
+            row.get("tit2", ""),
+            row.get("dpt", ""),
+            row.get("dpm", ""),
+            row.get("perm_total", ""),
+            row.get("f12_gpm", ""),
+            row.get("permeate_ri", ""),
+            row.get("retentate_ri", ""),
+            row.get("qic1_ntu_turbidity", ""),
+            row.get("pressure_pt1", ""),
+            row.get("pressure_pt2", ""),
+            row.get("pressure_pt3", ""),
+        )
+        if any(clean_value(value) for value in values):
+            row_numbers.append(int(row.get("row_no") or 1))
+    return max(row_numbers) if row_numbers else 1
+
+
+def filtration_cycle_context(row_map: dict | None = None) -> list[dict]:
+    """Build the four Microflow cycle sections shown by the filtration template."""
+    row_map = row_map or {}
+    return [
+        {
+            "number": cycle_no,
+            "prefix": f"cycle{cycle_no}",
+            "render_rows": filtration_cycle_render_rows(row_map, f"cycle{cycle_no}"),
+            "max_rows": 4,
+        }
+        for cycle_no in range(1, 5)
+    ]
 
 
 def build_evaporation_row_map(rows):
@@ -834,40 +935,80 @@ def build_extraction_payload(form, operator_initials: str):
     }
 
 
-def build_filtration_rows(form):
-    """Build normalized filtration row payloads for both the main and diafiltration tables."""
-    # Main filtration readings keep flow columns because those rows represent the primary process path.
-    main_rows = []
-    for i in range(1, 4):
-        main_rows.append(
-            {
-                "row_group": "main",
-                "row_no": i,
-                "row_time": form.get(f"row{i}_time", ""),
-                "feed_ri": form.get(f"row{i}_feed_ri", ""),
-                "retentate_ri": form.get(f"row{i}_retentate_ri", ""),
-                "permeate_ri": form.get(f"row{i}_permeate_ri", ""),
-                "perm_flow_c": form.get(f"row{i}_perm_flow_c", ""),
-                "perm_flow_d": form.get(f"row{i}_perm_flow_d", ""),
-            }
-        )
+def form_row_indexes(form, prefix: str) -> list[int]:
+    """Find row numbers submitted by a dynamic table prefix such as cycle1."""
+    indexes: set[int] = set()
+    marker = f"{prefix}_"
+    for key in form.keys():
+        if not key.startswith(marker):
+            continue
+        remainder = key[len(marker):]
+        row_text = remainder.split("_", 1)[0]
+        if row_text.isdigit():
+            indexes.add(int(row_text))
+    return sorted(indexes)
 
-    # Diafiltration rows use a smaller schema and intentionally leave flow columns blank.
-    dia_rows = []
-    for i in range(1, 3):
-        dia_rows.append(
-            {
-                "row_group": "dia",
-                "row_no": i,
-                "row_time": form.get(f"dia_row{i}_time", ""),
-                "feed_ri": form.get(f"dia_row{i}_feed_ri", ""),
-                "retentate_ri": form.get(f"dia_row{i}_retentate_ri", ""),
-                "permeate_ri": form.get(f"dia_row{i}_permeate_ri", ""),
+
+def build_filtration_rows(form):
+    """Build normalized Microflow Filtration cycle rows from the dynamic table fields."""
+    rows = []
+    row_fields = (
+        "time",
+        "operator_initials",
+        "fic1_gpm",
+        "tit1",
+        "tit2",
+        "dpt",
+        "dpm",
+        "perm_total",
+        "f12_gpm",
+        "permeate_ri",
+        "retentate_ri",
+        "qic1_ntu_turbidity",
+        "pressure_pt1",
+        "pressure_pt2",
+        "pressure_pt3",
+    )
+    for cycle_no in range(1, 5):
+        prefix = f"cycle{cycle_no}"
+        for row_no in form_row_indexes(form, prefix):
+            row = {
+                "row_group": prefix,
+                "row_no": row_no,
+                "row_time": form.get(f"{prefix}_{row_no}_time", ""),
+                "operator_initials": form.get(f"{prefix}_{row_no}_operator_initials", ""),
+                "fic1_gpm": form.get(f"{prefix}_{row_no}_fic1_gpm", ""),
+                "tit1": form.get(f"{prefix}_{row_no}_tit1", ""),
+                "tit2": form.get(f"{prefix}_{row_no}_tit2", ""),
+                "dpt": form.get(f"{prefix}_{row_no}_dpt", ""),
+                "dpm": form.get(f"{prefix}_{row_no}_dpm", ""),
+                "perm_total": form.get(f"{prefix}_{row_no}_perm_total", ""),
+                "f12_gpm": form.get(f"{prefix}_{row_no}_f12_gpm", ""),
+                "permeate_ri": form.get(f"{prefix}_{row_no}_permeate_ri", ""),
+                "retentate_ri": form.get(f"{prefix}_{row_no}_retentate_ri", ""),
+                "qic1_ntu_turbidity": form.get(f"{prefix}_{row_no}_qic1_ntu_turbidity", ""),
+                "pressure_pt1": form.get(f"{prefix}_{row_no}_pressure_pt1", ""),
+                "pressure_pt2": form.get(f"{prefix}_{row_no}_pressure_pt2", ""),
+                "pressure_pt3": form.get(f"{prefix}_{row_no}_pressure_pt3", ""),
+                "feed_ri": "",
                 "perm_flow_c": "",
                 "perm_flow_d": "",
             }
-        )
-    return main_rows + dia_rows
+            if any(clean_value(row.get(field if field != "time" else "row_time", "")) for field in row_fields):
+                rows.append(row)
+    return rows
+
+
+def build_filtration_extra_payload(form) -> dict:
+    """Store cycle summary fields that do not belong to a repeating reading row."""
+    payload = {}
+    cycle_summary_fields = ("cycle_number", "ri_to_sewer", "total_filtrate_volume", "cleaning_method")
+    for cycle_no in range(1, 5):
+        prefix = f"cycle{cycle_no}"
+        for field_name in cycle_summary_fields:
+            key = f"{prefix}_{field_name}"
+            payload[key] = form.get(key, "")
+    return payload
 
 
 def build_filtration_payload(form, operator_initials: str):
@@ -877,6 +1018,7 @@ def build_filtration_payload(form, operator_initials: str):
         "run_id": None,
         "operator_initials": operator_initials,
         "entry_date": form.get("entry_date", ""),
+        "cycle_volume_set_point": form.get("cycle_volume_set_point", ""),
         "clarification_sequential_no": form.get("clarification_sequential_no", ""),
         "retentate_flow_set_point": form.get("retentate_flow_set_point", ""),
         "zero_refract": form.get("zero_refract", ""),
@@ -886,6 +1028,7 @@ def build_filtration_payload(form, operator_initials: str):
         "stop_time": form.get("stop_time", ""),
         "comments": form.get("comments", "") or form.get("notes", ""),
         "photo_path": form.get("photo_path", ""),
+        "payload_json": json.dumps(build_filtration_extra_payload(form)),
         "rows": build_filtration_rows(form),
     }
 
@@ -1787,7 +1930,7 @@ def filtration_page(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "filtration.html", run=None)
+    return render_page(request, "filtration.html", run=None, entry_payload={}, filtration_cycles=filtration_cycle_context())
 
 
 @app.post("/submit/filtration")
@@ -1904,11 +2047,12 @@ def generic_stage_page(request: Request, stage_key: str):
 
     entry = get_latest_sheet_entry_for_run_stage(current_run_id(request), stage_key)
     payload = json.loads(entry["payload_json"] or "{}") if entry else {}
+    prepared_stage = generic_stage_for_render(stage, payload)
     return render_page(
         request,
         "generic_sheet.html",
         stage_key=stage_key,
-        stage=stage,
+        stage=prepared_stage,
         entry=entry,
         entry_values=payload,
         view_only=entry is not None,
@@ -2057,6 +2201,8 @@ def edit_filtration_page(request: Request, entry_id: int):
         run=None,
         entry=entry,
         row_map=build_filtration_row_map(rows),
+        entry_payload=parse_payload_json(entry),
+        filtration_cycles=filtration_cycle_context(build_filtration_row_map(rows)),
         is_edit=True,
         form_action=f"/edit/filtration/{entry_id}",
         submit_label="Save Filtration Changes",
@@ -2075,29 +2221,37 @@ async def edit_filtration_submit(request: Request, entry_id: int):
     if signature_error:
         return signature_error
     correction_reason = clean_value(form.get("correction_reason", ""))
+    entry_payload = parse_payload_json(entry)
     old_values = {
         "operator_initials": entry["operator_initials"],
         "entry_date": entry["entry_date"],
-        "clarification_sequential_no": entry["clarification_sequential_no"],
-        "retentate_flow_set_point": entry["retentate_flow_set_point"],
+        "cycle_volume_set_point": entry.get("cycle_volume_set_point", ""),
         "zero_refract": entry["zero_refract"],
-        "startup_time": entry["startup_time"],
-        "shutdown_time": entry["shutdown_time"],
         "notes": entry["comments"],
         "photo_path": entry["photo_path"],
     }
+    for cycle_no in range(1, 5):
+        for field_name in ("cycle_number", "ri_to_sewer", "total_filtrate_volume", "cleaning_method"):
+            key = f"cycle{cycle_no}_{field_name}"
+            old_values[key] = entry_payload.get(key, "")
     for row in existing_rows:
-        if row["row_group"] == "main":
-            prefix = f"row{row['row_no']}"
-        else:
-            prefix = f"dia_row{row['row_no']}"
+        row_group = row.get("row_group") or "cycle1"
+        prefix = f"{row_group}_{row['row_no']}"
         old_values[f"{prefix}_time"] = row["row_time"]
-        old_values[f"{prefix}_feed_ri"] = row["feed_ri"]
-        old_values[f"{prefix}_retentate_ri"] = row["retentate_ri"]
+        old_values[f"{prefix}_operator_initials"] = row.get("operator_initials", "")
+        old_values[f"{prefix}_fic1_gpm"] = row.get("fic1_gpm", "")
+        old_values[f"{prefix}_tit1"] = row.get("tit1", "")
+        old_values[f"{prefix}_tit2"] = row.get("tit2", "")
+        old_values[f"{prefix}_dpt"] = row.get("dpt", "")
+        old_values[f"{prefix}_dpm"] = row.get("dpm", "")
+        old_values[f"{prefix}_perm_total"] = row.get("perm_total", "")
+        old_values[f"{prefix}_f12_gpm"] = row.get("f12_gpm", "")
         old_values[f"{prefix}_permeate_ri"] = row["permeate_ri"]
-        if row["row_group"] == "main":
-            old_values[f"{prefix}_perm_flow_c"] = row["perm_flow_c"]
-            old_values[f"{prefix}_perm_flow_d"] = row["perm_flow_d"]
+        old_values[f"{prefix}_retentate_ri"] = row["retentate_ri"]
+        old_values[f"{prefix}_qic1_ntu_turbidity"] = row.get("qic1_ntu_turbidity", "")
+        old_values[f"{prefix}_pressure_pt1"] = row.get("pressure_pt1", "")
+        old_values[f"{prefix}_pressure_pt2"] = row.get("pressure_pt2", "")
+        old_values[f"{prefix}_pressure_pt3"] = row.get("pressure_pt3", "")
     changes, missing_details, mismatched_values = collect_field_changes(form, old_values, current_user(request), correction_reason)
     if missing_details:
         return correction_missing_response(missing_details)
@@ -2202,11 +2356,12 @@ def edit_generic_page(request: Request, entry_id: int):
     stage_key = entry["stage_key"]
     stage = get_generic_stage(stage_key)
     payload = json.loads(entry["payload_json"] or "{}")
+    prepared_stage = generic_stage_for_render(stage, payload)
     return render_page(
         request,
         "generic_sheet.html",
         stage_key=stage_key,
-        stage=stage,
+        stage=prepared_stage,
         entry_values=payload,
         entry=entry,
         is_edit=True,

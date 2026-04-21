@@ -2,20 +2,24 @@
 
 # Shared temperature label reused across multiple stage tables.
 DEG_F = "\u00B0F"
+YES_NO_OPTIONS = ["Yes", "No"]
+Y_N_OPTIONS = ["Y", "N"]
+A_B_OPTIONS = ["A", "B"]
+AUTO_OFF_OPTIONS = ["AUTO", "OFF"]
 
-def header(field_name: str, label: str, field_type: str):
+def header(field_name: str, label: str, field_type: str, options: list[str] | None = None, default: str = ""):
     """Build a header tuple for a top-of-form field in a generic stage sheet."""
-    return (field_name, label, field_type)
+    return (field_name, label, field_type, options or [], default)
 
 
-def column(field_name: str, label: str):
+def column(field_name: str, label: str, field_type: str = "text", options: list[str] | None = None, default: str = ""):
     """Build a table column tuple for a repeating row in a generic stage sheet."""
-    return (field_name, label)
+    return (field_name, label, field_type, options or [], default)
 
 
-def table(title: str, prefix: str, rows: int, columns: list[tuple[str, str]]):
+def table(title: str, prefix: str, rows: int, columns: list[tuple], initial_rows: int = 1):
     """Build a table definition consumed by the generic stage template."""
-    return {"title": title, "prefix": prefix, "rows": rows, "columns": columns}
+    return {"title": title, "prefix": prefix, "rows": rows, "initial_rows": initial_rows, "columns": columns}
 
 
 # Full configuration for every run-linked stage rendered through `generic_sheet.html`.
@@ -27,7 +31,7 @@ GENERIC_STAGE_DEFS = {
         "headers": [
             header("entry_date", "Date", "date"),
             header("cycle_volume_set_point", "Cycle Volume Set Point (gal)", "text"),
-            header("zero_refract", "Zero Refract", "select"),
+            header("zero_refract", "Zero Refract", "select", Y_N_OPTIONS),
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
@@ -80,7 +84,7 @@ GENERIC_STAGE_DEFS = {
             header("entry_date", "Date", "date"),
             header("clarification_sequential_no", "Clarification Sequential No.", "text"),
             header("retentate_flow_set_point", "Retentate Flow Set Point (gpm)", "text"),
-            header("zero_refract", "Zero Refract", "select"),
+            header("zero_refract", "Zero Refract", "select", Y_N_OPTIONS),
             header("startup_time", "Start-up Time", "time"),
             header("shutdown_time", "Shut-down Time", "time"),
             header("operator_initials", "Operator Initials", "text"),
@@ -116,7 +120,7 @@ GENERIC_STAGE_DEFS = {
             header("entry_date", "Date", "date"),
             header("run_number", "Run #", "text"),
             header("product_tank", "Product Tank", "text"),
-            header("cooler_isolated", "Cooler Isolated", "select"),
+            header("cooler_isolated", "Cooler Isolated", "select", Y_N_OPTIONS),
             header("startup_time", "Start-up Time", "time"),
             header("start_saving_product_at", "Start Saving Product At", "time"),
             header("shutdown_time", "Shut Down Time", "time"),
@@ -156,6 +160,7 @@ GENERIC_STAGE_DEFS = {
                 column("first_effect_temp", f"1st Effect Temp ({DEG_F})"),
                 column("second_effect_temp", f"2nd Effect Temp ({DEG_F})"),
                 column("third_effect_temp", f"3rd Effect Temp ({DEG_F})"),
+                column("condenser_temp", f"Condenser Temp ({DEG_F})"),
                 column("system_pressure", "System Pressure (in Hg)"),
                 column("h2o2_ppm", "H2O2 (ppm)"),
                 column("gcv", "GCV"),
@@ -170,9 +175,18 @@ GENERIC_STAGE_DEFS = {
             header("entry_date", "Date", "date"),
             header("tank_number", "Tank #", "text"),
             header("production_number", "Production #", "text"),
-            header("retain_sample_taken", "Retain Sample Taken", "select"),
-            header("retain_sample_logged", "Retain Sample Logged", "select"),
+            header("retain_sample_taken", "Retain Sample Taken", "select", YES_NO_OPTIONS),
+            header("retain_sample_logged", "Retain Sample Logged", "select", YES_NO_OPTIONS),
             header("dry_lag_weight", "Dry LAG Wt (lb)", "text"),
+            header("h2o2_target_vs_lag_weight", "Hydrogen Peroxide Target vs LAG Wt (%)", "text"),
+            header("h2o2_target_total_gallons", "Hydrogen Peroxide Target Total Addition (gal)", "text"),
+            header("h2o2_target_total_lbs", "Hydrogen Peroxide Target Total Addition (lb)", "text"),
+            header("h2o2_density", "Hydrogen Peroxide Density", "text", default="9.44 lb/gal"),
+            header("koh_target_vs_lag_weight", "Potassium Hydroxide Target vs LAG Wt (%)", "text"),
+            header("koh_target_total_liquid_lbs", "Potassium Hydroxide Target Total Addition - Liquid (lb)", "text"),
+            header("koh_target_total_dry_lbs", "Potassium Hydroxide Target Total Addition - Dry (lb)", "text"),
+            header("koh_density", "Potassium Hydroxide Density", "text", default="12 lb/gal"),
+            header("koh_target_gallons", "Potassium Hydroxide Target (gal)", "text"),
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
@@ -181,20 +195,14 @@ GENERIC_STAGE_DEFS = {
                 column("initials", "Initials"),
                 column("totalizer", "Totalizer (gal)"),
                 column("net_add", "Net Add (gal)"),
-                column("pump_status", "Pump Status"),
-                column("temp", f"Temp ({DEG_F})"),
-                column("tank_level", "Tank Level (%)"),
+                column("pump_status", "Pump Status", "select", AUTO_OFF_OPTIONS, "AUTO"),
             ]),
             table("Potassium Hydroxide Additions", "koh_additions", 10, [
                 column("time", "Time"),
                 column("initials", "Initials"),
-                column("pump_status", "Pump Status"),
-                column("flow", "Flow (gpm)"),
+                column("pump_status", "Pump Status", "select", AUTO_OFF_OPTIONS, "AUTO"),
                 column("net_add_gallons", "Net Add (gal)"),
-                column("tank_temp", f"Tank Temp ({DEG_F})"),
-                column("tank_level", "Tank Level (%)"),
-                column("ph_before", "pH Before"),
-                column("comments", "Comments"),
+                column("comments", "Comments: cooling water status, H2O2 ppm, etc."),
             ]),
         ],
     },
@@ -206,9 +214,13 @@ GENERIC_STAGE_DEFS = {
             header("entry_date", "Date", "date"),
             header("tank_number", "Tank #", "text"),
             header("run_blend_number", "Run / Blend #", "text"),
-            header("retain_sample_taken", "Retain Sample Taken", "select"),
-            header("retain_sample_logged", "Retain Sample Logged", "select"),
+            header("retain_sample_taken", "Retain Sample Taken", "select", YES_NO_OPTIONS),
+            header("retain_sample_logged", "Retain Sample Logged", "select", YES_NO_OPTIONS),
             header("dry_lag_weight", "Dry LAG Wt (lb)", "text"),
+            header("h2o2_target_vs_lag_weight", "Hydrogen Peroxide Target vs LAG Wt (%)", "text"),
+            header("h2o2_target_total_gallons", "Hydrogen Peroxide Target Total Addition (gal)", "text"),
+            header("calcium_target_vs_lag_weight", "Calcium Hydroxide Target vs LAG Wt (%)", "text"),
+            header("calcium_target_total_liquid_lbs", "Calcium Hydroxide Target Total Addition - Liquid (lb)", "text"),
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
@@ -223,11 +235,8 @@ GENERIC_STAGE_DEFS = {
                 column("operator_initials", "Initials"),
                 column("scale_before", "Scale Before (lb)"),
                 column("scale_after", "Scale After (lb)"),
-                column("net_add_liquid_lb", "Net Add (lb)"),
-                column("tank_temp", f"Tank Temp ({DEG_F})"),
-                column("tank_level", "Tank Level (%)"),
-                column("ph_before", "pH Before"),
-                column("comments", "Comments"),
+                column("net_add_liquid_lb", "Net Add - Liquid (lb)"),
+                column("comments", "Comments: cooling water status, H2O2 ppm, etc."),
             ]),
         ],
     },
@@ -250,7 +259,7 @@ GENERIC_STAGE_DEFS = {
                 column("time", "Time"),
                 column("h2o2_added", "H2O2 Added (ppm)"),
                 column("back_pressure", "Back Pressure (psi)"),
-                column("saving", "Saving Y/N"),
+                column("saving", "Saving Y/N", "select", YES_NO_OPTIONS),
             ]),
         ],
     },
@@ -261,12 +270,18 @@ GENERIC_STAGE_DEFS = {
         "headers": [
             header("entry_date", "Date", "date"),
             header("operator_initials", "Initials", "text"),
-            header("bed", "Bed", "select"),
+            header("bed", "Bed", "select", A_B_OPTIONS),
             header("start_color", "Start Color", "text"),
             header("run_blend_number", "Run or Blend #", "text"),
             header("pass_number", "Pass #", "text"),
             header("product_to_tank_start_time", "Product to Tank Start Time", "time"),
             header("ri_of_extract_to_be_exchanged", "RI of Extract to be Exchanged (%)", "text"),
+            header("started_transfer_to_tank", "Started Transfer to Tank", "select", YES_NO_OPTIONS),
+            header("transfer_to_tank_number", "Transfer to Tank #", "text"),
+            header("done_in_a_loop", "Done in A Loop", "select", YES_NO_OPTIONS),
+            header("completion_date", "Completion Date", "date"),
+            header("completion_time", "Completion Time", "time"),
+            header("completion_initials", "Completion Initials", "text"),
         ],
         "tables": [
             table("Exchange Log", "anion_exchange", 10, [
@@ -286,7 +301,7 @@ GENERIC_STAGE_DEFS = {
         "sheet_name": "Data Sheet - ResistAid Anion Exchange",
         "headers": [
             header("run_blend_number", "Run or Blend #", "text"),
-            header("transfer_path", "Transfer Path", "text"),
+            header("transfer_path", "Transfer Path", "text", default="T-561 to T-552"),
             header("entry_date", "Date", "date"),
             header("operator_initials", "Operator Initials", "text"),
         ],
@@ -299,7 +314,7 @@ GENERIC_STAGE_DEFS = {
                 column("inches_to_top", "Inches to Top (in)"),
                 column("t561_gallons", "T-561 Gallons (gal)"),
                 column("lag_lb_transferred", "LAG Transferred (lb)"),
-                column("current_bed", "Current Bed"),
+                column("current_bed", "Current Bed", "select", A_B_OPTIONS),
                 column("total_lb_transferred", "Total on Bed (lb)"),
             ]),
         ],
@@ -322,7 +337,7 @@ GENERIC_STAGE_DEFS = {
                 column("weight", "WT (lb)"),
                 column("name", "Name"),
                 column("lot_number", "Lot Number"),
-                column("flushed", "Flushed?"),
+                column("flushed", "Flushed?", "select", Y_N_OPTIONS),
             ]),
             table("Vessel Monitoring", "carbon_monitoring", 10, [
                 column("date", "Date"),
@@ -338,7 +353,6 @@ GENERIC_STAGE_DEFS = {
                 column("vessel_c_flavor", "Vessel C Flavor"),
                 column("vessel_c_odor", "Vessel C Odor"),
                 column("vessel_c_ri", "Vessel C RI (%)"),
-                column("temperature", f"Temp ({DEG_F})"),
             ]),
         ],
     },
