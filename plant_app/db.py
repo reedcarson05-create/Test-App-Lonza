@@ -366,10 +366,18 @@ def ensure_schema_migrations(conn) -> None:
 def init_db() -> None:
     """Validate that the configured database backend is reachable."""
     conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT 1")
-    ensure_schema_migrations(conn)
-    conn.close()
+    try:
+        cur = conn.cursor()
+        try:
+            # SQL Server keeps the result set active until it is consumed, which
+            # blocks the migration cursor from querying INFORMATION_SCHEMA.
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        finally:
+            cur.close()
+        ensure_schema_migrations(conn)
+    finally:
+        conn.close()
 
 
 def validate_user(employee: str, password: str) -> bool:
