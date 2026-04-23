@@ -56,6 +56,7 @@ from db import (
     insert_audit,
     get_field_change_history,
     last_12_hour_activity,
+    get_completed_stage_keys_for_run,
 )
 
 from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS
@@ -1936,7 +1937,16 @@ def stages(request: Request):
     if redirect:
         return redirect
 
-    return render_page(request, "stages.html", stage_links=STAGE_LINKS)
+    run_id = current_run_id(request)
+    completed = get_completed_stage_keys_for_run(run_id)
+
+    enriched_links = []
+    for stage in STAGE_LINKS:
+        href = stage["href"]
+        stage_key = href.rsplit("/", 1)[-1]
+        enriched_links.append({**stage, "done": stage_key in completed})
+
+    return render_page(request, "stages.html", stage_links=enriched_links)
 
 
 @app.get("/run/review", response_class=HTMLResponse)

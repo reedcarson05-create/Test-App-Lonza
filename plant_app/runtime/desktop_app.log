@@ -421,3 +421,41 @@
 =======
 >>>>>>> b12c07b38934a871caaebb4ab737acc7f7122552
 >>>>>>> ce28b8a027c7a1488656bbdac5db75ae69c3b100
+[2026-04-22 21:49:46] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-22 21:49:50] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-22 09:34:25 AM)). Switching desktop launch to port 8023.
+[2026-04-22 21:49:50] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:12:19] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:12:28] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:11:13 AM)). Switching desktop launch to port 8024.
+[2026-04-23 10:12:31] Server not running on port 8024, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8024.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8024.err.log
+[2026-04-23 10:12:31] Background host started with PID 34776.
+[2026-04-23 10:12:35] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:25:38] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:25:39] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:25:04 AM)). Switching desktop launch to port 8025.
+[2026-04-23 10:25:42] Server not running on port 8025, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8025.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8025.err.log
+[2026-04-23 10:25:42] Background host started with PID 42364.
+[2026-04-23 10:25:45] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:27:55] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:27:56] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:27:35 AM)). Switching desktop launch to port 8026.
+[2026-04-23 10:27:59] Server not running on port 8026, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8026.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8026.err.log
+[2026-04-23 10:27:59] Background host started with PID 16296.
+[2026-04-23 10:28:02] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:30:39] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:30:42] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 10:30:45] Server not running on port 8027, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8027.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8027.err.log
+[2026-04-23 10:30:45] Background host started with PID 7860.
+[2026-04-23 10:30:47] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:43:39] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:43:41] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 10:43:42] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 10:43:43] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 10:43:44] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 10:43:44] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 11:26:03] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 11:26:10] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 11:26:10] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 11:26:14] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 11:26:20] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
+[2026-04-23 11:26:23] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 11:26:25] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-23 11:26:29] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-23 10:29:49 AM)). Switching desktop launch to port 8027.
+[2026-04-23 11:26:30] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe

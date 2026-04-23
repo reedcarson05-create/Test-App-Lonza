@@ -76,8 +76,11 @@
       </div>
       <div class="section-grid stage-buttons">
         {% for stage in stage_links %}
-        <a class="summary-card stage-sheet-link" href="{{ stage['href'] }}">
-          <h3>{{ stage['title'] }}</h3>
+        <a class="summary-card stage-sheet-link{% if stage['done'] %} stage-done{% endif %}" href="{{ stage['href'] }}">
+          <div class="stage-sheet-top">
+            <h3>{{ stage['title'] }}</h3>
+            {% if stage['done'] %}<span class="stage-check" aria-label="Saved">&#10003;</span>{% endif %}
+          </div>
           <p>{{ stage_descriptions.get(stage['title'], 'Enter and review run data for this stage.') }}</p>
         </a>
         {% endfor %}

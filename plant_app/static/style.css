@@ -2297,6 +2297,37 @@ a.stage-sheet-link:hover h3 {
   text-decoration: underline;
 }
 
+a.stage-sheet-link.stage-done {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--line) 70%);
+}
+
+.stage-sheet-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stage-sheet-top h3 {
+  margin: 0;
+}
+
+.stage-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .hero-status .status-badge {
   margin-left: 0;
 }
@@ -2317,23 +2348,51 @@ a.stage-sheet-link:hover h3 {
   }
 
   body {
-    background: white;
+    background: white !important;
   }
 
-  .wrap,
+  .wrap {
+    max-width: 100% !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .card,
   .table-wrap {
+    overflow: visible !important;
+    position: static !important;
     box-shadow: none !important;
     border: 0 !important;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .card::before,
+  .card::after,
+  .page-intro::before,
+  .page-intro::after,
+  .hero-card::before,
+  .hero-card::after,
+  .entry-panel::before,
+  .summary-card::before,
+  .batch-pack::before,
+  .entry-card::before,
+  .login-card::before,
+  .login-card::after,
+  .signature-dialog::before,
+  .camera-dialog::before {
+    display: none !important;
   }
 
   .print-packet {
+    break-after: page;
     page-break-after: always;
   }
 
   .print-packet:last-of-type {
+    break-after: auto;
     page-break-after: auto;
   }
 }

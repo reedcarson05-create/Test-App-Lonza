@@ -448,6 +448,21 @@ def update_user_preferences(employee: str, theme: str, font_scale: str) -> dict[
     return {"theme": safe_theme, "font_scale": safe_font_scale}
 
 
+def get_completed_stage_keys_for_run(run_id: int) -> set:
+    """Return the set of stage keys that have at least one saved entry for this run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    completed = set()
+    cur.execute("SELECT 1 FROM evaporation_entries WHERE run_id = ? LIMIT 1", (run_id,)) if _is_sqlite_connection(conn) else cur.execute("SELECT TOP 1 1 FROM evaporation_entries WHERE run_id = ?", (run_id,))
+    if cur.fetchone():
+        completed.add("evaporation")
+    cur.execute("SELECT DISTINCT stage_key FROM sheet_entries WHERE run_id = ?", (run_id,))
+    for row in cur.fetchall():
+        completed.add(row[0])
+    conn.close()
+    return completed
+
+
 def get_user_role(employee: str) -> str:
     """Return the role string for a user, empty string if user not found."""
     conn = get_conn()

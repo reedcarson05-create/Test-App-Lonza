@@ -10,7 +10,7 @@
     .ps-run-header { border-bottom: 2px solid #000; padding-bottom: .5rem; margin-bottom: 1rem; }
     .ps-run-title { display: flex; align-items: baseline; gap: .75rem; margin-bottom: .25rem; }
     .ps-run-title h2 { margin: 0; font-size: 1.25rem; }
-    .ps-run-meta { font-size: .85rem; color: #444; margin-bottom: .25rem; }
+    .ps-run-meta { font-size: .85rem; color: #000; margin-bottom: .25rem; }
     .ps-sheet { margin-bottom: 1.5rem; }
     .ps-sheet-heading { display: flex; align-items: baseline; gap: .5rem; border-bottom: 1px solid #bbb; padding-bottom: .2rem; margin-bottom: .6rem; }
     .ps-sheet-heading h3 { margin: 0; font-size: 1rem; }
@@ -28,27 +28,66 @@
     .ps-no-entries { color: #777; font-style: italic; font-size: .85rem; padding: .5rem 0; }
 
     @media print {
-      @page { margin: 0.6in 0.5in; size: letter portrait; }
-      * { overflow: visible !important; box-shadow: none !important; }
-      body { background: white !important; color: black !important; font-size: 9pt; }
-      .wrap { max-width: none !important; padding: 0 !important; }
-      .card, .ps-sheet { border: none !important; padding: 0 !important; margin: 0 0 12pt !important; box-shadow: none !important; }
-      .ps-run-header { border-bottom: 1.5pt solid #000; padding-bottom: 4pt; margin-bottom: 8pt; }
-      .ps-run-title h2 { font-size: 13pt; }
-      .ps-run-meta { font-size: 8pt; }
-      .ps-sheet-heading { border-bottom: 0.75pt solid #999; margin-bottom: 4pt; }
-      .ps-sheet-heading h3 { font-size: 10pt; }
-      .ps-fields { grid-template-columns: repeat(4, 1fr); gap: 3pt 6pt; margin-bottom: 6pt; }
-      .ps-label { font-size: 6.5pt; }
-      .ps-value { font-size: 8pt; border-bottom: 0.5pt solid #999; min-height: 10pt; }
-      .ps-table-wrap { overflow: visible !important; }
-      .ps-table { width: 100% !important; font-size: 7pt; table-layout: fixed; }
-      .ps-table th { background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 2pt 3pt; font-size: 6.5pt; white-space: normal; word-break: break-word; }
-      .ps-table td { padding: 2pt 3pt; word-break: break-word; }
-      .ps-sheet { page-break-inside: avoid; }
-      .ps-notes { font-size: 7.5pt; border-left: 2pt solid #ccc; padding-left: 4pt; }
-      .print-packet { page-break-after: always; }
-      .print-packet:last-of-type { page-break-after: auto; }
+      /* ── Page setup ── */
+      @page { margin: 0.5in 0.4in; size: letter portrait; }
+
+      /* ── Hide screen-only chrome ── */
+      .print-hidden, .settings-root, .nav, .settings-toggle,
+      .settings-panel, .app-loading-overlay, .print-toolbar,
+      .actions { display: none !important; }
+
+      /* ── Flatten body and wrap ── */
+      html, body { width: 100% !important; margin: 0 !important; padding: 0 !important;
+        background: #fff !important; color: #000 !important; font-size: 9pt !important; }
+      * { color: #000 !important; }
+      .wrap { max-width: 100% !important; width: 100% !important;
+        margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+
+      /* ── Strip .card decoration so it doesn't clip content ── */
+      .card, .print-packet {
+        overflow: visible !important;
+        position: static !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      /* Remove the decorative pseudo-elements that sit inside overflow:hidden */
+      .card::before, .card::after,
+      .print-packet::before, .print-packet::after { display: none !important; }
+
+      /* ── Page breaks ── */
+      .print-packet { break-after: page; page-break-after: always; }
+      .print-packet:last-of-type { break-after: auto; page-break-after: auto; }
+
+      /* ── ps-* layout (all pt-based so they scale to paper) ── */
+      .ps-run-header { border-bottom: 1.5pt solid #000 !important; padding-bottom: 5pt; margin-bottom: 10pt; }
+      .ps-run-title h2 { font-size: 14pt; margin: 0; color: #000; }
+      .ps-run-meta { font-size: 8pt; color: #000; }
+      .ps-sheet { margin-bottom: 10pt; break-inside: avoid; page-break-inside: avoid; }
+      .ps-sheet-heading { border-bottom: 0.75pt solid #000 !important; margin-bottom: 4pt; }
+      .ps-sheet-heading h3 { font-size: 10pt; color: #000; }
+      .ps-sheet-name { font-size: 7.5pt; color: #000; }
+      .ps-fields { display: grid !important; grid-template-columns: repeat(4,1fr) !important;
+        gap: 3pt 8pt; margin-bottom: 6pt; }
+      .ps-label { font-size: 6.5pt !important; color: #000 !important; }
+      .ps-value { font-size: 8pt !important; color: #000 !important; border-bottom: 0.5pt solid #000 !important;
+        min-height: 10pt; padding: 1pt 0; word-break: break-word; }
+      .ps-table-wrap { overflow: visible !important; margin-bottom: 6pt; }
+      .ps-table { width: 100% !important; border-collapse: collapse !important;
+        font-size: 7pt !important; table-layout: fixed; color: #000 !important; }
+      .ps-table th { background: #ddd !important; -webkit-print-color-adjust: exact;
+        print-color-adjust: exact; border: 0.5pt solid #000 !important;
+        padding: 2pt 3pt !important; font-size: 6.5pt !important; color: #000 !important;
+        white-space: normal !important; word-break: break-word; }
+      .ps-table td { border: 0.5pt solid #000 !important; padding: 2pt 3pt !important;
+        color: #000 !important; word-break: break-word; }
+      .ps-table-title { font-size: 8pt; font-weight: 700; margin: 4pt 0 2pt; color: #000; }
+      .ps-notes { font-size: 7.5pt; border-left: 2pt solid #000 !important;
+        padding-left: 4pt; margin-top: 4pt; color: #000; }
+      .ps-no-entries { font-size: 8pt; color: #000; }
     }
   </style>
 </head>
