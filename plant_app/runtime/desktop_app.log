@@ -329,6 +329,12 @@
 [2026-04-20 09:40:48] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe.
 [2026-04-20 09:40:50] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> 2598c7fdb9f29657737cd1f166b0651bc3d4ca06
+<<<<<<< HEAD
+[2026-04-21 09:05:38] Server not running on port 8000, starting background host with C:\Users\Sam\AppData\Local\Python\bin\python.exe.
+[2026-04-21 09:05:40] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+[2026-04-21 09:25:33] Server not running on port 8000, starting background host with C:\Users\Sam\AppData\Local\Python\bin\python.exe.
+[2026-04-21 09:25:35] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+=======
 [2026-04-21 09:35:19] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
 [2026-04-21 09:35:27] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-21 09:30:45 AM)). Switching desktop launch to port 8011.
 [2026-04-21 09:35:28] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
@@ -358,6 +364,7 @@
 [2026-04-21 10:14:19] Server not running on port 8011, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8011.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8011.err.log
 [2026-04-21 10:14:19] Background host started with PID 36940.
 [2026-04-21 10:14:21] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+<<<<<<< HEAD
 [2026-04-21 17:19:55] Could not stop the stale server on port 8000: Port 8000 is already in use by another process and the launcher will not stop it automatically.
 [2026-04-21 17:20:02] Port 8000 is serving an older app host (the running app build (2026-04-10 11:47:13 AM) was older than disk (2026-04-21 05:18:05 PM)). Switching desktop launch to port 8012.
 [2026-04-21 17:20:05] Server not running on port 8012, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8012.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8012.err.log
@@ -411,3 +418,6 @@
 [2026-04-22 09:35:23] Server not running on port 8023, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8023.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8023.err.log
 [2026-04-22 09:35:23] Background host started with PID 11212.
 [2026-04-22 09:35:26] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+=======
+>>>>>>> b12c07b38934a871caaebb4ab737acc7f7122552
+>>>>>>> ce28b8a027c7a1488656bbdac5db75ae69c3b100
