@@ -1,0 +1,171 @@
+INFO:     127.0.0.1:63095 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63095 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63095 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63095 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63095 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64281 - "GET /boot?launch=1776811536941 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64281 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55458 - "GET /static/logo.png?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57939 - "GET /static/boot_loader.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64281 - "GET /static/signature_session.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57939 - "GET /static/settings.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55458 - "GET /static/form_corrections.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56440 - "GET /static/image_upload.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57941 - "GET /?fresh=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55689 - "GET /boot/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55689 - "GET /?fresh=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55689 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:55689 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55689 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52355 - "GET /run/use/7?next=/stages HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:52355 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52355 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:52355 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61622 - "GET /stage/evaporation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64317 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:61622 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63187 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63187 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63187 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60580 - "GET /run/use/7?next=/stages HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:60580 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60580 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60580 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60580 - "GET /stage/evaporation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55232 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:60580 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56339 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:49946 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:55249 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53639 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53639 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:55249 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:50212 - "POST /signature-session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50212 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:50212 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:55249 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53639 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53639 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53639 - "POST /submit/evaporation HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:53639 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53639 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53639 - "GET /stage/generic/clarifier HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53639 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50554 - "GET /static/dynamic_rows.js?v=1776811411924567000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53639 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:50554 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58895 - "POST /submit/generic/clarifier HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64716 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:64716 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:64716 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "GET /run/use/7?next=/runs/print HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:62604 - "GET /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "POST /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62604 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63942 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63942 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63942 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56243 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56243 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56243 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56243 - "GET /stage/evaporation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61196 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:56243 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49833 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49833 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52260 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56084 - "GET /stage/extraction HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65206 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:56084 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58827 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58827 - "POST /submit/extraction HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:58827 - "GET /process-dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58827 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58827 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58827 - "GET /static/style.css?v=1776811411924567000 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:58827 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59999 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59999 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59999 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59999 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51494 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51494 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51494 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51494 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56990 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53885 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53885 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53885 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53885 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64020 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64020 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64020 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64020 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62211 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62211 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62211 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62211 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50412 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53607 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53607 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53607 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53607 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50472 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50472 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50472 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50472 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60766 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52960 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52960 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52960 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52960 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52966 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52966 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52966 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52966 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53769 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53769 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53769 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53769 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57069 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58556 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58556 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58556 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58556 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53395 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53395 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53395 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53395 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63295 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63295 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63295 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63295 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57958 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57958 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57958 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57958 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53859 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53859 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53859 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53859 - "GET /app-status HTTP/1.1" 200 OK

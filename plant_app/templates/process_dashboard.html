@@ -43,10 +43,9 @@
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Standalone Machine Work</h2>
-        <span class="info-chip">Not tied to a run</span>
+        <h2>Extraction &amp; Filtration</h2>
       </div>
-      <p class="muted">Use this area for extraction and filtration only. Start a new entry from the buttons below, or open a saved entry from the history table to correct it.</p>
+      <p class="muted">Start a new entry below, or open a saved entry from the history table.</p>
       <div class="section-grid stage-buttons">
         {% for stage in stage_links %}
         <div class="summary-card">
@@ -74,7 +73,7 @@
             <td>{{ row['start_label'] or '' }}</td>
             <td>{{ row['end_label'] or '' }}</td>
             <td>{{ row['comments'] or '' }}</td>
-            <td><a class="table-action" href="{{ row['edit_href'] }}">Correct Saved Entry</a></td>
+            <td><a class="table-action" href="{{ row['edit_href'] }}">Open Entry</a></td>
           </tr>
           {% endfor %}
           {% if not items %}

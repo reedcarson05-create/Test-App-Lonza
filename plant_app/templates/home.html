@@ -35,41 +35,44 @@
   <div class="nav">
     <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Plant App</div>
     <div class="navlinks">
+      {% if run %}<span class="pill">Run {{ run_label(run) }}</span>{% endif %}
       <a class="pill" href="/run/select">Runs</a>
       <a class="pill" href="/runs/print">Print</a>
+      {% if user_is_admin %}<a class="pill" href="/admin/users">Admin</a>{% endif %}
       <a class="pill" href="/logout">Logout</a>
-      <span class="pill">User: {{ user }}</span>
+      <span class="pill">{{ user }}</span>
     </div>
   </div>
 
+  {% if run %}
+  <div class="hero-card">
+    <div>
+      <p class="eyebrow">Currently Working On</p>
+      <h1>Run {{ run_label(run) }}</h1>
+      {% if run['product_name'] %}<p class="muted">{{ run['product_name'] }}</p>{% endif %}
+      <div class="hero-status">
+        {% if run['status'] %}<span class="status-badge">{{ run['status'] }}</span>{% endif %}
+        {% if run['blend_number'] %}<span class="status-badge">Blend {{ run['blend_number'] }}</span>{% endif %}
+        {% if run['split_batch_number'] %}<span class="status-badge">Split {{ run['split_batch_number'] }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/stages">Open Run Sheets</a>
+      <a class="btn ghost" href="/stage/extraction">Extraction</a>
+      <a class="btn ghost" href="/stage/filtration">Filtration</a>
+      <a class="btn ghost" href="/run/select">Change Run</a>
+    </div>
+  </div>
+  {% else %}
   <div class="card page-intro">
     <div class="section-title">
-      <h2>Run Control</h2>
-      {% if run %}
-      <span class="info-chip">Current Run {{ run_label(run) }}</span>
-      {% else %}
+      <h2>Get Started</h2>
       <span class="info-chip">No run selected</span>
-      {% endif %}
     </div>
-    <p class="muted">Create runs, jump into open machines, blend or split selected runs, and print audit-ready summaries from this page.</p>
+    <p class="muted">Select an open run or create a new one to start recording batch data.</p>
     {% include "partials/create_run_form.html" %}
   </div>
-
-  {% set action_links = [
-    {"label": "Open Run Sheets", "href": "/stages" if run else "/run/select"},
-    {"label": "Extraction", "href": "/stage/extraction", "ghost": True},
-    {"label": "Filtration", "href": "/stage/filtration", "ghost": True},
-    {"label": "Blend", "href": "/runs/blend"},
-    {"label": "Split", "href": "/runs/split"},
-    {"label": "Print", "href": "/runs/print", "ghost": True}
-  ] %}
-  <div class="card">
-    <div class="section-title">
-      <h2>Quick Actions</h2>
-      <span class="info-chip">Minimized clicks</span>
-    </div>
-    {% include "partials/action_link_grid.html" %}
-  </div>
+  {% endif %}
 
   <div class="card">
     <div class="section-title">
@@ -78,21 +81,17 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Run</th><th>Product</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Actions</th></tr>
+        <tr><th>Run</th><th>Product</th><th>Updated</th><th>Actions</th></tr>
         {% for run_item in open_runs %}
         <tr>
           <td>
             <strong>{{ run_label(run_item) }}</strong>
-            {% if run and run_item['id'] == run['id'] %}<span class="info-chip">Current</span>{% endif %}
+            {% if run and run_item['id'] == run['id'] %}<span class="status-badge current">Active</span>{% endif %}
           </td>
           <td>{{ run_item['product_name'] or '' }}</td>
-          <td>{{ run_item['status'] or '' }}</td>
-          <td>{{ run_item['blend_number'] or '' }}</td>
-          <td>{{ run_item['split_batch_number'] or '' }}</td>
           <td>{{ run_item['updated_at'] or '' }}</td>
           <td class="table-actions">
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}">Use</a>
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/run/edit">Edit</a>
+            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/stages">Work</a>
             <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/run/review">Review</a>
             <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/runs/print">Print</a>
             <form method="post" action="/run/close/{{ run_item['id'] }}" class="inline-form">
@@ -102,16 +101,20 @@
         </tr>
         {% endfor %}
         {% if not open_runs %}
-        <tr><td colspan="7" class="muted center">No runs are open right now.</td></tr>
+        <tr><td colspan="4" class="muted center">No runs are open right now.</td></tr>
         {% endif %}
       </table>
     </div>
+    {% if run %}
+    <div style="margin-top:1rem; border-top: 1px solid var(--line); padding-top:1rem;">
+      {% include "partials/create_run_form.html" %}
+    </div>
+    {% endif %}
   </div>
 
   <div class="card">
     <div class="section-title">
       <h2>Machines</h2>
-      <span class="info-chip">Auto-populated usage state</span>
     </div>
     <div class="section-grid machine-grid">
       {% for machine in machine_cards %}
@@ -126,37 +129,6 @@
         </div>
       </div>
       {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="section-title">
-      <h2>Currently In Use</h2>
-      <span class="info-chip">{{ in_use_items|length }} Active Items</span>
-    </div>
-    <div class="section-grid">
-      {% for item in in_use_items %}
-      <div class="summary-card">
-        <h3>{{ item['title'] }}</h3>
-        <p>{% if item['run_label'] %}Run {{ item['run_label'] }}{% else %}Standalone machine{% endif %}</p>
-        <div class="summary-line">
-          <span class="pill">{{ item['status_label'] }}</span>
-          <span class="pill">{{ item['activity_time'] }}</span>
-        </div>
-        {% if item['comments'] %}
-        <p class="muted">{{ item['comments'] }}</p>
-        {% endif %}
-        <div class="actions">
-          <a class="btn ghost" href="{{ item['href'] }}">Open</a>
-        </div>
-      </div>
-      {% endfor %}
-      {% if not in_use_items %}
-      <div class="summary-card">
-        <h3>No Active Items</h3>
-        <p>Open runs and machines will appear here as soon as they are in use.</p>
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>

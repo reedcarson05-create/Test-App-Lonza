@@ -118,15 +118,9 @@ def _is_sqlite_connection(conn) -> bool:
     return isinstance(conn, sqlite3.Connection)
 
 
-def _limit_clause(limit: int, sqlite_backend: bool) -> str:
-    """Return the backend-specific row-limit clause fragment."""
-    safe_limit = max(1, int(limit))
-    return f"LIMIT {safe_limit}" if sqlite_backend else f"TOP ({safe_limit})"
-
-
 def _connect_sql_server():
     """Open the configured SQL Server database."""
-    return pyodbc.connect(_connection_string(resolve_sql_database()))
+    return pyodbc.connect(build_sql_connection_string(resolve_sql_database()))
 
 
 def _sql_server_target() -> str:
@@ -177,7 +171,6 @@ def build_sql_connection_string(database: str) -> str:
     ]
 
     if username:
-        # Shared SQL credentials let every signed-in device write to one central server.
         parts.extend([f"UID={username}", f"PWD={password}"])
     else:
         parts.append(
@@ -198,11 +191,6 @@ def build_sql_connection_string(database: str) -> str:
     return ";".join(parts) + ";"
 
 
-def _connection_string(database: str) -> str:
-    """Backwards-compatible wrapper around the shared SQL connection builder."""
-    return build_sql_connection_string(database)
-
-
 def resolve_sql_database() -> str:
     """Pick an explicit, preferred, or discovered Plant App database name."""
     global _resolved_sql_database
@@ -215,7 +203,7 @@ def resolve_sql_database() -> str:
         return _resolved_sql_database
 
     try:
-        conn = pyodbc.connect(_connection_string("master"))
+        conn = pyodbc.connect(build_sql_connection_string("master"))
         try:
             cur = conn.cursor()
             cur.execute(
@@ -363,6 +351,21 @@ def ensure_schema_migrations(conn) -> None:
     conn.commit()
 
 
+def _seed_admin_user(conn) -> None:
+    """Insert the admin account if no admin-role user exists yet."""
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM users WHERE role = 'admin'")
+    if cur.fetchone():
+        return
+    admin_password = os.getenv("PLANT_APP_ADMIN_PASSWORD", "LagAdmin2024!")
+    cur.execute("""
+        INSERT INTO users (employee_number, full_name, password, role, active, created_at, initials, theme_preference, font_scale_preference)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, ("admin", "Carson Reed", admin_password, "admin", 1,
+          datetime.now().isoformat(timespec="seconds"), "CR", "light", "1"))
+    conn.commit()
+
+
 def init_db() -> None:
     """Validate that the configured database backend is reachable."""
     conn = get_conn()
@@ -376,6 +379,7 @@ def init_db() -> None:
         finally:
             cur.close()
         ensure_schema_migrations(conn)
+        _seed_admin_user(conn)
     finally:
         conn.close()
 
@@ -442,6 +446,81 @@ def update_user_preferences(employee: str, theme: str, font_scale: str) -> dict[
     conn.commit()
     conn.close()
     return {"theme": safe_theme, "font_scale": safe_font_scale}
+
+
+def get_user_role(employee: str) -> str:
+    """Return the role string for a user, empty string if user not found."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT role FROM users WHERE employee_number = ?", (employee.strip(),))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else ""
+
+
+def employee_number_exists(employee: str) -> bool:
+    """Return True when an account with that employee number already exists."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM users WHERE employee_number = ?", (employee.strip(),))
+    row = cur.fetchone()
+    conn.close()
+    return row is not None
+
+
+def create_pending_user(employee: str, full_name: str, initials: str, password: str) -> None:
+    """Create a new user with active=0 (pending admin approval)."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO users (employee_number, full_name, password, role, active, created_at, initials, theme_preference, font_scale_preference)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (employee.strip(), full_name.strip(), password.strip(), "operator", 0,
+          datetime.now().isoformat(timespec="seconds"), initials.strip().upper(), "light", "1"))
+    conn.commit()
+    conn.close()
+
+
+def get_all_users() -> list:
+    """Return all users ordered by pending first, then by creation date."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, employee_number, full_name, role, active, created_at, initials
+        FROM users
+        ORDER BY active ASC, created_at DESC
+    """)
+    columns = [col[0] for col in cur.description]
+    rows = [row_to_dict(columns, r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def approve_user(employee: str) -> None:
+    """Set a pending user's account to active."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET active = 1 WHERE employee_number = ?", (employee.strip(),))
+    conn.commit()
+    conn.close()
+
+
+def reject_user(employee: str) -> None:
+    """Delete a pending user account."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE employee_number = ? AND role != 'admin'", (employee.strip(),))
+    conn.commit()
+    conn.close()
+
+
+def deactivate_user(employee: str) -> None:
+    """Disable an active user account without deleting it."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET active = 0 WHERE employee_number = ? AND role != 'admin'", (employee.strip(),))
+    conn.commit()
+    conn.close()
 
 
 def create_run(

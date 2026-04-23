@@ -2282,6 +2282,29 @@ html[data-theme="dark"] .loading-screen-track {
   }
 }
 
+a.stage-sheet-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+a.stage-sheet-link h3 {
+  color: var(--brand);
+}
+
+a.stage-sheet-link:hover h3 {
+  text-decoration: underline;
+}
+
+.hero-status .status-badge {
+  margin-left: 0;
+}
+
+.hero-status .status-badge:first-child {
+  margin-left: 0;
+}
+
 @media print {
   .print-hidden,
   .settings-root,

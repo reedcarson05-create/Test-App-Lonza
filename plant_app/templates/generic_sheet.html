@@ -52,9 +52,9 @@
     </div>
     <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
       {% if signature_session_ready %}
-      Handwritten signature saved for this login: {{ session_signature_initials }} at {{ session_signature_signed_at }}. It will be reused until you log out.
+      Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Before your first save on this login, sign once by hand and confirm your initials, date, and time. The saved signature will be reused until you log out.
+      Sign your initials below to get started — your signature stays active for this login.
       {% endif %}
     </div>
     {% if view_only and not is_edit %}

@@ -150,6 +150,30 @@ function Get-PortOwnerProcess {
   }
 }
 
+function Get-ListeningPortSet {
+  $ports = New-Object 'System.Collections.Generic.HashSet[int]'
+
+  try {
+    $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
+    foreach ($listener in $listeners) {
+      [void]$ports.Add([int]$listener.Port)
+    }
+  } catch {
+  }
+
+  return $ports
+}
+
+function Get-DesktopPortCandidates {
+  param(
+    [int]$PreferredPort
+  )
+
+  $legacyFallbackPorts = @(8011, 8012, 8013, 8020)
+  $overflowFallbackPorts = 8021..8099
+  return @($PreferredPort) + $legacyFallbackPorts + $overflowFallbackPorts | Select-Object -Unique
+}
+
 function Stop-StaleProjectServer {
   param(
     [int]$LocalPort,
@@ -184,17 +208,22 @@ function Resolve-DesktopPort {
     [int]$PreferredPort
   )
 
-  $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  $candidates = Get-DesktopPortCandidates -PreferredPort $PreferredPort
+  $listeningPorts = Get-ListeningPortSet
   $firstAvailablePort = $null
   foreach ($candidate in $candidates) {
+    if (-not $listeningPorts.Contains($candidate)) {
+      if ($null -eq $firstAvailablePort) {
+        $firstAvailablePort = $candidate
+      }
+      continue
+    }
+
     $candidateHealth = "http://127.0.0.1:$candidate/health"
     $candidateBoot = "http://127.0.0.1:$candidate/boot"
     $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
 
     if (-not (Test-AppServerReady -Url $candidateHealth)) {
-      if ($null -eq $firstAvailablePort) {
-        $firstAvailablePort = $candidate
-      }
       continue
     }
 
@@ -210,7 +239,7 @@ function Resolve-DesktopPort {
     return $firstAvailablePort
   }
 
-  throw "No available desktop launch port was found. Close any old Plant App windows and try again."
+  throw "No available desktop launch port was found in the Plant App desktop range. Close any old Plant App windows and try again."
 }
 
 function Resolve-ReusableDesktopPort {
@@ -218,8 +247,13 @@ function Resolve-ReusableDesktopPort {
     [int]$PreferredPort
   )
 
-  $candidates = @($PreferredPort, 8011, 8012, 8013, 8020) | Select-Object -Unique
+  $candidates = Get-DesktopPortCandidates -PreferredPort $PreferredPort
+  $listeningPorts = Get-ListeningPortSet
   foreach ($candidate in $candidates) {
+    if (-not $listeningPorts.Contains($candidate)) {
+      continue
+    }
+
     $candidateHealth = "http://127.0.0.1:$candidate/health"
     $candidateBoot = "http://127.0.0.1:$candidate/boot"
     $candidateAppStatus = "http://127.0.0.1:$candidate/app-status"
@@ -279,7 +313,18 @@ function Resolve-PythonExe {
   }
 
   foreach ($candidate in ($localCandidates | Select-Object -Unique)) {
-    if ((Test-Path -LiteralPath $candidate) -and (Test-PythonRuntime $candidate)) {
+    if (-not $candidate) {
+      continue
+    }
+
+    $candidateExists = $false
+    try {
+      $candidateExists = Test-Path -LiteralPath $candidate -PathType Leaf -ErrorAction Stop
+    } catch {
+      continue
+    }
+
+    if ($candidateExists -and (Test-PythonRuntime $candidate)) {
       return $candidate
     }
   }
