@@ -1,0 +1,100 @@
+INFO:     127.0.0.1:58195 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58195 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58195 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58195 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58195 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54152 - "GET /boot?launch=1777392723390 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61536 - "GET /static/logo.png?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63013 - "GET /static/style.css?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56219 - "GET /static/boot_loader.js?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63013 - "GET /static/signature_session.js?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56219 - "GET /static/settings.js?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61536 - "GET /static/form_corrections.js?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58286 - "GET /static/image_upload.js?v=1777392634271527100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63372 - "GET /?fresh=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56682 - "GET /boot/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56682 - "GET /?fresh=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54158 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54159 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62224 - "POST /login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:53829 - "POST /login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:51354 - "POST /login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:60250 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:60250 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60250 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53419 - "POST /run/select HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:53419 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53419 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50000 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50000 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57952 - "GET /stage/evaporation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51503 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:57952 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49268 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:61073 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:60034 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58045 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58045 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:60034 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:53003 - "POST /signature-session HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53003 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:60034 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58045 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:55880 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:56487 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56487 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56487 - "GET /run/use/22?next=/run/review HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:56487 - "GET /run/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56487 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /run/use/22 HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64588 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52385 - "GET /run/use/21?next=/runs/print HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:52385 - "GET /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52385 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57900 - "POST /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57900 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54985 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54985 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57057 - "GET /stage/extraction HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57057 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57057 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:61191 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:61191 - "POST /submit/extraction HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:61191 - "GET /process-dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61191 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /process-dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /run/use/21?next=/run/review HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:52673 - "GET /run/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /stage/evaporation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52673 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:50368 - "POST /signature-debug HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:50368 - "POST /submit/evaporation HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:50368 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50368 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50368 - "GET /run/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50368 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /stages HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "POST /runs/print HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60732 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60732 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64723 - "GET /logout HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64723 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64723 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64723 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64723 - "GET /settings HTTP/1.1" 200 OK
