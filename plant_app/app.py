@@ -27,6 +27,7 @@ from db import (
     employee_number_exists,
     create_pending_user,
     get_all_users,
+    get_active_users,
     approve_user,
     reject_user,
     deactivate_user,
@@ -1382,6 +1383,18 @@ async def register(request: Request):
 
 
 # ------------------------
+# TEAM — OPERATOR VIEW
+# --------------------
+
+@app.get("/team", response_class=HTMLResponse)
+def team_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    active = get_active_users()
+    return render_page(request, "team.html", active_users=active)
+
+
 # ADMIN — USER MANAGEMENT
 # ------------------------
 

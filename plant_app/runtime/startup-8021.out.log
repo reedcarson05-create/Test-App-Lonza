@@ -126,3 +126,15 @@ INFO:     127.0.0.1:60012 - "GET /health HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60012 - "GET /boot HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60012 - "GET /app-status HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60012 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60361 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58031 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58031 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58031 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58031 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /app-status HTTP/1.1" 200 OK

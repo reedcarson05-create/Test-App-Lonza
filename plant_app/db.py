@@ -511,6 +511,22 @@ def get_all_users() -> list:
     return rows
 
 
+def get_active_users() -> list:
+    """Return only active users ordered alphabetically by full name."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, employee_number, full_name, role, active, created_at, initials
+        FROM users
+        WHERE active = 1
+        ORDER BY full_name ASC
+    """)
+    columns = [col[0] for col in cur.description]
+    rows = [row_to_dict(columns, r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
 def approve_user(employee: str) -> None:
     """Set a pending user's account to active."""
     conn = get_conn()
