@@ -365,3 +365,10 @@
 [2026-04-21 10:14:19] Background host started with PID 36940.
 [2026-04-21 10:14:21] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> b12c07b38934a871caaebb4ab737acc7f7122552
+[2026-04-28 09:09:50] Server not running on port 8000, starting background host with C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\.venv\Scripts\python.exe. Logs: stdout=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.out.log stderr=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.err.log
+[2026-04-28 09:09:50] Background host started with PID 17628.
+[2026-04-28 09:10:46] Server not running on port 8000, starting background host with C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\.venv\Scripts\python.exe. Logs: stdout=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.out.log stderr=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.err.log
+[2026-04-28 09:10:46] Background host started with PID 2004.
+[2026-04-28 09:12:08] Server not running on port 8000, starting background host with C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\.venv\Scripts\python.exe. Logs: stdout=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.out.log stderr=C:\Users\Lonza-Techs\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.err.log
+[2026-04-28 09:12:08] Background host started with PID 14000.
+[2026-04-28 09:12:08] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe

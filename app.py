@@ -596,7 +596,7 @@ def render_page(request: Request, template_name: str, **context):
         "activity_open_href": activity_open_href,
     }
     page_context.update(context)
-    return templates.TemplateResponse(template_name, page_context)
+    return templates.TemplateResponse(request=request, name=template_name, context=page_context)
 
 
 def clean_value(value) -> str:
@@ -1193,8 +1193,9 @@ def boot_page(request: Request):
     clear_signature_session(request)
     request.session.clear()
     response = templates.TemplateResponse(
-        "boot.html",
-        {
+        request=request,
+        name="boot.html",
+        context={
             "request": request,
             "boot_manifest": build_boot_manifest(request),
             "asset_version": asset_version(),
@@ -1249,8 +1250,9 @@ def login_page(request: Request):
         return RedirectResponse("/home", status_code=303)
 
     response = templates.TemplateResponse(
-        "login.html",
-        {
+        request=request,
+        name="login.html",
+        context={
             "request": request,
             "error": "",
             "settings_theme": "light",
@@ -1288,8 +1290,9 @@ def login(
         return RedirectResponse("/home", status_code=303)
 
     return templates.TemplateResponse(
-        "login.html",
-        {
+        request=request,
+        name="login.html",
+        context={
             "request": request,
             "error": "Invalid employee number or password.",
             "settings_theme": "light",
