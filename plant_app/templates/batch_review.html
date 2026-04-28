@@ -1,0 +1,122 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review Run Records</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+{% from "partials/template_helpers.html" import run_label, display_or_blank %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}">
+  <div class="settings-root">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Review Run Records</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/stages">Run Sheets</a>
+        <a class="pill" href="/logout">Logout</a>
+      </div>
+    </div>
+
+    <div class="card page-intro">
+      <div class="section-title">
+        <h2>Review Before Closing</h2>
+        <span class="info-chip">Run {{ run_label(run) }}</span>
+      </div>
+      <p class="muted">Review the saved run-linked records below, then close the run when everything looks right.</p>
+    </div>
+
+    <div class="card">
+      <h2>Run Details</h2>
+      <div class="banner">
+        Run: <strong>{{ run_label(run) }}</strong>
+        {% if run['product_name'] %}| Product {{ run['product_name'] }}{% endif %}
+        {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
+        {% if run['split_batch_number'] %}| Split {{ run['split_batch_number'] }}{% endif %}
+        {% if run['status'] %}| Status: {{ run['status'] }}{% endif %}
+      </div>
+      {% if run['notes'] %}
+      <p><strong>Notes:</strong> {{ run['notes'] }}</p>
+      {% endif %}
+    </div>
+
+    {% if evaporation_entry %}
+    <div class="card">
+      <h2>Evaporation</h2>
+      <div class="grid three-up">
+        <div><label>Date</label><input value="{{ display_or_blank(evaporation_entry['entry_date'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+        <div><label>Operator</label><input value="{{ display_or_blank(evaporation_entry['operator_initials'] or evaporation_entry['employee'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+        <div><label>Evaporator</label><input value="{{ display_or_blank(evaporation_entry['evaporator_no'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+        <div><label>Start</label><input value="{{ display_or_blank(evaporation_entry['startup_time'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+        <div><label>Stop</label><input value="{{ display_or_blank(evaporation_entry['shutdown_time'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+        <div><label>Feed RI</label><input value="{{ display_or_blank(evaporation_entry['feed_ri'], evaporation_entry['entry_date'], evaporation_entry['operator_initials']) }}" disabled></div>
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="/edit/evaporation/{{ evaporation_entry['id'] }}">Correct Evaporation</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% for item in generic_entries %}
+    <div class="card">
+      <div class="section-title">
+        <h2>{{ item['title'] }}</h2>
+        <span class="info-chip">Saved</span>
+      </div>
+      <div class="grid three-up">
+        {% for field in item['stage']['headers'] %}
+        <div>
+          <label>{{ field[1] }}</label>
+          <input value="{{ display_or_blank(item['payload'].get(field[0], ''), item['payload'].get('entry_date', today), item['payload'].get('operator_initials', '')) }}" disabled>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="/edit/generic/{{ item['entry']['id'] }}">Correct {{ item['title'] }}</a>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if not has_entries %}
+    <div class="card">
+      <p class="muted center">No run-linked records have been saved yet. Add at least one run sheet before closing the run.</p>
+    </div>
+    {% endif %}
+
+    <div class="actions">
+      <a class="btn ghost" href="/stages">Back To Run Sheets</a>
+      {% if has_entries and run['status'] != 'Complete' %}
+      <form method="post" action="/run/review/finalize">
+        <button class="btn" type="submit">Close Run</button>
+      </form>
+      {% elif run['status'] == 'Complete' %}
+      <span class="pill">Run Closed</span>
+      {% endif %}
+    </div>
+  </div>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
+</body>
+</html>

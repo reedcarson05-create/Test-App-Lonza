@@ -1,0 +1,656 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report MustUnderstand="df" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:df="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily">
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>5f6af8d0-8714-4d2d-aafd-f9bf1f6a8a51</rd:ReportID>
+  <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
+  <Description>Starter paginated report for Plant App run packets.</Description>
+  <AutoRefresh>0</AutoRefresh>
+  <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
+  <DataSources>
+    <DataSource Name="PlantOpsSqlServer">
+      <rd:SecurityType>WindowsIntegrated</rd:SecurityType>
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString>Data Source=DESKTOP-8NEGE16;Initial Catalog=LonzaPlantOpsApp;TrustServerCertificate=True</ConnectString>
+        <IntegratedSecurity>true</IntegratedSecurity>
+      </ConnectionProperties>
+      <rd:DataSourceID>b0843c29-fd0c-4684-94ea-e57f8d405109</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="dsRunPicker">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <CommandText>SELECT TOP (250) h.run_id, h.run_label, h.product_name, h.run_status, h.created_at, h.created_at_ts FROM dbo.vw_bi_run_packet_header h ORDER BY COALESCE(h.created_at_ts, CONVERT(datetime2(0), '1900-01-01T00:00:00', 126)) DESC, h.run_id DESC;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id">
+          <DataField>run_id</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="run_label">
+          <DataField>run_label</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="product_name">
+          <DataField>product_name</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="run_status">
+          <DataField>run_status</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="created_at">
+          <DataField>created_at</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="created_at_ts">
+          <DataField>created_at_ts</DataField>
+          <rd:TypeName>System.DateTime</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="dsHeader">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@RunId">
+            <Value>=Parameters!RunId.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT h.run_id, h.run_label, h.batch_number, h.split_batch_number, h.blend_number, h.run_number, h.batch_type, h.product_name, h.shift_name, h.operator_id, h.run_notes, h.run_status, h.finalized_at, h.finalized_by, h.created_at, h.updated_at FROM dbo.vw_bi_run_packet_header h WHERE h.run_id = @RunId;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id"><DataField>run_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="run_label"><DataField>run_label</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="batch_number"><DataField>batch_number</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="split_batch_number"><DataField>split_batch_number</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="blend_number"><DataField>blend_number</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="run_number"><DataField>run_number</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="batch_type"><DataField>batch_type</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="product_name"><DataField>product_name</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="shift_name"><DataField>shift_name</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="operator_id"><DataField>operator_id</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="run_notes"><DataField>run_notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="run_status"><DataField>run_status</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="finalized_at"><DataField>finalized_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="finalized_by"><DataField>finalized_by</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="created_at"><DataField>created_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="updated_at"><DataField>updated_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="dsEvaporation">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@RunId">
+            <Value>=Parameters!RunId.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT e.run_id, e.run_label, e.evaporation_entry_id, e.employee, e.operator_initials, e.entry_date, e.evaporator_no, e.startup_time, e.shutdown_time, e.feed_ri, e.concentrate_ri, e.steam_pressure, e.vacuum, e.sump_level, e.product_temp, e.stage_notes, e.created_at FROM dbo.vw_bi_latest_evaporation e WHERE e.run_id = @RunId;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id"><DataField>run_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="run_label"><DataField>run_label</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="evaporation_entry_id"><DataField>evaporation_entry_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="employee"><DataField>employee</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="operator_initials"><DataField>operator_initials</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="entry_date"><DataField>entry_date</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="evaporator_no"><DataField>evaporator_no</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="startup_time"><DataField>startup_time</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="shutdown_time"><DataField>shutdown_time</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="feed_ri"><DataField>feed_ri</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="concentrate_ri"><DataField>concentrate_ri</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="steam_pressure"><DataField>steam_pressure</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="vacuum"><DataField>vacuum</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="sump_level"><DataField>sump_level</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="product_temp"><DataField>product_temp</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="stage_notes"><DataField>stage_notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="created_at"><DataField>created_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="dsEvaporationRows">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@RunId">
+            <Value>=Parameters!RunId.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT r.run_id, r.evaporation_entry_id, r.table_title, r.row_no, r.row_time, r.feed_rate, r.evap_temp, r.row_vacuum, r.row_concentrate_ri FROM dbo.vw_bi_latest_evaporation_rows r WHERE r.run_id = @RunId ORDER BY r.row_no;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id"><DataField>run_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="evaporation_entry_id"><DataField>evaporation_entry_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="table_title"><DataField>table_title</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="row_no"><DataField>row_no</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="row_time"><DataField>row_time</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="feed_rate"><DataField>feed_rate</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="evap_temp"><DataField>evap_temp</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="row_vacuum"><DataField>row_vacuum</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="row_concentrate_ri"><DataField>row_concentrate_ri</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="dsStageFields">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@RunId">
+            <Value>=Parameters!RunId.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT f.run_id, f.stage_order, f.stage_key, f.stage_title, f.sheet_name, f.sheet_entry_id, f.field_order, f.field_key, f.field_label, f.field_value, f.entry_date, f.operator_initials, f.employee, f.stage_notes, f.created_at FROM dbo.vw_bi_stage_fields f WHERE f.run_id = @RunId ORDER BY f.stage_order, f.field_order;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id"><DataField>run_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="stage_order"><DataField>stage_order</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="stage_key"><DataField>stage_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="stage_title"><DataField>stage_title</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="sheet_name"><DataField>sheet_name</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="sheet_entry_id"><DataField>sheet_entry_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="field_order"><DataField>field_order</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="field_key"><DataField>field_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="field_label"><DataField>field_label</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="field_value"><DataField>field_value</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="entry_date"><DataField>entry_date</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="operator_initials"><DataField>operator_initials</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="employee"><DataField>employee</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="stage_notes"><DataField>stage_notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="created_at"><DataField>created_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="dsStageTableCells">
+      <Query>
+        <DataSourceName>PlantOpsSqlServer</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="@RunId">
+            <Value>=Parameters!RunId.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>SELECT c.run_id, c.stage_order, c.stage_key, c.stage_title, c.sheet_name, c.sheet_entry_id, c.table_order, c.table_key, c.table_title, c.row_no, c.row_key, c.column_order, c.column_key, c.column_label, c.cell_value, c.entry_date, c.operator_initials, c.employee, c.stage_notes, c.created_at FROM dbo.vw_bi_stage_table_cells c WHERE c.run_id = @RunId ORDER BY c.stage_order, c.table_order, c.row_no, c.column_order;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="run_id"><DataField>run_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="stage_order"><DataField>stage_order</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="stage_key"><DataField>stage_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="stage_title"><DataField>stage_title</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="sheet_name"><DataField>sheet_name</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="sheet_entry_id"><DataField>sheet_entry_id</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="table_order"><DataField>table_order</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="table_key"><DataField>table_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="table_title"><DataField>table_title</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="row_no"><DataField>row_no</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="row_key"><DataField>row_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="column_order"><DataField>column_order</DataField><rd:TypeName>System.Int32</rd:TypeName></Field>
+        <Field Name="column_key"><DataField>column_key</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="column_label"><DataField>column_label</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="cell_value"><DataField>cell_value</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="entry_date"><DataField>entry_date</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="operator_initials"><DataField>operator_initials</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="employee"><DataField>employee</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="stage_notes"><DataField>stage_notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="created_at"><DataField>created_at</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+  <ReportParameters>
+    <ReportParameter Name="RunId">
+      <DataType>Integer</DataType>
+      <Prompt>Run</Prompt>
+      <ValidValues>
+        <DataSetReference>
+          <DataSetName>dsRunPicker</DataSetName>
+          <ValueField>run_id</ValueField>
+          <LabelField>run_label</LabelField>
+        </DataSetReference>
+      </ValidValues>
+      <DefaultValue>
+        <DataSetReference>
+          <DataSetName>dsRunPicker</DataSetName>
+          <ValueField>run_id</ValueField>
+        </DataSetReference>
+      </DefaultValue>
+    </ReportParameter>
+  </ReportParameters>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Textbox Name="ReportTitle">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Plant App Run Packet</Value>
+                    <Style>
+                      <FontFamily>Segoe UI Semibold</FontFamily>
+                      <FontSize>20pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>0in</Top>
+            <Left>0in</Left>
+            <Height>0.38in</Height>
+            <Width>7.5in</Width>
+            <Style>
+              <Border><Style>None</Style></Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="ReportSubtitle">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=&quot;Run &quot; &amp; First(Fields!run_label.Value, &quot;dsHeader&quot;) &amp; &quot; packet view&quot;</Value>
+                    <Style>
+                      <Color>#4b5563</Color>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.42in</Top>
+            <Left>0in</Left>
+            <Height>0.24in</Height>
+            <Width>7.5in</Width>
+            <Style>
+              <Border><Style>None</Style></Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Rectangle Name="HeaderCard">
+            <ReportItems>
+              <Textbox Name="HeaderRunLabel">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs>
+                  <Paragraph>
+                    <TextRuns>
+                      <TextRun>
+                        <Value>=&quot;Run &quot; &amp; First(Fields!run_label.Value, &quot;dsHeader&quot;)</Value>
+                        <Style>
+                          <FontFamily>Segoe UI Semibold</FontFamily>
+                          <FontSize>16pt</FontSize>
+                        </Style>
+                      </TextRun>
+                    </TextRuns>
+                    <Style />
+                  </Paragraph>
+                </Paragraphs>
+                <Top>0.08in</Top>
+                <Left>0.12in</Left>
+                <Height>0.3in</Height>
+                <Width>2.2in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderStatus">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Status: &quot; &amp; First(Fields!run_status.Value, &quot;dsHeader&quot;)</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.1in</Top>
+                <Left>5.35in</Left>
+                <Height>0.24in</Height>
+                <Width>1.9in</Width>
+                <Style><Border><Style>None</Style></Border><TextAlign>Right</TextAlign></Style>
+              </Textbox>
+              <Textbox Name="HeaderProduct">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Product: &quot; &amp; IIF(IsNothing(First(Fields!product_name.Value, &quot;dsHeader&quot;)), &quot;&quot;, First(Fields!product_name.Value, &quot;dsHeader&quot;))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.46in</Top>
+                <Left>0.12in</Left>
+                <Height>0.22in</Height>
+                <Width>3.1in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderBlend">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Blend: &quot; &amp; IIF(IsNothing(First(Fields!blend_number.Value, &quot;dsHeader&quot;)), &quot;&quot;, First(Fields!blend_number.Value, &quot;dsHeader&quot;))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.46in</Top>
+                <Left>3.28in</Left>
+                <Height>0.22in</Height>
+                <Width>1.55in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderSplit">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Split: &quot; &amp; IIF(IsNothing(First(Fields!split_batch_number.Value, &quot;dsHeader&quot;)), &quot;&quot;, First(Fields!split_batch_number.Value, &quot;dsHeader&quot;))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.46in</Top>
+                <Left>4.9in</Left>
+                <Height>0.22in</Height>
+                <Width>1.45in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderCreated">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Created: &quot; &amp; IIF(IsNothing(First(Fields!created_at.Value, &quot;dsHeader&quot;)), &quot;&quot;, First(Fields!created_at.Value, &quot;dsHeader&quot;))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.76in</Top>
+                <Left>0.12in</Left>
+                <Height>0.22in</Height>
+                <Width>3.25in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderFinalized">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Finalized: &quot; &amp; IIF(IsNothing(First(Fields!finalized_at.Value, &quot;dsHeader&quot;)), &quot;&quot;, First(Fields!finalized_at.Value, &quot;dsHeader&quot;))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>0.76in</Top>
+                <Left>3.42in</Left>
+                <Height>0.22in</Height>
+                <Width>2.1in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+              <Textbox Name="HeaderNotes">
+                <CanGrow>true</CanGrow>
+                <KeepTogether>true</KeepTogether>
+                <Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Notes: &quot; &amp; IIF(IsNothing(First(Fields!run_notes.Value, &quot;dsHeader&quot;)) OR Trim(CStr(First(Fields!run_notes.Value, &quot;dsHeader&quot;))) = &quot;&quot;, &quot;No run notes&quot;, CStr(First(Fields!run_notes.Value, &quot;dsHeader&quot;)))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+                <Top>1.05in</Top>
+                <Left>0.12in</Left>
+                <Height>0.26in</Height>
+                <Width>7.1in</Width>
+                <Style><Border><Style>None</Style></Border></Style>
+              </Textbox>
+            </ReportItems>
+            <Top>0.78in</Top>
+            <Left>0in</Left>
+            <Height>1.42in</Height>
+            <Width>7.5in</Width>
+            <Style>
+              <Border>
+                <Color>#d1d5db</Color>
+                <Style>Solid</Style>
+              </Border>
+              <BackgroundColor>#f9fafb</BackgroundColor>
+            </Style>
+          </Rectangle>
+          <Textbox Name="EvaporationHeader">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Evaporation</Value><Style><FontFamily>Segoe UI Semibold</FontFamily><FontSize>12pt</FontSize></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+            <Top>2.34in</Top>
+            <Left>0in</Left>
+            <Height>0.28in</Height>
+            <Width>7.5in</Width>
+            <Style><Border><Style>None</Style></Border><PaddingTop>2pt</PaddingTop></Style>
+            <Visibility>
+              <Hidden>=CountRows("dsEvaporation") = 0</Hidden>
+            </Visibility>
+          </Textbox>
+          <Rectangle Name="EvaporationCard">
+            <ReportItems>
+              <Textbox Name="EvapDate"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Date: &quot; &amp; First(Fields!entry_date.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.08in</Top><Left>0.12in</Left><Height>0.22in</Height><Width>1.6in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapOperator"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Operator: &quot; &amp; First(Fields!operator_initials.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.08in</Top><Left>1.9in</Left><Height>0.22in</Height><Width>1.6in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapNo"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Evaporator: &quot; &amp; First(Fields!evaporator_no.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.08in</Top><Left>3.75in</Left><Height>0.22in</Height><Width>1.6in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapStart"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Start: &quot; &amp; First(Fields!startup_time.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.08in</Top><Left>5.5in</Left><Height>0.22in</Height><Width>1.8in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapStop"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Stop: &quot; &amp; First(Fields!shutdown_time.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.36in</Top><Left>0.12in</Left><Height>0.22in</Height><Width>1.6in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapFeed"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Feed RI: &quot; &amp; First(Fields!feed_ri.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.36in</Top><Left>1.9in</Left><Height>0.22in</Height><Width>1.45in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapConc"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Conc RI: &quot; &amp; First(Fields!concentrate_ri.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.36in</Top><Left>3.45in</Left><Height>0.22in</Height><Width>1.5in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapSteam"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Steam: &quot; &amp; First(Fields!steam_pressure.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.36in</Top><Left>5.02in</Left><Height>0.22in</Height><Width>1.3in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapVac"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Vacuum: &quot; &amp; First(Fields!vacuum.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.36in</Top><Left>6.15in</Left><Height>0.22in</Height><Width>1.1in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapTemp"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Product Temp: &quot; &amp; First(Fields!product_temp.Value, &quot;dsEvaporation&quot;)</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.64in</Top><Left>0.12in</Left><Height>0.22in</Height><Width>2.0in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+              <Textbox Name="EvapNotes"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Notes: &quot; &amp; IIF(IsNothing(First(Fields!stage_notes.Value, &quot;dsEvaporation&quot;)) OR Trim(CStr(First(Fields!stage_notes.Value, &quot;dsEvaporation&quot;))) = &quot;&quot;, &quot;No section notes&quot;, CStr(First(Fields!stage_notes.Value, &quot;dsEvaporation&quot;)))</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Top>0.92in</Top><Left>0.12in</Left><Height>0.28in</Height><Width>7.1in</Width><Style><Border><Style>None</Style></Border></Style></Textbox>
+            </ReportItems>
+            <Top>2.66in</Top>
+            <Left>0in</Left>
+            <Height>1.28in</Height>
+            <Width>7.5in</Width>
+            <Style>
+              <Border><Color>#d1d5db</Color><Style>Solid</Style></Border>
+              <BackgroundColor>#ffffff</BackgroundColor>
+            </Style>
+            <Visibility>
+              <Hidden>=CountRows("dsEvaporation") = 0</Hidden>
+            </Visibility>
+          </Rectangle>
+          <Tablix Name="EvaporationRowsTable">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>1.1in</Width></TablixColumn>
+                <TablixColumn><Width>1.3in</Width></TablixColumn>
+                <TablixColumn><Width>1.4in</Width></TablixColumn>
+                <TablixColumn><Width>1.2in</Width></TablixColumn>
+                <TablixColumn><Width>2.0in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.24in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="EvapHdrTime"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Time</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapHdrFeed"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Feed Rate</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapHdrTemp"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Evap Temp</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapHdrVac"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Vacuum</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapHdrConc"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Concentrate RI</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="EvapDtlTime"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!row_time.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapDtlFeed"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!feed_rate.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapDtlTemp"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!evap_temp.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapDtlVac"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!row_vacuum.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="EvapDtlConc"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!row_concentrate_ri.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers><TablixMember /><TablixMember /><TablixMember /><TablixMember /><TablixMember /></TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember><KeepWithGroup>After</KeepWithGroup><RepeatOnNewPage>true</RepeatOnNewPage></TablixMember>
+                <TablixMember>
+                  <Group Name="EvaporationRowsDetail" />
+                  <SortExpressions>
+                    <SortExpression><Value>=Fields!row_no.Value</Value></SortExpression>
+                  </SortExpressions>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>dsEvaporationRows</DataSetName>
+            <Top>4.08in</Top>
+            <Left>0in</Left>
+            <Height>0.46in</Height>
+            <Width>7in</Width>
+            <NoRowsMessage>No evaporation readings recorded for this run.</NoRowsMessage>
+            <Style><Border><Style>None</Style></Border></Style>
+            <Visibility>
+              <Hidden>=CountRows("dsEvaporationRows") = 0</Hidden>
+            </Visibility>
+          </Tablix>
+          <Textbox Name="StageFieldsHeader">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Stage Header Fields</Value><Style><FontFamily>Segoe UI Semibold</FontFamily><FontSize>12pt</FontSize></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+            <Top>4.8in</Top>
+            <Left>0in</Left>
+            <Height>0.28in</Height>
+            <Width>7.5in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+          <Tablix Name="StageFieldsTable">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>1.9in</Width></TablixColumn>
+                <TablixColumn><Width>2.4in</Width></TablixColumn>
+                <TablixColumn><Width>3.2in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.24in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="StageFieldHdrSection"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Section</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageFieldHdrField"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Field</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageFieldHdrValue"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Value</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="StageFieldDtlSection"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!stage_title.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageFieldDtlField"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!field_label.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageFieldDtlValue"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!field_value.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers><TablixMember /><TablixMember /><TablixMember /></TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember><KeepWithGroup>After</KeepWithGroup><RepeatOnNewPage>true</RepeatOnNewPage></TablixMember>
+                <TablixMember>
+                  <Group Name="StageFieldsDetail" />
+                  <SortExpressions>
+                    <SortExpression><Value>=Fields!stage_order.Value</Value></SortExpression>
+                    <SortExpression><Value>=Fields!field_order.Value</Value></SortExpression>
+                  </SortExpressions>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>dsStageFields</DataSetName>
+            <Top>5.12in</Top>
+            <Left>0in</Left>
+            <Height>0.46in</Height>
+            <Width>7.5in</Width>
+            <NoRowsMessage>No generic stage header fields recorded for this run.</NoRowsMessage>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+          <Textbox Name="StageTablesHeader">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Stage Table Cells</Value><Style><FontFamily>Segoe UI Semibold</FontFamily><FontSize>12pt</FontSize></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs>
+            <Top>7.62in</Top>
+            <Left>0in</Left>
+            <Height>0.28in</Height>
+            <Width>7.5in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+          <Tablix Name="StageCellsTable">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>1.5in</Width></TablixColumn>
+                <TablixColumn><Width>1.6in</Width></TablixColumn>
+                <TablixColumn><Width>0.45in</Width></TablixColumn>
+                <TablixColumn><Width>2.15in</Width></TablixColumn>
+                <TablixColumn><Width>1.8in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.24in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="StageCellHdrSection"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Section</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellHdrTable"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Table</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellHdrRow"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Row</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellHdrColumn"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Column</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellHdrValue"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>Value</Value><Style><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#e5e7eb</BackgroundColor><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents><Textbox Name="StageCellDtlSection"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!stage_title.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellDtlTable"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!table_title.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellDtlRow"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!row_no.Value</Value><Style /></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellDtlColumn"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!column_label.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                    <TablixCell><CellContents><Textbox Name="StageCellDtlValue"><CanGrow>true</CanGrow><KeepTogether>true</KeepTogether><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!cell_value.Value</Value><Style /></TextRun></TextRuns><Style /></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><PaddingLeft>2pt</PaddingLeft><PaddingRight>2pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox></CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers><TablixMember /><TablixMember /><TablixMember /><TablixMember /><TablixMember /></TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember><KeepWithGroup>After</KeepWithGroup><RepeatOnNewPage>true</RepeatOnNewPage></TablixMember>
+                <TablixMember>
+                  <Group Name="StageCellsDetail" />
+                  <SortExpressions>
+                    <SortExpression><Value>=Fields!stage_order.Value</Value></SortExpression>
+                    <SortExpression><Value>=Fields!table_order.Value</Value></SortExpression>
+                    <SortExpression><Value>=Fields!row_no.Value</Value></SortExpression>
+                    <SortExpression><Value>=Fields!column_order.Value</Value></SortExpression>
+                  </SortExpressions>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>dsStageTableCells</DataSetName>
+            <Top>7.94in</Top>
+            <Left>0in</Left>
+            <Height>0.46in</Height>
+            <Width>7.5in</Width>
+            <NoRowsMessage>No generic stage table cells recorded for this run.</NoRowsMessage>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+        </ReportItems>
+        <Height>11.1in</Height>
+        <Style><Border><Style>None</Style></Border></Style>
+      </Body>
+      <Width>7.5in</Width>
+      <Page>
+        <PageFooter>
+          <Height>0.35in</Height>
+          <PrintOnFirstPage>true</PrintOnFirstPage>
+          <PrintOnLastPage>true</PrintOnLastPage>
+          <ReportItems>
+            <Textbox Name="FooterExecution">
+              <CanGrow>true</CanGrow>
+              <KeepTogether>true</KeepTogether>
+              <Paragraphs>
+                <Paragraph>
+                  <TextRuns>
+                    <TextRun>
+                      <Value>=&quot;Generated &quot; &amp; Globals!ExecutionTime</Value>
+                      <Style><FontSize>8pt</FontSize><Color>#6b7280</Color></Style>
+                    </TextRun>
+                  </TextRuns>
+                  <Style><TextAlign>Right</TextAlign></Style>
+                </Paragraph>
+              </Paragraphs>
+              <Top>0.06in</Top>
+              <Left>4.9in</Left>
+              <Height>0.2in</Height>
+              <Width>2.4in</Width>
+              <Style><Border><Style>None</Style></Border></Style>
+            </Textbox>
+          </ReportItems>
+          <Style><Border><Style>None</Style></Border></Style>
+        </PageFooter>
+        <LeftMargin>0.4in</LeftMargin>
+        <RightMargin>0.4in</RightMargin>
+        <TopMargin>0.5in</TopMargin>
+        <BottomMargin>0.5in</BottomMargin>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <ReportParametersLayout>
+    <GridLayoutDefinition>
+      <NumberOfColumns>2</NumberOfColumns>
+      <NumberOfRows>1</NumberOfRows>
+    </GridLayoutDefinition>
+  </ReportParametersLayout>
+  <Language>en-US</Language>
+</Report>

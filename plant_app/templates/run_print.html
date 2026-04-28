@@ -1,0 +1,298 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Runs</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+  <style>
+    .ps-run-header { border-bottom: 2px solid #000; padding-bottom: .5rem; margin-bottom: 1rem; }
+    .ps-run-title { display: flex; align-items: baseline; gap: .75rem; margin-bottom: .25rem; }
+    .ps-run-title h2 { margin: 0; font-size: 1.25rem; }
+    .ps-run-meta { font-size: .85rem; color: #000; margin-bottom: .25rem; }
+    .ps-sheet { margin-bottom: 1.5rem; }
+    .ps-sheet-heading { display: flex; align-items: baseline; gap: .5rem; border-bottom: 1px solid #bbb; padding-bottom: .2rem; margin-bottom: .6rem; }
+    .ps-sheet-heading h3 { margin: 0; font-size: 1rem; }
+    .ps-sheet-name { margin: 0; font-size: .8rem; color: #555; font-style: italic; }
+    .ps-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem .75rem; margin-bottom: .75rem; }
+    .ps-field { display: flex; flex-direction: column; }
+    .ps-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; color: #555; letter-spacing: .03em; }
+    .ps-value { font-size: .85rem; border-bottom: 1px solid #999; padding: .1rem 0; min-height: 1.2rem; word-break: break-word; }
+    .ps-table-wrap { overflow-x: auto; margin-bottom: .75rem; }
+    .ps-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .ps-table th { background: #f0f0f0; border: 1px solid #bbb; padding: .2rem .4rem; text-align: left; font-weight: 600; white-space: nowrap; }
+    .ps-table td { border: 1px solid #ccc; padding: .2rem .4rem; min-width: 3rem; }
+    .ps-table-title { font-size: .85rem; font-weight: 600; margin: .5rem 0 .2rem; }
+    .ps-notes { font-size: .82rem; color: #333; border-left: 3px solid #ccc; padding-left: .5rem; margin-top: .5rem; }
+    .ps-no-entries { color: #777; font-style: italic; font-size: .85rem; padding: .5rem 0; }
+
+    @media print {
+      /* ── Page setup ── */
+      @page { margin: 0.5in 0.4in; size: letter portrait; }
+
+      /* ── Hide screen-only chrome ── */
+      .print-hidden, .settings-root, .nav, .settings-toggle,
+      .settings-panel, .app-loading-overlay, .print-toolbar,
+      .actions { display: none !important; }
+
+      /* ── Flatten body and wrap ── */
+      html, body { width: 100% !important; margin: 0 !important; padding: 0 !important;
+        background: #fff !important; color: #000 !important; font-size: 9pt !important; }
+      * { color: #000 !important; }
+      .wrap { max-width: 100% !important; width: 100% !important;
+        margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+
+      /* ── Strip .card decoration so it doesn't clip content ── */
+      .card, .print-packet {
+        overflow: visible !important;
+        position: static !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      /* Remove the decorative pseudo-elements that sit inside overflow:hidden */
+      .card::before, .card::after,
+      .print-packet::before, .print-packet::after { display: none !important; }
+
+      /* ── Page breaks ── */
+      .print-packet { break-after: page; page-break-after: always; }
+      .print-packet:last-of-type { break-after: auto; page-break-after: auto; }
+
+      /* ── ps-* layout (all pt-based so they scale to paper) ── */
+      .ps-run-header { border-bottom: 1.5pt solid #000 !important; padding-bottom: 5pt; margin-bottom: 10pt; }
+      .ps-run-title h2 { font-size: 14pt; margin: 0; color: #000; }
+      .ps-run-meta { font-size: 8pt; color: #000; }
+      .ps-sheet { margin-bottom: 10pt; break-inside: avoid; page-break-inside: avoid; }
+      .ps-sheet-heading { border-bottom: 0.75pt solid #000 !important; margin-bottom: 4pt; }
+      .ps-sheet-heading h3 { font-size: 10pt; color: #000; }
+      .ps-sheet-name { font-size: 7.5pt; color: #000; }
+      .ps-fields { display: grid !important; grid-template-columns: repeat(4,1fr) !important;
+        gap: 3pt 8pt; margin-bottom: 6pt; }
+      .ps-label { font-size: 6.5pt !important; color: #000 !important; }
+      .ps-value { font-size: 8pt !important; color: #000 !important; border-bottom: 0.5pt solid #000 !important;
+        min-height: 10pt; padding: 1pt 0; word-break: break-word; }
+      .ps-table-wrap { overflow: visible !important; margin-bottom: 6pt; }
+      .ps-table { width: 100% !important; border-collapse: collapse !important;
+        font-size: 7pt !important; table-layout: fixed; color: #000 !important; }
+      .ps-table th { background: #ddd !important; -webkit-print-color-adjust: exact;
+        print-color-adjust: exact; border: 0.5pt solid #000 !important;
+        padding: 2pt 3pt !important; font-size: 6.5pt !important; color: #000 !important;
+        white-space: normal !important; word-break: break-word; }
+      .ps-table td { border: 0.5pt solid #000 !important; padding: 2pt 3pt !important;
+        color: #000 !important; word-break: break-word; }
+      .ps-table-title { font-size: 8pt; font-weight: 700; margin: 4pt 0 2pt; color: #000; }
+      .ps-notes { font-size: 7.5pt; border-left: 2pt solid #000 !important;
+        padding-left: 4pt; margin-top: 4pt; color: #000; }
+      .ps-no-entries { font-size: 8pt; color: #000; }
+    }
+  </style>
+</head>
+{% from "partials/template_helpers.html" import run_label, display_or_blank %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+  <div class="settings-root print-hidden">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="nav print-hidden">
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Print Runs</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/run/select">Runs</a>
+        <a class="pill" href="/logout">Logout</a>
+        <span class="pill">User: {{ user }}</span>
+      </div>
+    </div>
+
+    <div class="card page-intro print-hidden">
+      <div class="section-title">
+        <h2>Run Selection And Audit Print</h2>
+        <span class="info-chip">{{ runs|length }} Available Runs</span>
+      </div>
+      <p class="muted">Choose a single run, multiple runs, or grouped blend/split runs, then build a print-ready audit summary.</p>
+      {% if error_message %}
+      <div class="alert">{{ error_message }}</div>
+      {% endif %}
+    </div>
+
+    <form method="post" action="/runs/print" class="stack-gap print-hidden">
+      <div class="card">
+        <div class="section-title">
+          <h2>Select Runs To Print</h2>
+          <span class="info-chip">Single or multiple runs</span>
+        </div>
+        {% include "partials/run_selection_table.html" %}
+        <div class="actions">
+          <button class="btn" type="submit">Build Print Preview</button>
+          <a class="btn ghost" href="/home">Back Home</a>
+        </div>
+      </div>
+    </form>
+
+    {% if print_packets %}
+    <div class="card print-toolbar print-hidden">
+      <div class="section-title">
+        <h2>Print Preview</h2>
+        <span class="info-chip">{{ print_packets|length }} Run Packet{{ 's' if print_packets|length != 1 else '' }}</span>
+      </div>
+      <p class="muted">Review the sheets below, then print when everything looks right. Each run starts on a new page.</p>
+      <div class="actions">
+        <button class="btn" type="button" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    {% for packet in print_packets %}
+    <section class="card print-packet">
+
+      <div class="ps-run-header">
+        <div class="ps-run-title">
+          <h2>Batch Record &mdash; Run {{ packet['run_label'] }}</h2>
+          <span class="info-chip">{{ packet['run']['status'] or 'Open' }}</span>
+        </div>
+        <div class="ps-run-meta">
+          {% if packet['run']['product_name'] %}Product: <strong>{{ packet['run']['product_name'] }}</strong>{% endif %}
+          {% if packet['run']['blend_number'] %} &nbsp;|&nbsp; Blend: {{ packet['run']['blend_number'] }}{% endif %}
+          {% if packet['run']['split_batch_number'] %} &nbsp;|&nbsp; Split: {{ packet['run']['split_batch_number'] }}{% endif %}
+          {% if packet['run']['created_at'] %} &nbsp;|&nbsp; Created: {{ packet['run']['created_at'] }}{% endif %}
+        </div>
+        {% if packet['run']['notes'] %}
+        <div class="ps-notes">Notes: {{ packet['run']['notes'] }}</div>
+        {% endif %}
+      </div>
+
+      {% if not packet['has_entries'] %}
+      <p class="ps-no-entries">No run-linked records have been saved for this run yet.</p>
+      {% endif %}
+
+      {# ── Evaporation ── #}
+      {% if packet['evaporation_entry'] %}
+      {% set evap = packet['evaporation_entry'] %}
+      {% set evap_date = evap['entry_date'] or '' %}
+      {% set evap_initials = evap['operator_initials'] or '' %}
+      <div class="ps-sheet">
+        <div class="ps-sheet-heading">
+          <h3>Evaporation</h3>
+        </div>
+        <div class="ps-fields">
+          <div class="ps-field"><span class="ps-label">Date</span><span class="ps-value">{{ display_or_blank(evap['entry_date'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Operator Initials</span><span class="ps-value">{{ display_or_blank(evap['operator_initials'] or evap['employee'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Evaporator No.</span><span class="ps-value">{{ display_or_blank(evap['evaporator_no'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Start-up Time</span><span class="ps-value">{{ display_or_blank(evap['startup_time'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Shut-down Time</span><span class="ps-value">{{ display_or_blank(evap['shutdown_time'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Feed RI (%)</span><span class="ps-value">{{ display_or_blank(evap['feed_ri'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Concentrate RI (%)</span><span class="ps-value">{{ display_or_blank(evap['concentrate_ri'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Steam Pressure (psig)</span><span class="ps-value">{{ display_or_blank(evap['steam_pressure'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Vacuum (in Hg)</span><span class="ps-value">{{ display_or_blank(evap['vacuum'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Sump Level (%)</span><span class="ps-value">{{ display_or_blank(evap['sump_level'], evap_date, evap_initials) }}</span></div>
+          <div class="ps-field"><span class="ps-label">Product Temp (°F)</span><span class="ps-value">{{ display_or_blank(evap['product_temp'], evap_date, evap_initials) }}</span></div>
+        </div>
+        {% if packet['evaporation_rows'] %}
+        <p class="ps-table-title">Hourly Readings</p>
+        <div class="ps-table-wrap">
+          <table class="ps-table">
+            <tr>
+              <th>Time</th>
+              <th>Feed Rate (gpm)</th>
+              <th>Evap Temp (°F)</th>
+              <th>Vacuum (in Hg)</th>
+              <th>Concentrate RI (%)</th>
+            </tr>
+            {% for row in packet['evaporation_rows'] %}
+            <tr>
+              <td>{{ display_or_blank(row['row_time'], evap_date, evap_initials) }}</td>
+              <td>{{ display_or_blank(row['feed_rate'], evap_date, evap_initials) }}</td>
+              <td>{{ display_or_blank(row['evap_temp'], evap_date, evap_initials) }}</td>
+              <td>{{ display_or_blank(row['row_vacuum'], evap_date, evap_initials) }}</td>
+              <td>{{ display_or_blank(row['row_concentrate_ri'], evap_date, evap_initials) }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        {% endif %}
+        {% if evap['comments'] %}
+        <div class="ps-notes">Notes: {{ evap['comments'] }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# ── Generic stage sheets ── #}
+      {% for item in packet['generic_entries'] %}
+      {% set entry_date = item['entry']['entry_date'] or '' %}
+      {% set entry_initials = item['entry']['operator_initials'] or '' %}
+      <div class="ps-sheet">
+        <div class="ps-sheet-heading">
+          <h3>{{ item['title'] }}</h3>
+          <span class="ps-sheet-name">{{ item['sheet_name'] }}</span>
+        </div>
+
+        <div class="ps-fields">
+          {% for field in item['stage']['headers'] %}
+          <div class="ps-field">
+            <span class="ps-label">{{ field[1] }}</span>
+            <span class="ps-value">{{ display_or_blank(item['payload'].get(field[0], ''), entry_date, entry_initials) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% for tbl in item['stage']['tables'] %}
+        <p class="ps-table-title">{{ tbl['title'] }}</p>
+        <div class="ps-table-wrap">
+          <table class="ps-table">
+            <tr>
+              {% for col in tbl['columns'] %}
+              <th>{{ col[1] }}</th>
+              {% endfor %}
+            </tr>
+            {% for row_no in range(1, tbl['rows'] + 1) %}
+            {% set rp = tbl['prefix'] ~ '_' ~ row_no ~ '_' %}
+            {% set has_row = namespace(value=false) %}
+            {% for col in tbl['columns'] %}
+              {% if item['payload'].get(rp ~ col[0]) %}{% set has_row.value = true %}{% endif %}
+            {% endfor %}
+            {% if has_row.value %}
+            <tr>
+              {% for col in tbl['columns'] %}
+              <td>{{ display_or_blank(item['payload'].get(rp ~ col[0], ''), entry_date, entry_initials) }}</td>
+              {% endfor %}
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </table>
+        </div>
+        {% endfor %}
+
+        {% if item['entry']['comments'] %}
+        <div class="ps-notes">Notes: {{ item['entry']['comments'] }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </section>
+    {% endfor %}
+    {% endif %}
+  </div>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
+</body>
+</html>
