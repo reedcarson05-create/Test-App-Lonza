@@ -37,8 +37,10 @@
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/stages">Run Sheets</a>
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -54,13 +56,20 @@
       <h2>Run Details</h2>
       <div class="banner">
         Run: <strong>{{ run_label(run) }}</strong>
-        {% if run['product_name'] %}| Product {{ run['product_name'] }}{% endif %}
         {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
         {% if run['split_batch_number'] %}| Split {{ run['split_batch_number'] }}{% endif %}
         {% if run['status'] %}| Status: {{ run['status'] }}{% endif %}
       </div>
       {% if run['notes'] %}
       <p><strong>Notes:</strong> {{ run['notes'] }}</p>
+      {% endif %}
+      {% if run['status'] != 'Complete' %}
+      <div>
+        <label>Product Type</label>
+        <input name="product_name" form="finalize-form" value="{{ run['product_name'] or '' }}" placeholder="ex. Resin A" autocomplete="off">
+      </div>
+      {% elif run['product_name'] %}
+      <p><strong>Product Type:</strong> {{ run['product_name'] }}</p>
       {% endif %}
     </div>
 
@@ -110,11 +119,11 @@
     <div class="actions">
       <a class="btn ghost" href="/stages">Back To Run Sheets</a>
       {% if has_entries and run['status'] != 'Complete' %}
-      <form method="post" action="/run/review/finalize">
-        <button class="btn" type="submit">Close Run</button>
+      <form id="finalize-form" method="post" action="/run/review/finalize">
+        <button class="btn" type="submit">Finish Run</button>
       </form>
       {% elif run['status'] == 'Complete' %}
-      <span class="pill">Run Closed</span>
+      <span class="pill">Run Finished</span>
       {% endif %}
     </div>
   </div>

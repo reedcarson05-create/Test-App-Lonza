@@ -13,7 +13,7 @@
       <div class="login-logo"><img src="/static/logo.png?v={{ asset_version }}" alt="LAG"></div>
       <p class="eyebrow center">Plant Operations</p>
       <h1>Request Access</h1>
-      <p class="muted center">Fill in your details below. An admin will review and activate your account.</p>
+      <p class="muted center">Fill in your details below and choose a 4-digit passcode. An admin will review and activate your account.</p>
 
       {% if success %}
       <div class="banner success-banner">
@@ -38,12 +38,12 @@
           <input name="initials" required maxlength="5" value="{{ form_initials or '' }}" style="text-transform: uppercase;">
         </div>
         <div>
-          <label>Password</label>
-          <input type="password" name="password" required autocomplete="new-password" minlength="6">
+          <label>4-Digit Passcode</label>
+          <input type="password" name="passcode" required autocomplete="new-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" placeholder="0000">
         </div>
         <div>
-          <label>Confirm Password</label>
-          <input type="password" name="confirm_password" required autocomplete="new-password">
+          <label>Confirm Passcode</label>
+          <input type="password" name="confirm_passcode" required autocomplete="new-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" placeholder="0000">
         </div>
         <button class="btn" type="submit">Submit Request</button>
       </form>

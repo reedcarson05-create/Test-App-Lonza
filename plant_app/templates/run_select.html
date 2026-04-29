@@ -38,6 +38,7 @@
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/runs/blend">Blend</a>
         <a class="pill" href="/runs/split">Split</a>
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/runs/print">Print</a>
         <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
@@ -46,23 +47,24 @@
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Create Or Reopen Runs</h2>
+        <h2>New Standard Run</h2>
         <span class="info-chip">{{ open_runs|length }} Open Runs</span>
       </div>
-      <p class="muted">Run number is the main identifier. Creating a run only needs that one value, and open runs are listed below for quick reuse.</p>
+      <p class="muted">Create standard runs here with a run number and product type, or reopen an existing run below.</p>
       {% include "partials/create_run_form.html" %}
     </div>
 
     {% set action_links = [
-      {"label": "Blend Runs", "href": "/runs/blend"},
-      {"label": "Split Runs", "href": "/runs/split"},
+      {"label": "Open Blend Run Setup", "href": "/runs/blend"},
+      {"label": "Open Split Run Setup", "href": "/runs/split"},
       {"label": "Print Runs", "href": "/runs/print", "ghost": True}
     ] %}
     <div class="card">
       <div class="section-title">
-        <h2>Run Actions</h2>
-        <span class="info-chip">Shared selection workflows</span>
+        <h2>Blend &amp; Split Run Setup</h2>
+        <span class="info-chip">Separate from standard runs</span>
       </div>
+      <p class="muted">Use these separate pages when original runs need to stay in place and the app should create a new blend or split run number tied back to them.</p>
       {% include "partials/action_link_grid.html" %}
     </div>
 
@@ -73,7 +75,7 @@
       </div>
       <div class="table-wrap">
         <table class="table">
-          <tr><th>Run</th><th>Product</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Open</th></tr>
+          <tr><th>Run</th><th>Product Type</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Open</th></tr>
           {% for run_item in runs %}
           <tr>
             <td><strong>{{ run_label(run_item) }}</strong></td>

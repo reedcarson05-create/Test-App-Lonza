@@ -357,7 +357,7 @@ BEGIN
     VALUES (
         N'1001',
         N'Operator 1',
-        N'test123',
+        N'1001',
         N'operator',
         N'OP',
         1,
@@ -384,7 +384,7 @@ BEGIN
     VALUES (
         N'2001',
         N'Supervisor 1',
-        N'test123',
+        N'2001',
         N'supervisor',
         N'SU',
         1,

@@ -38,6 +38,7 @@
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/stages">Run Sheets</a>
         <a class="pill" href="/run/review">Review</a>
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
         <span class="pill">{{ user }}</span>
@@ -45,11 +46,17 @@
     </div>
 
     <form method="post" action="/run/edit" class="stack-gap">
+      {% set run_number_value = form_run_number if form_run_number is defined else run_label(run) %}
+      {% set product_name_value = form_product_name if form_product_name is defined else (run['product_name'] or '') %}
+      {% set notes_value = form_notes if form_notes is defined else (run['notes'] or '') %}
+      {% set final_edit_initials_value = form_final_edit_initials if form_final_edit_initials is defined else (run['final_edit_initials'] or '') %}
+      {% set final_edit_notes_value = form_final_edit_notes if form_final_edit_notes is defined else (run['final_edit_notes'] or '') %}
+
       <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
         {% if signature_session_ready %}
         Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
         {% else %}
-        Sign your initials below to get started — your signature stays active for this login.
+        Sign your initials below to get started - your signature stays active for this login.
         {% endif %}
       </div>
 
@@ -58,28 +65,51 @@
           <h2>Run Details</h2>
           <span class="info-chip">{{ run['status'] or 'Open' }}</span>
         </div>
-        <p class="muted">Run number stays as the main identifier. Product is the main detail expected to change between runs.</p>
+        <p class="muted">Run number stays as the main identifier. Product type is the main detail expected to change between runs. Use the separate blend and split pages below whenever you need the app to create a new derived run number.</p>
+        {% if result_message %}
+        <div class="banner success-banner">{{ result_message }}</div>
+        {% endif %}
+        {% if error_message %}
+        <div class="alert">{{ error_message }}</div>
+        {% endif %}
       </div>
 
       <div class="card">
-        <div class="grid two-up">
-          <div><label>Run Number</label><input name="run_number" value="{{ run_label(run) }}"></div>
-          <div><label>Product</label><input name="product_name" value="{{ run['product_name'] or '' }}"></div>
-          <div><label>Blend</label><input value="{{ run['blend_number'] or 'Not assigned' }}" disabled></div>
-          <div><label>Split</label><input value="{{ run['split_batch_number'] or 'Not assigned' }}" disabled></div>
+        <div>
+          <label>Run Number</label><input name="run_number" value="{{ run_number_value }}">
         </div>
         <div>
           <label>Run Notes</label>
-          <textarea name="notes" rows="4">{{ run['notes'] or '' }}</textarea>
+          <textarea name="notes" rows="4">{{ notes_value }}</textarea>
         </div>
+        <div>
+          <label>Product Type</label><input name="product_name" value="{{ product_name_value }}">
+        </div>
+      </div>
+
+      {% set action_links = [
+        {"label": "Open Blend Run Setup", "href": "/runs/blend"},
+        {"label": "Open Split Run Setup", "href": "/runs/split", "ghost": True}
+      ] %}
+      <div class="card">
+        <div class="section-title">
+          <h2>Blend &amp; Split Runs</h2>
+          <span class="info-chip">Separate pages</span>
+        </div>
+        <p class="muted">Create blend and split runs on their own pages so this original run stays unchanged while the app creates a separate run with the new number.</p>
+        <div class="summary-line">
+          <span class="pill">Blend: {{ run['blend_number'] or 'Not assigned' }}</span>
+          <span class="pill">Split: {{ run['split_batch_number'] or 'Not assigned' }}</span>
+        </div>
+        {% include "partials/action_link_grid.html" %}
       </div>
 
       <div class="card">
         <h2>Final Run Update</h2>
         <p class="muted">Use one final run note here instead of opening each machine individually just to close the run.</p>
         <div class="grid two-up">
-          <div><label>Final Edit Initials</label><input name="final_edit_initials" value="{{ run['final_edit_initials'] or '' }}"></div>
-          <div><label>What Changed</label><input name="final_edit_notes" value="{{ run['final_edit_notes'] or '' }}"></div>
+          <div><label>Final Edit Initials</label><input name="final_edit_initials" value="{{ final_edit_initials_value }}"></div>
+          <div><label>What Changed</label><input name="final_edit_notes" value="{{ final_edit_notes_value }}"></div>
         </div>
       </div>
 

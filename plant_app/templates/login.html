@@ -12,8 +12,8 @@
     <div class="card login-card">
       <div class="login-logo"><img src="/static/logo.png?v={{ asset_version }}" alt="LAG"></div>
       <p class="eyebrow center">Plant Operations</p>
-      <h1>Operator Login</h1>
-      <p class="muted center">Secure sign-in for run setup, machine entries, and audit history.</p>
+      <h1>Start Session</h1>
+      <p class="muted center">Use your employee number and 4-digit passcode to sign in. If the app reopens before logout, only the passcode is needed to unlock.</p>
       <div class="login-meta">
         <span class="info-chip">Run Setup</span>
         <span class="info-chip">Machine Entries</span>
@@ -23,11 +23,11 @@
       <form method="post" action="/login" class="stack">
         <div>
           <label>Employee Number</label>
-          <input name="employee" required autocomplete="username">
+          <input name="employee" value="{{ form_employee or '' }}" required autocomplete="username">
         </div>
         <div>
-          <label>Password</label>
-          <input type="password" name="password" required autocomplete="current-password">
+          <label>4-Digit Passcode</label>
+          <input type="password" name="passcode" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" required autocomplete="current-password" placeholder="0000">
         </div>
         <button class="btn" type="submit" data-loading-label="Signing in...">Login</button>
       </form>

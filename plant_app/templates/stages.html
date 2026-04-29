@@ -50,8 +50,10 @@
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/run/select">Runs</a>
         <a class="pill" href="/run/review">Review</a>
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -60,12 +62,13 @@
         <h2>Run {{ run_label(run) }}</h2>
         {% if run['status'] %}<span class="info-chip">{{ run['status'] }}</span>{% endif %}
       </div>
-      {% if run['product_name'] %}<p class="muted">{{ run['product_name'] }}{% if run['blend_number'] %} &nbsp;&middot;&nbsp; Blend {{ run['blend_number'] }}{% endif %}{% if run['split_batch_number'] %} &nbsp;&middot;&nbsp; Split {{ run['split_batch_number'] }}{% endif %}</p>{% endif %}
+      {% if run['product_name'] %}<p class="muted">Product Type: {{ run['product_name'] }}{% if run['blend_number'] %} &nbsp;&middot;&nbsp; Blend {{ run['blend_number'] }}{% endif %}{% if run['split_batch_number'] %} &nbsp;&middot;&nbsp; Split {{ run['split_batch_number'] }}{% endif %}</p>{% endif %}
       {% set action_links = [
         {"label": "Change Run", "href": "/run/select", "ghost": True},
         {"label": "Edit Run", "href": "/run/edit", "ghost": True},
         {"label": "Print", "href": "/runs/print", "ghost": True},
-        {"label": "Review", "href": "/run/review"}
+        {"label": "Review", "href": "/run/review"},
+        {"label": "Change Log", "href": "/change-history", "ghost": True}
       ] %}
       {% include "partials/action_link_grid.html" %}
     </div>
@@ -77,16 +80,51 @@
       </div>
       <div class="section-grid stage-buttons">
         {% for stage in stage_links %}
-        <a class="summary-card stage-sheet-link{% if stage['done'] %} stage-done{% endif %}" href="{{ stage['href'] }}">
-          <div class="stage-sheet-top">
-            <h3>{{ stage['title'] }}</h3>
-            {% if stage['done'] %}<span class="stage-check" aria-label="Saved">&#10003;</span>{% endif %}
-          </div>
-          <p>{{ stage_descriptions.get(stage['title'], 'Enter and review run data for this stage.') }}</p>
-        </a>
+        <div class="summary-card stage-sheet-link{% if stage['done'] %} stage-done{% elif stage['voided'] %} stage-voided{% endif %}">
+          <a class="stage-card-body" href="{{ stage['href'] }}">
+            <div class="stage-sheet-top">
+              <h3>{{ stage['title'] }}</h3>
+              {% if stage['done'] %}
+                <span class="stage-check" aria-label="Saved">&#10003;</span>
+              {% elif stage['voided'] %}
+                <span class="stage-void-badge">N/A</span>
+              {% endif %}
+            </div>
+            <p>{{ stage_descriptions.get(stage['title'], 'Enter and review run data for this stage.') }}</p>
+          </a>
+          {% if stage['stage_key'] in ('h2o2_koh_decolorizing', 'h2o2_calcium_decolorizing') and not stage['done'] %}
+          <form method="post" action="/stage/{{ stage['stage_key'] }}/void" class="stage-void-form">
+            <button type="submit" class="stage-void-btn">{% if stage['voided'] %}Restore{% else %}Void{% endif %}</button>
+          </form>
+          {% endif %}
+        </div>
         {% endfor %}
       </div>
     </div>
+
+    {% if run['status'] != 'Complete' %}
+    <div class="card">
+      <div class="section-title">
+        <h2>Finish Run</h2>
+        <span class="info-chip">Close operator access</span>
+      </div>
+      <p class="muted">Review your saved records first, then close the run from the Review page.</p>
+      <div class="actions">
+        <a class="btn{% if not can_finish_batch %} disabled{% endif %}" href="/run/review">Review &amp; Finish Run</a>
+      </div>
+      {% if not can_finish_batch %}
+      <p class="muted" style="margin-top: 1rem;">Save at least one run sheet before finishing the run.</p>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="section-title">
+        <h2>Run Finished</h2>
+        <span class="info-chip">Admin view only</span>
+      </div>
+      <p class="muted">This run is already closed for operators and remains available from the admin data view.</p>
+    </div>
+    {% endif %}
   </div>
   <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>

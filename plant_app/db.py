@@ -22,6 +22,9 @@ FALLBACK_SQL_DATABASE = "LAGPlantOpsApp"
 SQLITE_FALLBACK_PATH = Path(__file__).resolve().parent / "plant.db"
 _resolved_sql_database: str | None = None
 _active_backend: str | None = None
+DEFAULT_ADMIN_PASSCODE = "1234"
+LEGACY_DEFAULT_ADMIN_PASSWORD = "LagAdmin2024!"
+LEGACY_SAMPLE_PASSWORD = "test123"
 
 
 def _env_text(name: str, default: str = "") -> str:
@@ -50,6 +53,21 @@ def _env_bool(name: str, default: bool) -> bool:
 def _yes_no(value: bool) -> str:
     """Convert a boolean into the yes/no string SQL Server expects."""
     return "yes" if value else "no"
+
+
+def _valid_passcode(value: str) -> bool:
+    """Return True when the supplied credential is exactly four numeric digits."""
+    candidate = (value or "").strip()
+    return len(candidate) == 4 and candidate.isdigit()
+
+
+def _configured_admin_passcode() -> str:
+    """Return the seeded admin passcode, preferring an explicit passcode env override."""
+    for env_name in ("PLANT_APP_ADMIN_PASSCODE", "PLANT_APP_ADMIN_PASSWORD"):
+        candidate = (os.getenv(env_name, "") or "").strip()
+        if _valid_passcode(candidate):
+            return candidate
+    return DEFAULT_ADMIN_PASSCODE
 
 
 def _resolved_sql_driver() -> str:
@@ -327,9 +345,43 @@ def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_t
         cur.execute(f"ALTER TABLE dbo.{table_name} ADD {column_name} {sqlserver_type} NULL")
 
 
+def _table_exists(conn, cur, table_name: str) -> bool:
+    """Return True when the named table already exists in the database."""
+    if _is_sqlite_connection(conn):
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+    else:
+        cur.execute(
+            "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=?",
+            (table_name,),
+        )
+    return cur.fetchone() is not None
+
+
 def ensure_schema_migrations(conn) -> None:
     """Apply small additive schema updates needed by newer forms."""
     cur = conn.cursor()
+    if not _table_exists(conn, cur, "voided_stages"):
+        if _is_sqlite_connection(conn):
+            cur.execute("""
+                CREATE TABLE voided_stages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id INTEGER NOT NULL,
+                    stage_key TEXT NOT NULL,
+                    voided_at TEXT NOT NULL,
+                    UNIQUE(run_id, stage_key)
+                )
+            """)
+        else:
+            cur.execute("""
+                CREATE TABLE dbo.voided_stages (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    run_id INT NOT NULL,
+                    stage_key NVARCHAR(100) NOT NULL,
+                    voided_at NVARCHAR(50) NOT NULL,
+                    CONSTRAINT uq_voided_stages UNIQUE (run_id, stage_key)
+                )
+            """)
+        conn.commit()
     additions = (
         ("filtration_entries", "cycle_volume_set_point", "TEXT", "NVARCHAR(100)"),
         ("filtration_entries", "payload_json", "TEXT", "NVARCHAR(MAX)"),
@@ -357,12 +409,34 @@ def _seed_admin_user(conn) -> None:
     cur.execute("SELECT 1 FROM users WHERE role = 'admin'")
     if cur.fetchone():
         return
-    admin_password = os.getenv("PLANT_APP_ADMIN_PASSWORD", "LagAdmin2024!")
+    admin_password = _configured_admin_passcode()
     cur.execute("""
         INSERT INTO users (employee_number, full_name, password, role, active, created_at, initials, theme_preference, font_scale_preference)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, ("admin", "Carson Reed", admin_password, "admin", 1,
-          datetime.now().isoformat(timespec="seconds"), "CR", "light", "1"))
+    """, ("admin", "Lag Admin", admin_password, "admin", 1,
+          datetime.now().isoformat(timespec="seconds"), "LA", "light", "1"))
+    conn.commit()
+
+
+def _migrate_legacy_user_passcodes(conn) -> None:
+    """Convert seeded legacy credentials to four-digit passcodes without touching custom accounts."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE users
+        SET password = ?
+        WHERE employee_number = ? AND role = 'admin' AND password = ?
+        """,
+        (_configured_admin_passcode(), "admin", LEGACY_DEFAULT_ADMIN_PASSWORD),
+    )
+    cur.execute(
+        """
+        UPDATE users
+        SET password = employee_number
+        WHERE employee_number IN (?, ?) AND password = ?
+        """,
+        ("1001", "2001", LEGACY_SAMPLE_PASSWORD),
+    )
     conn.commit()
 
 
@@ -380,19 +454,20 @@ def init_db() -> None:
             cur.close()
         ensure_schema_migrations(conn)
         _seed_admin_user(conn)
+        _migrate_legacy_user_passcodes(conn)
     finally:
         conn.close()
 
 
-def validate_user(employee: str, password: str) -> bool:
-    """Return True when the supplied employee credentials match an active user."""
+def validate_user(employee: str, passcode: str) -> bool:
+    """Return True when the supplied employee number and four-digit passcode match an active user."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
         SELECT 1
         FROM users
         WHERE employee_number = ? AND password = ? AND active = 1
-    """, (employee.strip(), password.strip()))
+    """, (employee.strip(), passcode.strip()))
     row = cur.fetchone()
     conn.close()
     return row is not None
@@ -463,6 +538,40 @@ def get_completed_stage_keys_for_run(run_id: int) -> set:
     return completed
 
 
+def get_voided_stage_keys_for_run(run_id: int) -> set:
+    """Return the set of stage keys that have been voided for this run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT stage_key FROM voided_stages WHERE run_id = ?", (run_id,))
+    keys = {row[0] for row in cur.fetchall()}
+    conn.close()
+    return keys
+
+
+def toggle_stage_void(run_id: int, stage_key: str) -> bool:
+    """Toggle a stage void. Returns True if now voided, False if now restored."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM voided_stages WHERE run_id = ? AND stage_key = ?",
+        (run_id, stage_key),
+    )
+    exists = cur.fetchone() is not None
+    if exists:
+        cur.execute(
+            "DELETE FROM voided_stages WHERE run_id = ? AND stage_key = ?",
+            (run_id, stage_key),
+        )
+    else:
+        cur.execute(
+            "INSERT INTO voided_stages (run_id, stage_key, voided_at) VALUES (?, ?, ?)",
+            (run_id, stage_key, datetime.now().isoformat(timespec="seconds")),
+        )
+    conn.commit()
+    conn.close()
+    return not exists
+
+
 def get_user_role(employee: str) -> str:
     """Return the role string for a user, empty string if user not found."""
     conn = get_conn()
@@ -483,14 +592,14 @@ def employee_number_exists(employee: str) -> bool:
     return row is not None
 
 
-def create_pending_user(employee: str, full_name: str, initials: str, password: str) -> None:
+def create_pending_user(employee: str, full_name: str, initials: str, passcode: str) -> None:
     """Create a new user with active=0 (pending admin approval)."""
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO users (employee_number, full_name, password, role, active, created_at, initials, theme_preference, font_scale_preference)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (employee.strip(), full_name.strip(), password.strip(), "operator", 0,
+    """, (employee.strip(), full_name.strip(), passcode.strip(), "operator", 0,
           datetime.now().isoformat(timespec="seconds"), initials.strip().upper(), "light", "1"))
     conn.commit()
     conn.close()
@@ -626,6 +735,41 @@ def get_run(run_id: int):
     return row
 
 
+def get_run_by_number(run_number: str):
+    """Fetch the most recent run whose run number or batch number matches exactly."""
+    normalized = run_number.strip()
+    if not normalized:
+        return None
+
+    conn = get_conn()
+    cur = conn.cursor()
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT *
+            FROM production_runs
+            WHERE run_number = ? OR batch_number = ?
+            ORDER BY CASE WHEN status = 'Open' THEN 0 ELSE 1 END, updated_at DESC
+            LIMIT 1
+            """,
+            (normalized, normalized),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM production_runs
+            WHERE run_number = ? OR batch_number = ?
+            ORDER BY CASE WHEN status = 'Open' THEN 0 ELSE 1 END, updated_at DESC
+            """,
+            (normalized, normalized),
+        )
+    columns = [col[0] for col in cur.description]
+    row = row_to_dict(columns, cur.fetchone())
+    conn.close()
+    return row
+
+
 def list_runs(limit: int = 50):
     """Return the most recently updated production runs for the selection screen."""
     conn = get_conn()
@@ -649,6 +793,98 @@ def list_runs(limit: int = 50):
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
     return rows
+
+
+def get_run_stats() -> dict:
+    """Return aggregate counts for the admin dashboard."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM production_runs")
+    total_runs = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM production_runs WHERE status = 'Open'")
+    open_runs = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM production_runs WHERE status != 'Open'")
+    completed_runs = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM users WHERE active = 0")
+    pending_users = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) FROM users WHERE active = 1")
+    active_users = cur.fetchone()[0] or 0
+    conn.close()
+    return {
+        "total_runs": total_runs,
+        "open_runs": open_runs,
+        "completed_runs": completed_runs,
+        "pending_users": pending_users,
+        "active_users": active_users,
+    }
+
+
+def list_runs_paginated(
+    page: int = 1,
+    per_page: int = 25,
+    search: str = "",
+    status: str = "all",
+    batch_type: str = "all",
+):
+    """Return a page of runs with total count; each row includes a stage_count field."""
+    conn = get_conn()
+    cur = conn.cursor()
+    sqlite_backend = _is_sqlite_connection(conn)
+
+    safe_page = max(1, int(page))
+    safe_per_page = max(1, int(per_page))
+    offset = (safe_page - 1) * safe_per_page
+    like = f"%{search.strip()}%" if search.strip() else "%"
+
+    status_clause = "" if status == "all" else "AND pr.status = ?"
+    batch_type_clause = "" if batch_type == "all" else "AND COALESCE(NULLIF(LTRIM(RTRIM(pr.batch_type)), ''), 'standard') = ?"
+    params_count = [like, like, like]
+    params_data = [like, like, like]
+    if status != "all":
+        params_count.append(status)
+        params_data.append(status)
+    if batch_type != "all":
+        params_count.append(batch_type)
+        params_data.append(batch_type)
+
+    stage_subquery = (
+        "(SELECT COUNT(DISTINCT stage_key) FROM sheet_entries WHERE run_id = pr.id) + "
+        "(CASE WHEN EXISTS(SELECT 1 FROM evaporation_entries WHERE run_id = pr.id) THEN 1 ELSE 0 END)"
+    )
+
+    cur.execute(f"""
+        SELECT COUNT(*) FROM production_runs pr
+        WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
+        {status_clause}
+        {batch_type_clause}
+    """, params_count)
+    total = cur.fetchone()[0] or 0
+
+    if sqlite_backend:
+        cur.execute(f"""
+            SELECT pr.*, ({stage_subquery}) AS stage_count
+            FROM production_runs pr
+            WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
+            {status_clause}
+            {batch_type_clause}
+            ORDER BY pr.updated_at DESC
+            LIMIT {safe_per_page} OFFSET {offset}
+        """, params_data)
+    else:
+        cur.execute(f"""
+            SELECT pr.*, ({stage_subquery}) AS stage_count
+            FROM production_runs pr
+            WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
+            {status_clause}
+            {batch_type_clause}
+            ORDER BY pr.updated_at DESC
+            OFFSET {offset} ROWS FETCH NEXT {safe_per_page} ROWS ONLY
+        """, params_data)
+
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows, total
 
 
 def list_open_runs(limit: int = 100):
@@ -699,6 +935,96 @@ def get_runs_by_ids(run_ids: list[int]):
     return rows
 
 
+def list_runs_by_group_label(action_type: str, action_label: str) -> list[dict]:
+    """Return runs currently stamped with the supplied split or blend label."""
+    normalized = action_label.strip()
+    if not normalized:
+        return []
+
+    if action_type == "blend":
+        column_name = "blend_number"
+    elif action_type == "split":
+        column_name = "split_batch_number"
+    else:
+        raise ValueError(f"Unsupported run action: {action_type}")
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        SELECT *
+        FROM production_runs
+        WHERE {column_name} = ?
+        ORDER BY updated_at DESC
+        """,
+        (normalized,),
+    )
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
+def list_recent_group_labels(action_type: str, limit: int = 12) -> list[dict]:
+    """Return recently used blend or split labels so operators can reuse prior batch groupings."""
+    if action_type == "blend":
+        column_name = "blend_number"
+    elif action_type == "split":
+        column_name = "split_batch_number"
+    else:
+        raise ValueError(f"Unsupported run action: {action_type}")
+
+    conn = get_conn()
+    cur = conn.cursor()
+    sqlite_backend = _is_sqlite_connection(conn)
+    safe_limit = max(1, int(limit))
+
+    if sqlite_backend:
+        cur.execute(
+            f"""
+            SELECT
+                {column_name} AS label,
+                MAX(updated_at) AS updated_at,
+                COUNT(*) AS run_count
+            FROM production_runs
+            WHERE TRIM(COALESCE({column_name}, '')) != ''
+            GROUP BY {column_name}
+            ORDER BY MAX(updated_at) DESC
+            LIMIT {safe_limit}
+            """
+        )
+    else:
+        cur.execute(
+            f"""
+            SELECT TOP ({safe_limit})
+                {column_name} AS label,
+                MAX(updated_at) AS updated_at,
+                COUNT(*) AS run_count
+            FROM production_runs
+            WHERE LTRIM(RTRIM(ISNULL({column_name}, ''))) != ''
+            GROUP BY {column_name}
+            ORDER BY MAX(updated_at) DESC
+            """
+        )
+
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
+def set_run_product_name(run_id: int, product_name: str) -> None:
+    """Update just the product name on an existing run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE production_runs SET product_name = ?, updated_at = ? WHERE id = ?",
+        (product_name.strip(), now_stamp(), run_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def mark_run_complete(run_id: int, employee: str = ""):
     """Finalize a production run and stamp who closed it out."""
     conn = get_conn()
@@ -712,16 +1038,20 @@ def mark_run_complete(run_id: int, employee: str = ""):
     conn.close()
 
 
-def apply_run_group_action(run_ids: list[int], action_type: str, action_label: str):
+def apply_run_group_action(run_ids: list[int], action_type: str, action_label: str, update_batch_type: bool = True):
     """Stamp the selected runs with a shared blend or split label."""
     normalized_ids = [int(run_id) for run_id in run_ids if int(run_id) > 0]
     if not normalized_ids:
         return 0
 
     if action_type == "blend":
-        action_sql = "blend_number = ?, split_batch_number = '', batch_type = 'blend'"
+        action_sql = "blend_number = ?, split_batch_number = ''"
+        if update_batch_type:
+            action_sql += ", batch_type = 'blend'"
     elif action_type == "split":
-        action_sql = "split_batch_number = ?, blend_number = '', batch_type = 'split'"
+        action_sql = "split_batch_number = ?, blend_number = ''"
+        if update_batch_type:
+            action_sql += ", batch_type = 'split'"
     else:
         raise ValueError(f"Unsupported run action: {action_type}")
 
@@ -736,6 +1066,30 @@ def apply_run_group_action(run_ids: list[int], action_type: str, action_label: s
         WHERE id IN ({placeholders})
         """,
         [action_label, now_stamp(), *normalized_ids],
+    )
+    affected_rows = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected_rows
+
+
+def set_run_batch_type(run_ids: list[int], batch_type: str):
+    """Normalize one or more runs to a specific batch type without touching their labels."""
+    normalized_ids = [int(run_id) for run_id in run_ids if int(run_id) > 0]
+    if not normalized_ids:
+        return 0
+
+    placeholders = ", ".join("?" for _ in normalized_ids)
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        UPDATE production_runs
+        SET batch_type = ?,
+            updated_at = ?
+        WHERE id IN ({placeholders})
+        """,
+        [batch_type.strip() or "standard", now_stamp(), *normalized_ids],
     )
     affected_rows = cur.rowcount
     conn.commit()
@@ -1051,6 +1405,37 @@ def get_extraction_entry(entry_id: int):
     return row
 
 
+def get_latest_extraction_for_run(run_id: int):
+    """Fetch the latest extraction entry recorded for a specific run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT *
+            FROM extraction_entries
+            WHERE run_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (run_id,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM extraction_entries
+            WHERE run_id = ?
+            ORDER BY id DESC
+            """,
+            (run_id,),
+        )
+    columns = [col[0] for col in cur.description]
+    row = row_to_dict(columns, cur.fetchone())
+    conn.close()
+    return row
+
+
 def update_extraction(entry_id: int, employee: str, data: dict) -> None:
     """Update an existing extraction entry and increment its version number."""
     conn = get_conn()
@@ -1107,6 +1492,50 @@ def get_filtration_entry(entry_id: int):
     """, (entry_id,))
     row_columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(row_columns, cur.fetchall())
+    conn.close()
+    return entry, rows
+
+
+def get_latest_filtration_for_run(run_id: int):
+    """Fetch the latest filtration entry recorded for a specific run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT *
+            FROM filtration_entries
+            WHERE run_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (run_id,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM filtration_entries
+            WHERE run_id = ?
+            ORDER BY id DESC
+            """,
+            (run_id,),
+        )
+    entry_columns = [col[0] for col in cur.description]
+    entry = row_to_dict(entry_columns, cur.fetchone())
+    rows = []
+    if entry:
+        cur.execute(
+            """
+            SELECT *
+            FROM filtration_rows
+            WHERE filtration_entry_id = ?
+            ORDER BY row_group, row_no
+            """,
+            (entry["id"],),
+        )
+        row_columns = [col[0] for col in cur.description]
+        rows = rows_to_dicts(row_columns, cur.fetchall())
     conn.close()
     return entry, rows
 

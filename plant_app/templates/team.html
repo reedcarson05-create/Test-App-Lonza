@@ -34,11 +34,12 @@
   <div class="nav">
     <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Team</div>
     <div class="navlinks">
-      <a class="pill" href="/home">Home</a>
-      <a class="pill" href="/run/select">Runs</a>
+      <a class="pill" href="{{ user_home_path }}">Home</a>
+      {% if user_can_edit_data %}<a class="pill" href="/run/select">Runs</a>{% endif %}
+      <a class="pill" href="/change-history">Change Log</a>
       <a class="pill" href="/runs/print">Print</a>
       <a class="pill active" href="/team">Team</a>
-      {% if user_is_admin %}<a class="pill" href="/admin/users">Admin</a>{% endif %}
+      {% if user_is_admin %}<a class="pill" href="/admin/dashboard">Admin</a>{% endif %}
       <a class="pill" href="/logout">Logout</a>
       <span class="pill">{{ user }}</span>
     </div>
@@ -81,7 +82,7 @@
     </div>
     <p class="muted">Full account management is available on the admin panel.</p>
     <div class="actions" style="margin-top: 1rem;">
-      <a class="btn" href="/admin/users">Open Admin Panel</a>
+      <a class="btn" href="/admin/dashboard">Open Admin Panel</a>
     </div>
   </div>
   {% endif %}

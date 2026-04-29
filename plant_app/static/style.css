@@ -1298,6 +1298,7 @@ td.blank-display {
   top: 14px;
   right: 14px;
   z-index: 80;
+  max-height: calc(100vh - 28px);
 }
 
 .settings-toggle {
@@ -1323,6 +1324,10 @@ td.blank-display {
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 94%, white 6%), var(--card));
   box-shadow: var(--panel-shadow);
+  max-height: min(70vh, calc(100vh - 92px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .settings-panel[hidden] {
@@ -2282,23 +2287,75 @@ html[data-theme="dark"] .loading-screen-track {
   }
 }
 
-a.stage-sheet-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
+.stage-sheet-link {
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
 }
 
-a.stage-sheet-link h3 {
+.stage-card-body {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  flex: 1;
+}
+
+.stage-card-body h3 {
   color: var(--brand);
 }
 
-a.stage-sheet-link:hover h3 {
+.stage-card-body:hover h3 {
   text-decoration: underline;
 }
 
-a.stage-sheet-link.stage-done {
+.stage-sheet-link.stage-done {
   border-color: color-mix(in srgb, var(--success) 30%, var(--line) 70%);
+}
+
+.stage-sheet-link.stage-voided {
+  opacity: 0.55;
+  border-color: var(--line);
+  border-style: dashed;
+}
+
+.stage-void-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--line-strong);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+.stage-void-form {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.stage-void-btn {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.stage-void-btn:hover {
+  background: var(--surface-strong);
+  border-color: var(--text-muted);
+  color: var(--text);
 }
 
 .stage-sheet-top {

@@ -37,13 +37,18 @@
     <div class="navlinks">
       {% if run %}<span class="pill">Run {{ run_label(run) }}</span>{% endif %}
       <a class="pill" href="/run/select">Runs</a>
+      <a class="pill" href="/change-history">Change Log</a>
       <a class="pill" href="/runs/print">Print</a>
       <a class="pill" href="/team">Team</a>
-      {% if user_is_admin %}<a class="pill" href="/admin/users">Admin</a>{% endif %}
+      {% if user_is_admin %}<a class="pill" href="/admin/dashboard">Admin</a>{% endif %}
       <a class="pill" href="/logout">Logout</a>
       <span class="pill">{{ user }}</span>
     </div>
   </div>
+
+  {% if finish_message %}
+  <div class="banner success-banner">{{ finish_message }}</div>
+  {% endif %}
 
   {% if run %}
   <div class="hero-card">
@@ -70,7 +75,7 @@
       <h2>Get Started</h2>
       <span class="info-chip">No run selected</span>
     </div>
-    <p class="muted">Select an open run or create a new one to start recording batch data.</p>
+    <p class="muted">Select an open run or create a standard run with a run number and product type to start recording batch data.</p>
     {% include "partials/create_run_form.html" %}
   </div>
   {% endif %}
@@ -82,7 +87,7 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Run</th><th>Product</th><th>Updated</th><th>Actions</th></tr>
+        <tr><th>Run</th><th>Product Type</th><th>Updated</th><th>Actions</th></tr>
         {% for run_item in open_runs %}
         <tr>
           <td>
@@ -111,6 +116,20 @@
       {% include "partials/create_run_form.html" %}
     </div>
     {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      <h2>Review &amp; Audit</h2>
+      <span class="info-chip">Quick access</span>
+    </div>
+    <p class="muted">Open the change log to review corrections, or jump straight to the print-ready run packet.</p>
+    {% set action_links = [
+      {"label": "Open Change Log", "href": "/change-history"},
+      {"label": "Print Runs", "href": "/runs/print", "ghost": True},
+      {"label": "Run Records", "href": "/dashboard", "ghost": True}
+    ] %}
+    {% include "partials/action_link_grid.html" %}
   </div>
 
   <div class="card">

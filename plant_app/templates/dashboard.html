@@ -35,9 +35,11 @@
   <div class="nav">
     <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Run Records</div>
     <div class="navlinks">
-      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="{{ user_home_path }}">Home</a>
+      <a class="pill" href="/change-history">Change Log</a>
       <a class="pill" href="/runs/print">Print</a>
       <a class="pill" href="/team">Team</a>
+      {% if user_is_admin %}<a class="pill" href="/admin/dashboard">Admin</a>{% endif %}
       <a class="pill" href="/logout">Logout</a>
       <span class="pill">{{ user }}</span>
     </div>
@@ -48,7 +50,13 @@
       <h2>Run Records Dashboard</h2>
       <span class="info-chip">{{ run_groups|length }} Run Groups</span>
     </div>
-    <p class="muted">Use this dashboard to reopen run-linked records and review recent activity across the plant.</p>
+    <p class="muted">
+      {% if user_can_edit_data %}
+      Use this dashboard to reopen run-linked records and review recent activity across the plant.
+      {% else %}
+      Use this dashboard to review recent run-linked activity across the plant. This account stays read-only.
+      {% endif %}
+    </p>
   </div>
 
   <div class="card">
@@ -74,14 +82,17 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <tr><th>Saved</th><th>Record</th><th>Operator</th><th>Comments</th><th>Open</th></tr>
+            <tr>
+              <th>Saved</th><th>Record</th><th>Operator</th><th>Comments</th>
+              {% if user_can_edit_data %}<th>Open</th>{% endif %}
+            </tr>
             {% for row in group['entries'] %}
             <tr>
               <td>{{ row['activity_time'] }}</td>
               <td>{{ row['display_section'] }}</td>
               <td>{{ row['employee'] }}{% if row['operator_initials'] %} ({{ row['operator_initials'] }}){% endif %}</td>
               <td>{{ row['comments'] or '' }}</td>
-              <td><a class="table-action" href="{{ row['edit_href'] }}">Open</a></td>
+              {% if user_can_edit_data %}<td><a class="table-action" href="{{ row['edit_href'] }}">Open</a></td>{% endif %}
             </tr>
             {% endfor %}
           </table>
@@ -104,7 +115,10 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Saved</th><th>Record</th><th>Run</th><th>Status</th><th>Comments</th><th>Open</th></tr>
+        <tr>
+          <th>Saved</th><th>Record</th><th>Run</th><th>Status</th><th>Comments</th>
+          {% if user_can_edit_data %}<th>Open</th>{% endif %}
+        </tr>
         {% for row in rows %}
         <tr>
           <td>{{ row['activity_time'] }}</td>
@@ -112,11 +126,11 @@
           <td>{{ run_label(row) or 'Standalone' }}</td>
           <td>{{ row['status'] or '' }}</td>
           <td>{{ row['comments'] or '' }}</td>
-          <td><a class="table-action" href="{{ activity_href(row) }}">Open</a></td>
+          {% if user_can_edit_data %}<td><a class="table-action" href="{{ activity_href(row) }}">Open</a></td>{% endif %}
         </tr>
         {% endfor %}
         {% if not rows %}
-        <tr><td colspan="6" class="muted center">No activity has been saved yet.</td></tr>
+        <tr><td colspan="{{ 6 if user_can_edit_data else 5 }}" class="muted center">No activity has been saved yet.</td></tr>
         {% endif %}
       </table>
     </div>

@@ -35,9 +35,10 @@
     <div class="nav">
       <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Change History</div>
       <div class="navlinks">
-        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="{{ user_home_path }}">Home</a>
         <a class="pill" href="/dashboard">Run Records</a>
         <a class="pill" href="/team">Team</a>
+        {% if user_is_admin %}<a class="pill" href="/admin/dashboard">Admin</a>{% endif %}
         <a class="pill" href="/logout">Logout</a>
         <span class="pill">{{ user }}</span>
       </div>
