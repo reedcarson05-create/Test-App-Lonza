@@ -383,8 +383,6 @@ def ensure_schema_migrations(conn) -> None:
             """)
         conn.commit()
     additions = (
-<<<<<<< HEAD
-=======
         ("extraction_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
         ("extraction_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
         ("filtration_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
@@ -393,7 +391,6 @@ def ensure_schema_migrations(conn) -> None:
         ("evaporation_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
         ("sheet_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
         ("sheet_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         ("filtration_entries", "cycle_volume_set_point", "TEXT", "NVARCHAR(100)"),
         ("filtration_entries", "payload_json", "TEXT", "NVARCHAR(MAX)"),
         ("filtration_rows", "operator_initials", "TEXT", "NVARCHAR(50)"),
@@ -1148,11 +1145,8 @@ def insert_extraction(employee: str, data: dict) -> int:
         data.get("chip_chute_temp", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("version_no", 1),
         data.get("previous_entry_id"),
         now_stamp(),
@@ -1166,16 +1160,10 @@ def insert_extraction(employee: str, data: dict) -> int:
                 psf2_speed, psf2_load, psf2_blowback,
                 press_speed, press_load, press_blowback,
                 pressate_ri, chip_bin_steam, chip_chute_temp,
-<<<<<<< HEAD
-                comments, photo_path, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 comments, photo_path, signature_data, signature_signed_at,
                 version_no, previous_entry_id, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.lastrowid)
     else:
@@ -1187,18 +1175,11 @@ def insert_extraction(employee: str, data: dict) -> int:
                 psf2_speed, psf2_load, psf2_blowback,
                 press_speed, press_load, press_blowback,
                 pressate_ri, chip_bin_steam, chip_chute_temp,
-<<<<<<< HEAD
-                comments, photo_path, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 comments, photo_path, signature_data, signature_signed_at,
                 version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.fetchone()[0])
     conn.commit()
@@ -1227,11 +1208,8 @@ def insert_filtration(employee: str, data: dict) -> int:
         data.get("stop_time", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("payload_json", "{}"),
         data.get("version_no", 1),
         data.get("previous_entry_id"),
@@ -1244,16 +1222,10 @@ def insert_filtration(employee: str, data: dict) -> int:
                 cycle_volume_set_point,
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
-<<<<<<< HEAD
-                comments, photo_path, payload_json, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 comments, photo_path, signature_data, signature_signed_at,
                 payload_json, version_no, previous_entry_id, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.lastrowid)
     else:
@@ -1263,18 +1235,11 @@ def insert_filtration(employee: str, data: dict) -> int:
                 cycle_volume_set_point,
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
-<<<<<<< HEAD
-                comments, photo_path, payload_json, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 comments, photo_path, signature_data, signature_signed_at,
                 payload_json, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.fetchone()[0])
 
@@ -1339,11 +1304,8 @@ def insert_evaporation(employee: str, data: dict) -> int:
         data.get("product_temp", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("version_no", 1),
         data.get("previous_entry_id"),
         now_stamp(),
@@ -1354,15 +1316,9 @@ def insert_evaporation(employee: str, data: dict) -> int:
                 run_id, employee, operator_initials, entry_date, evaporator_no,
                 startup_time, shutdown_time, feed_ri, concentrate_ri, steam_pressure,
                 vacuum, sump_level, product_temp, comments, photo_path,
-<<<<<<< HEAD
-                version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 signature_data, signature_signed_at, version_no, previous_entry_id, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.lastrowid)
     else:
@@ -1371,17 +1327,10 @@ def insert_evaporation(employee: str, data: dict) -> int:
                 run_id, employee, operator_initials, entry_date, evaporator_no,
                 startup_time, shutdown_time, feed_ri, concentrate_ri, steam_pressure,
                 vacuum, sump_level, product_temp, comments, photo_path,
-<<<<<<< HEAD
-                version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 signature_data, signature_signed_at, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.fetchone()[0])
 
@@ -1516,10 +1465,7 @@ def update_extraction(entry_id: int, employee: str, data: dict) -> None:
             psf1_blowback = ?, psf2_speed = ?, psf2_load = ?, psf2_blowback = ?,
             press_speed = ?, press_load = ?, press_blowback = ?, pressate_ri = ?,
             chip_bin_steam = ?, chip_chute_temp = ?, comments = ?, photo_path = ?,
-<<<<<<< HEAD
-=======
             signature_data = ?, signature_signed_at = ?,
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
             version_no = COALESCE(version_no, 1) + 1
         WHERE id = ?
     """, (
@@ -1545,11 +1491,8 @@ def update_extraction(entry_id: int, employee: str, data: dict) -> None:
         data.get("chip_chute_temp", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         entry_id,
     ))
     conn.commit()
@@ -1627,11 +1570,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         SET employee = ?, operator_initials = ?, entry_date = ?, clarification_sequential_no = ?,
             cycle_volume_set_point = ?, retentate_flow_set_point = ?, zero_refract = ?, startup_time = ?, shutdown_time = ?,
             start_time = ?, stop_time = ?, comments = ?, photo_path = ?,
-<<<<<<< HEAD
-            payload_json = ?,
-=======
             signature_data = ?, signature_signed_at = ?, payload_json = ?,
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
             version_no = COALESCE(version_no, 1) + 1
         WHERE id = ?
     """, (
@@ -1648,11 +1587,8 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         data.get("stop_time", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("payload_json", "{}"),
         entry_id,
     ))
@@ -1753,12 +1689,8 @@ def update_evaporation(entry_id: int, employee: str, data: dict) -> None:
         SET employee = ?, operator_initials = ?, entry_date = ?, evaporator_no = ?,
             startup_time = ?, shutdown_time = ?, feed_ri = ?, concentrate_ri = ?,
             steam_pressure = ?, vacuum = ?, sump_level = ?, product_temp = ?,
-<<<<<<< HEAD
-            comments = ?, photo_path = ?, version_no = COALESCE(version_no, 1) + 1
-=======
             comments = ?, photo_path = ?, signature_data = ?, signature_signed_at = ?,
             version_no = COALESCE(version_no, 1) + 1
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         WHERE id = ?
     """, (
         employee,
@@ -1775,11 +1707,8 @@ def update_evaporation(entry_id: int, employee: str, data: dict) -> None:
         data.get("product_temp", ""),
         data.get("comments", ""),
         data.get("photo_path", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         entry_id,
     ))
     # Rebuild the child rows from the submitted form so the saved set always matches the current screen.
@@ -1845,23 +1774,16 @@ def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
     cur.execute("""
         UPDATE sheet_entries
         SET employee = ?, operator_initials = ?, entry_date = ?, comments = ?,
-<<<<<<< HEAD
-            payload_json = ?, version_no = COALESCE(version_no, 1) + 1
-=======
             signature_data = ?, signature_signed_at = ?, payload_json = ?,
             version_no = COALESCE(version_no, 1) + 1
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         WHERE id = ?
     """, (
         employee,
         data.get("operator_initials", ""),
         data.get("entry_date", ""),
         data.get("comments", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("payload_json", "{}"),
         entry_id,
     ))
@@ -1882,11 +1804,8 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
         data.get("operator_initials", ""),
         data.get("entry_date", ""),
         data.get("comments", ""),
-<<<<<<< HEAD
-=======
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         data.get("payload_json", "{}"),
         data.get("version_no", 1),
         data.get("previous_entry_id"),
@@ -1896,34 +1815,21 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
         cur.execute("""
             INSERT INTO sheet_entries (
                 run_id, stage_key, stage_title, employee, operator_initials,
-<<<<<<< HEAD
-                entry_date, comments, payload_json, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 entry_date, comments, signature_data, signature_signed_at,
                 payload_json, version_no, previous_entry_id, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.lastrowid)
     else:
         cur.execute("""
             INSERT INTO sheet_entries (
                 run_id, stage_key, stage_title, employee, operator_initials,
-<<<<<<< HEAD
-                entry_date, comments, payload_json, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-=======
                 entry_date, comments, signature_data, signature_signed_at,
                 payload_json, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         """, params)
         entry_id = int(cur.fetchone()[0])
     conn.commit()

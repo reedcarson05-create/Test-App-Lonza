@@ -1,6 +1,4 @@
 {% from "partials/template_helpers.html" import display_or_blank %}
-<<<<<<< HEAD
-=======
 {% macro signature_block(signature_data, signature_signed_at='', initials='') -%}
 {% if signature_data %}
 <div class="ps-signature">
@@ -10,7 +8,6 @@
 </div>
 {% endif %}
 {%- endmacro %}
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
 <section class="card print-packet">
   <div class="ps-run-header">
     <div class="ps-run-title">
@@ -40,10 +37,7 @@
     <div class="ps-sheet-heading">
       <h3>Evaporation</h3>
     </div>
-<<<<<<< HEAD
-=======
     {{ signature_block(evap.get('signature_data', ''), evap.get('signature_signed_at', ''), evap_initials) }}
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
     <div class="ps-fields">
       <div class="ps-field"><span class="ps-label">Date</span><span class="ps-value">{{ display_or_blank(evap['entry_date'], evap_date, evap_initials) }}</span></div>
       <div class="ps-field"><span class="ps-label">Operator Initials</span><span class="ps-value">{{ display_or_blank(evap['operator_initials'] or evap['employee'], evap_date, evap_initials) }}</span></div>
@@ -94,10 +88,7 @@
       <h3>{{ item['title'] }}</h3>
       <span class="ps-sheet-name">{{ item['sheet_name'] }}</span>
     </div>
-<<<<<<< HEAD
-=======
     {{ signature_block(item['entry'].get('signature_data', ''), item['entry'].get('signature_signed_at', ''), entry_initials) }}
->>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
 
     <div class="ps-fields">
       {% for field in item['stage']['headers'] %}
