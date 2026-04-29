@@ -298,6 +298,20 @@ def current_signature_data(request: Request) -> str:
     return request.session.get("signature_data", "")
 
 
+def current_signature_record(request: Request) -> dict[str, str]:
+    """Return the durable signature fields saved alongside a data-entry record."""
+    return {
+        "signature_data": current_signature_data(request),
+        "signature_signed_at": current_signature_signed_at(request),
+    }
+
+
+def attach_current_signature(request: Request, payload: dict) -> dict:
+    """Attach the current handwritten signature metadata to a record payload."""
+    payload.update(current_signature_record(request))
+    return payload
+
+
 def current_session_quick_code(request: Request) -> str:
     """Return the active session-only quick unlock passcode, if one was set at login."""
     return request.session.get("session_quick_code", "")
@@ -425,10 +439,6 @@ def update_signature_session(request: Request, initials: str, signature_data: st
     if not signed_initials or not saved_signature or not saved_at:
         return False
 
-    previous_signature = clean_value(request.session.get("signature_data", ""))
-    if previous_signature and previous_signature != saved_signature:
-        delete_signature_asset(previous_signature)
-
     request.session["signature_initials"] = signed_initials
     request.session["signature_data"] = saved_signature
     request.session["signature_signed_at"] = saved_at
@@ -436,8 +446,7 @@ def update_signature_session(request: Request, initials: str, signature_data: st
 
 
 def clear_signature_session(request: Request) -> None:
-    """Remove any saved signature PNG for the session and clear its signature-specific keys."""
-    delete_signature_asset(clean_value(request.session.get("signature_data", "")))
+    """Clear signature session keys while keeping saved signature images for audit records."""
     request.session.pop("signature_initials", None)
     request.session.pop("signature_data", None)
     request.session.pop("signature_signed_at", None)
@@ -2564,7 +2573,10 @@ async def submit_extraction(request: Request):
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
 
     try:
-        entry_id = insert_extraction(current_user(request), build_extraction_payload(form, operator_initials))
+        entry_id = insert_extraction(
+            current_user(request),
+            attach_current_signature(request, build_extraction_payload(form, operator_initials)),
+        )
 
         insert_audit(
             table_name="extraction_entries",
@@ -2614,7 +2626,10 @@ async def submit_filtration(request: Request):
 
     try:
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-        entry_id = insert_filtration(current_user(request), build_filtration_payload(form, operator_initials))
+        entry_id = insert_filtration(
+            current_user(request),
+            attach_current_signature(request, build_filtration_payload(form, operator_initials)),
+        )
 
         insert_audit(
             table_name="filtration_entries",
@@ -2683,7 +2698,10 @@ async def submit_evaporation(request: Request):
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
         entry_id = insert_evaporation(
             current_user(request),
-            build_evaporation_payload(form, current_run_id(request), operator_initials),
+            attach_current_signature(
+                request,
+                build_evaporation_payload(form, current_run_id(request), operator_initials),
+            ),
         )
 
         insert_audit(
@@ -2772,6 +2790,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
             "entry_date": form.get("entry_date", ""),
             "comments": form.get("comments", ""),
             "payload_json": json.dumps(payload),
+            **current_signature_record(request),
         },
     )
 
@@ -2861,7 +2880,11 @@ async def edit_extraction_submit(request: Request, entry_id: int):
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-    update_extraction(entry_id, current_user(request), build_extraction_payload(form, operator_initials))
+    update_extraction(
+        entry_id,
+        current_user(request),
+        attach_current_signature(request, build_extraction_payload(form, operator_initials)),
+    )
     insert_field_change_log(entry["run_id"], "extraction_entries", entry_id, changes)
     insert_audit(
         table_name="extraction_entries",
@@ -2950,7 +2973,11 @@ async def edit_filtration_submit(request: Request, entry_id: int):
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-    update_filtration(entry_id, current_user(request), build_filtration_payload(form, operator_initials))
+    update_filtration(
+        entry_id,
+        current_user(request),
+        attach_current_signature(request, build_filtration_payload(form, operator_initials)),
+    )
     insert_field_change_log(entry["run_id"], "filtration_entries", entry_id, changes)
     insert_audit(
         table_name="filtration_entries",
@@ -3030,7 +3057,10 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
     update_evaporation(
         entry_id,
         current_user(request),
-        build_evaporation_payload(form, entry["run_id"], operator_initials),
+        attach_current_signature(
+            request,
+            build_evaporation_payload(form, entry["run_id"], operator_initials),
+        ),
     )
     insert_field_change_log(entry["run_id"], "evaporation_entries", entry_id, changes)
     insert_audit(
@@ -3113,6 +3143,7 @@ async def edit_generic_submit(request: Request, entry_id: int):
             "entry_date": form.get("entry_date", ""),
             "comments": form.get("comments", ""),
             "payload_json": json.dumps(payload),
+            **current_signature_record(request),
         },
     )
     insert_field_change_log(entry["run_id"], "sheet_entries", entry_id, changes)

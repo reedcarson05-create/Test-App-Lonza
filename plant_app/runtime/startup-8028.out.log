@@ -127,3 +127,7 @@ INFO:     127.0.0.1:52248 - "GET /health HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52248 - "GET /boot HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52248 - "GET /app-status HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52248 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64425 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64425 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64425 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64425 - "GET /app-status HTTP/1.1" 200 OK
