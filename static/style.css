@@ -1298,6 +1298,7 @@ td.blank-display {
   top: 14px;
   right: 14px;
   z-index: 80;
+  max-height: calc(100vh - 28px);
 }
 
 .settings-toggle {
@@ -1323,6 +1324,10 @@ td.blank-display {
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 94%, white 6%), var(--card));
   box-shadow: var(--panel-shadow);
+  max-height: min(70vh, calc(100vh - 92px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .settings-panel[hidden] {
