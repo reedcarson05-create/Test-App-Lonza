@@ -163,10 +163,15 @@ function Stop-StaleProjectServer {
   }
 
   $commandLine = [string]$owner.CommandLine
+  $executablePath = [string]$owner.ExecutablePath
   $normalizedRoot = $ExpectedRoot.ToLowerInvariant()
+  $normalizedExecutablePath = $executablePath.ToLowerInvariant()
   $looksLikeProjectServer = (
-    $commandLine.ToLowerInvariant().Contains($normalizedRoot) -and
-    $commandLine.ToLowerInvariant().Contains("app.py")
+    $commandLine.ToLowerInvariant().Contains("app.py") -and
+    (
+      $commandLine.ToLowerInvariant().Contains($normalizedRoot) -or
+      $normalizedExecutablePath.StartsWith($normalizedRoot)
+    )
   )
 
   if (-not $looksLikeProjectServer) {
