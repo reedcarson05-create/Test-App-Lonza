@@ -83,6 +83,11 @@ BEGIN
         chip_chute_temp NVARCHAR(50) NULL,
         comments NVARCHAR(MAX) NULL,
         photo_path NVARCHAR(500) NULL,
+<<<<<<< HEAD
+=======
+        signature_data NVARCHAR(MAX) NULL,
+        signature_signed_at NVARCHAR(100) NULL,
+>>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         version_no INT NOT NULL CONSTRAINT DF_extraction_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
         created_at NVARCHAR(50) NOT NULL
@@ -108,6 +113,11 @@ BEGIN
         stop_time NVARCHAR(50) NULL,
         comments NVARCHAR(MAX) NULL,
         photo_path NVARCHAR(500) NULL,
+<<<<<<< HEAD
+=======
+        signature_data NVARCHAR(MAX) NULL,
+        signature_signed_at NVARCHAR(100) NULL,
+>>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         payload_json NVARCHAR(MAX) NULL,
         version_no INT NOT NULL CONSTRAINT DF_filtration_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
@@ -164,6 +174,11 @@ BEGIN
         product_temp NVARCHAR(50) NULL,
         comments NVARCHAR(MAX) NULL,
         photo_path NVARCHAR(500) NULL,
+<<<<<<< HEAD
+=======
+        signature_data NVARCHAR(MAX) NULL,
+        signature_signed_at NVARCHAR(100) NULL,
+>>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         version_no INT NOT NULL CONSTRAINT DF_evaporation_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
         created_at NVARCHAR(50) NOT NULL
@@ -212,6 +227,11 @@ BEGIN
         operator_initials NVARCHAR(20) NULL,
         entry_date NVARCHAR(50) NULL,
         comments NVARCHAR(MAX) NULL,
+<<<<<<< HEAD
+=======
+        signature_data NVARCHAR(MAX) NULL,
+        signature_signed_at NVARCHAR(100) NULL,
+>>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
         payload_json NVARCHAR(MAX) NOT NULL,
         version_no INT NOT NULL CONSTRAINT DF_sheet_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
