@@ -573,3 +573,17 @@
 [2026-04-28 22:36:33] Background host started with PID 48840.
 [2026-04-28 22:36:36] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> a88012f75bfc1cca5291e758423dbf80f32e58cc
+[2026-04-28 23:21:09] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:21:09] Background host started with PID 57760.
+[2026-04-28 23:21:32] Startup logs for port 8000: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:21:32] Startup stderr tail: File "C:\Users\reedc\OneDrive\Test App Lonza\plant_app\app.py", line 301 | <<<<<<< HEAD | ^^ | SyntaxError: invalid syntax
+[2026-04-28 23:21:37] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:21:37] Background host started with PID 116288.
+[2026-04-28 23:22:00] Startup logs for port 8000: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:22:44] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:22:44] Background host started with PID 104452.
+[2026-04-28 23:23:07] Startup logs for port 8000: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:23:07] Startup stderr tail: File "C:\Users\reedc\OneDrive\Test App Lonza\plant_app\app.py", line 301 | <<<<<<< HEAD | ^^ | SyntaxError: invalid syntax
+[2026-04-28 23:26:37] Server not running on port 8000, starting background host with C:\Users\reedc\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.out.log stderr=C:\Users\reedc\OneDrive\Test App Lonza\plant_app\runtime\startup-8000.err.log
+[2026-04-28 23:26:37] Background host started with PID 11616.
+[2026-04-28 23:26:40] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
