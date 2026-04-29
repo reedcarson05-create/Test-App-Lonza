@@ -59,3 +59,4 @@ INFO:     127.0.0.1:60128 - "GET /?fresh=1 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:61520 - "GET /boot/warm HTTP/1.1" 200 OK
 INFO:     127.0.0.1:61520 - "GET /?fresh=1 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:57404 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60335 - "GET /health HTTP/1.1" 200 OK

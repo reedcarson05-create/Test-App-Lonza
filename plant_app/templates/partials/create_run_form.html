@@ -1,0 +1,13 @@
+{% if create_error %}
+<div class="alert">{{ create_error }}</div>
+{% endif %}
+<form method="post" action="/run/select" class="stack-gap run-create-form">
+  <div class="run-create-inline">
+    <div class="run-create-field">
+      <label>Run Number</label>
+      <input name="run_number" value="{{ create_run_number or '' }}" placeholder="ex. 26-001" autocomplete="off">
+    </div>
+    <button class="btn" type="submit">Create Standard Run</button>
+  </div>
+  <p class="muted">Standard runs start here. Blend and split batch assignment stays separate.</p>
+</form>

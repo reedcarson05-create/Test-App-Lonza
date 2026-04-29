@@ -1,0 +1,201 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+{% from "partials/template_helpers.html" import run_label, display_or_blank, blank_class %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
+<div class="settings-root">
+  <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+  <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+    <p class="settings-title">Display Settings</p>
+    <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+    <div class="settings-group">
+      <span class="settings-label">Theme</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+        <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <span class="settings-label">Text Size</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+        <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+        <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Generic run-sheet template driven entirely by the stage definitions in `stage_defs.py`. -->
+<div class="wrap">
+  <div class="nav">
+    <!-- Shared nav plus current run badge for run-linked work. -->
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit {{ stage['title'] }}{% else %}{{ stage['title'] }}{% endif %}</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/stages">Current Work</a>
+      <a class="pill" href="/change-history">Change Log</a>
+      <a class="pill" href="/team">Team</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">Run: {% if run %}{{ run_label(run) }}{% else %}No run{% endif %}</span>
+    </div>
+  </div>
+
+  <form method="post" action="{{ form_action or ('/submit/generic/' ~ stage_key) }}" class="stack-gap">
+    <!-- Intro card explains whether the operator is creating, viewing, or correcting a sheet. -->
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved {{ stage['title'] }} Data{% elif view_only %}Saved {{ stage['title'] }} Data{% else %}Enter {{ stage['title'] }} Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Use this correction page to fix saved run records. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is already saved to the active run record. The saved values stay here and can only be changed from the correction tab.{% else %}Fill in the sheet below and save it when you are done.{% endif %}</p>
+    </div>
+    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+      {% if signature_session_ready %}
+      Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
+      {% else %}
+      Sign your initials below to get started — your signature stays active for this login.
+      {% endif %}
+    </div>
+    {% if view_only and not is_edit %}
+    <div class="banner">This {{ stage['title'] }} entry is already saved to the active run record.</div>
+    {% endif %}
+    <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
+    <div class="card">
+      <!-- Header fields come from `stage['headers']` in `stage_defs.py`. -->
+      <h2>{{ stage['sheet_name'] }}</h2>
+      <div class="grid three-up">
+        {% for field in stage['headers'] %}
+        {% set field_name = field[0] %}
+        {% set field_label = field[1] %}
+        {% set field_type = field[2] %}
+        {% set field_options = field[3] if field|length > 3 else [] %}
+        {% set field_default = field_default_value(field, run) %}
+        {% set field_value = entry_values.get(field_name) if entry_values and entry_values.get(field_name) is not none else field_default %}
+        <div>
+          <label>{{ field_label }}</label>
+          {% if field_type == 'select' %}
+          <select name="{{ field_name }}">
+            <option value=""></option>
+            {% if field_options %}
+            {% for option in field_options %}
+            <option value="{{ option }}" {% if field_value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+            {% elif 'zero_refract' in field_name or field_name == 'cooler_isolated' %}
+            <option value="Y" {% if field_value == 'Y' %}selected{% endif %}>Y</option>
+            <option value="N" {% if field_value == 'N' %}selected{% endif %}>N</option>
+            {% elif field_name == 'bed' %}
+            <option value="A" {% if field_value == 'A' %}selected{% endif %}>A</option>
+            <option value="B" {% if field_value == 'B' %}selected{% endif %}>B</option>
+            {% else %}
+            <option value="Yes" {% if field_value == 'Yes' %}selected{% endif %}>Yes</option>
+            <option value="No" {% if field_value == 'No' %}selected{% endif %}>No</option>
+            {% endif %}
+          </select>
+          {% else %}
+          <input
+            name="{{ field_name }}"
+            type="{{ 'text' if view_only and not is_edit else field_type }}"
+            value="{% if view_only and not is_edit and entry_values and entry_values.get(field_name) is not none %}{{ display_or_blank(entry_values.get(field_name), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field_name) is not none %}{{ entry_values.get(field_name) }}{% elif field_name == 'entry_date' or field_name == 'startup_date' %}{{ today }}{% elif field_name == 'operator_initials' %}{{ initials }}{% else %}{{ field_default }}{% endif %}"
+            class="{% if view_only and not is_edit and entry_values and entry_values.get(field_name) is not none %}{{ blank_class(entry_values.get(field_name)) }}{% endif %}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% for table in stage['tables'] %}
+    <div class="card">
+      <!-- Repeating table rows come from each table definition in `stage_defs.py`. -->
+      <h2>{{ table['title'] }}</h2>
+      <div class="table-wrap">
+        <table class="table entry-table" data-repeat-table data-repeat-prefix="{{ table['prefix'] }}" data-repeat-max-rows="{{ table['rows'] }}">
+          <tr>
+            {% for column in table['columns'] %}
+            <th>{{ column[1] }}</th>
+            {% endfor %}
+          </tr>
+          <tbody data-repeat-body>
+          {% for row in range(table['render_rows'] or 1) %}
+          <tr>
+            {% for column in table['columns'] %}
+            {% set column_name = column[0] %}
+            {% set column_type = column[2] if column|length > 2 else 'text' %}
+            {% set column_options = column[3] if column|length > 3 else [] %}
+            {% set column_default = column[4] if column|length > 4 else '' %}
+            {% set cell_name = table['prefix'] ~ '_' ~ (row + 1) ~ '_' ~ column_name %}
+            {% set cell_saved = entry_values.get(cell_name, '') if entry_values else '' %}
+            {% set cell_value = cell_saved if entry_values else column_default %}
+            <td>
+              {% if view_only and not is_edit %}
+              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ display_or_blank(cell_saved, entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}" class="{{ blank_class(cell_saved) }}">
+              {% elif column_type == 'select' %}
+              <select name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}">
+                <option value=""></option>
+                {% for option in column_options %}
+                <option value="{{ option }}" {% if cell_value == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+              {% else %}
+              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ cell_value }}">
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if not is_edit and not view_only %}
+      <div class="table-actions">
+        <button class="btn ghost" type="button" data-add-row>Add Row</button>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <!-- Shared free-text fields appended to every generic stage sheet. -->
+      <div class="grid two-up">
+        <div>
+          <label>Comments</label>
+          <textarea name="comments" rows="4">{{ entry_values.get('comments', entry['comments']) if entry_values else (entry['comments'] if entry else '') }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <div data-image-field-container data-upload-endpoint="/upload-image">
+            <textarea name="photo_path" rows="4" placeholder="Saved image links will appear here after capture or upload." data-image-field>{{ entry_values.get('photo_path', '') if entry_values else '' }}</textarea>
+            <div class="image-tools">
+              <button class="btn ghost" type="button" data-image-camera-button>Take Photo</button>
+              <button class="btn ghost" type="button" data-image-upload-button>Upload Images</button>
+              <input type="file" accept="image/*" capture="environment" data-image-camera-input>
+              <input type="file" accept="image/*" multiple data-image-upload-input>
+            </div>
+            <p class="muted small image-status" data-image-status>No image selected yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    </fieldset>
+
+    <div class="actions">
+      {% if not view_only or is_edit %}
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save ' ~ stage['title']) }}</button>
+      {% endif %}
+      {% if view_only and not is_edit and edit_href %}
+      <a class="btn" href="{{ edit_href }}">Correct Saved Entry</a>
+      {% endif %}
+      <a class="btn ghost" href="/run/edit">Edit Run</a>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/dynamic_rows.js?v={{ asset_version }}"></script>
+<script src="/static/image_upload.js?v={{ asset_version }}"></script>
+<script src="/static/signature_session.js?v={{ asset_version }}"></script>
+{% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}
+</body>
+</html>

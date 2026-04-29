@@ -1,0 +1,5 @@
+<div class="action-grid">
+  {% for action in action_links %}
+  <a class="btn{% if action.get('ghost') %} ghost{% endif %}{% if action.get('class_name') %} {{ action['class_name'] }}{% endif %}" href="{{ action['href'] }}">{{ action['label'] }}</a>
+  {% endfor %}
+</div>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit Evaporation{% else %}Evaporation{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+{% from "partials/template_helpers.html" import run_label, display_or_blank, blank_class %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
+  <div class="settings-root">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Evaporation entry, read-only, and correction template for run-linked work. -->
+  <div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Evaporation Entry{% else %}Evaporation Data Entry{% endif %}</div>
+    <div class="navlinks">
+      <a class="pill" href="/home">Home</a>
+      <a class="pill" href="/stages">Current Work</a>
+      <a class="pill" href="/change-history">Change Log</a>
+      <a class="pill" href="/team">Team</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">Run: {% if run %}{{ run_label(run) }}{% else %}No run{% endif %}</span>
+    </div>
+  </div>
+
+  {% if saved %}
+  <div class="banner success-banner">Entry saved. Fill in the form below to record another entry.</div>
+  {% endif %}
+  <form method="post" action="{{ form_action or '/submit/evaporation' }}" class="stack-gap">
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved Evaporation Data{% elif view_only %}Saved Evaporation Data{% else %}Enter Evaporation Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Use this correction page to fix saved run records. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This run already has a saved evaporation entry. The values stay locked here and can only be changed from the correction tab.{% else %}Enter the run-linked readings below and save when the sheet is complete.{% endif %}</p>
+    </div>
+    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+      {% if signature_session_ready %}
+      Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
+      {% else %}
+      Sign your initials below to get started — your signature stays active for this login.
+      {% endif %}
+    </div>
+    {% if view_only and not is_edit %}
+    <div class="banner">This evaporation entry is already saved to the active run record.</div>
+    {% endif %}
+    <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
+    <div class="card">
+      <h2>Header Information</h2>
+      <div class="grid three-up">
+        <div><label>Run Number</label><input value="{% if run %}{{ run_label(run) }}{% else %}No run{% endif %}" disabled></div>
+        <div><label>Date</label><input type="{{ 'text' if view_only and not is_edit else 'date' }}" name="entry_date" value="{{ display_or_blank(entry['entry_date'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['entry_date'] if entry else today) }}" class="{% if view_only and entry %}{{ blank_class(entry['entry_date']) }}{% endif %}"></div>
+        <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ display_or_blank(entry['operator_initials'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['operator_initials'] if entry and entry['operator_initials'] else initials) }}" class="{% if view_only and entry %}{{ blank_class(entry['operator_initials']) }}{% endif %}"></div>
+        <div><label>Evaporator No.</label><input name="evaporator_no" value="{{ display_or_blank(entry['evaporator_no'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['evaporator_no'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['evaporator_no']) }}{% endif %}"></div>
+        <div><label>Start-up Time</label><input type="{{ 'text' if view_only and not is_edit else 'time' }}" name="startup_time" value="{{ display_or_blank(entry['startup_time'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['startup_time'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['startup_time']) }}{% endif %}"></div>
+        <div><label>Shut-down Time</label><input type="{{ 'text' if view_only and not is_edit else 'time' }}" name="shutdown_time" value="{{ display_or_blank(entry['shutdown_time'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['shutdown_time'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['shutdown_time']) }}{% endif %}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Process Readings</h2>
+      <div class="grid three-up">
+        <div><label>Feed RI (%)</label><input name="feed_ri" value="{{ display_or_blank(entry['feed_ri'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['feed_ri'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['feed_ri']) }}{% endif %}"></div>
+        <div><label>Concentrate RI (%)</label><input name="concentrate_ri" value="{{ display_or_blank(entry['concentrate_ri'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['concentrate_ri'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['concentrate_ri']) }}{% endif %}"></div>
+        <div><label>Steam Pressure (psig)</label><input name="steam_pressure" value="{{ display_or_blank(entry['steam_pressure'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['steam_pressure'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['steam_pressure']) }}{% endif %}"></div>
+        <div><label>Vacuum (in Hg)</label><input name="vacuum" value="{{ display_or_blank(entry['vacuum'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['vacuum'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['vacuum']) }}{% endif %}"></div>
+        <div><label>Sump Level (%)</label><input name="sump_level" value="{{ display_or_blank(entry['sump_level'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['sump_level'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['sump_level']) }}{% endif %}"></div>
+        <div><label>Product Temp (°F)</label><input name="product_temp" value="{{ display_or_blank(entry['product_temp'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['product_temp'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['product_temp']) }}{% endif %}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Hourly Readings</h2>
+      <div class="table-wrap">
+        <table class="table entry-table">
+          <tr><th>Time</th><th>Feed Rate (gpm)</th><th>Evap Temp (°F)</th><th>Vacuum (in Hg)</th><th>Concentrate RI (%)</th></tr>
+          <tr><td><input name="row1_time" value="{{ display_or_blank(row_map['row1']['row_time'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row1') else (row_map['row1']['row_time'] if row_map and row_map.get('row1') else '') }}" class="{% if view_only and row_map and row_map.get('row1') %}{{ blank_class(row_map['row1']['row_time']) }}{% endif %}"></td><td><input name="row1_feed_rate" value="{{ display_or_blank(row_map['row1']['feed_rate'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row1') else (row_map['row1']['feed_rate'] if row_map and row_map.get('row1') else '') }}" class="{% if view_only and row_map and row_map.get('row1') %}{{ blank_class(row_map['row1']['feed_rate']) }}{% endif %}"></td><td><input name="row1_evap_temp" value="{{ display_or_blank(row_map['row1']['evap_temp'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row1') else (row_map['row1']['evap_temp'] if row_map and row_map.get('row1') else '') }}" class="{% if view_only and row_map and row_map.get('row1') %}{{ blank_class(row_map['row1']['evap_temp']) }}{% endif %}"></td><td><input name="row1_vacuum" value="{{ display_or_blank(row_map['row1']['row_vacuum'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row1') else (row_map['row1']['row_vacuum'] if row_map and row_map.get('row1') else '') }}" class="{% if view_only and row_map and row_map.get('row1') %}{{ blank_class(row_map['row1']['row_vacuum']) }}{% endif %}"></td><td><input name="row1_concentrate_ri" value="{{ display_or_blank(row_map['row1']['row_concentrate_ri'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row1') else (row_map['row1']['row_concentrate_ri'] if row_map and row_map.get('row1') else '') }}" class="{% if view_only and row_map and row_map.get('row1') %}{{ blank_class(row_map['row1']['row_concentrate_ri']) }}{% endif %}"></td></tr>
+          <tr><td><input name="row2_time" value="{{ display_or_blank(row_map['row2']['row_time'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row2') else (row_map['row2']['row_time'] if row_map and row_map.get('row2') else '') }}" class="{% if view_only and row_map and row_map.get('row2') %}{{ blank_class(row_map['row2']['row_time']) }}{% endif %}"></td><td><input name="row2_feed_rate" value="{{ display_or_blank(row_map['row2']['feed_rate'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row2') else (row_map['row2']['feed_rate'] if row_map and row_map.get('row2') else '') }}" class="{% if view_only and row_map and row_map.get('row2') %}{{ blank_class(row_map['row2']['feed_rate']) }}{% endif %}"></td><td><input name="row2_evap_temp" value="{{ display_or_blank(row_map['row2']['evap_temp'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row2') else (row_map['row2']['evap_temp'] if row_map and row_map.get('row2') else '') }}" class="{% if view_only and row_map and row_map.get('row2') %}{{ blank_class(row_map['row2']['evap_temp']) }}{% endif %}"></td><td><input name="row2_vacuum" value="{{ display_or_blank(row_map['row2']['row_vacuum'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row2') else (row_map['row2']['row_vacuum'] if row_map and row_map.get('row2') else '') }}" class="{% if view_only and row_map and row_map.get('row2') %}{{ blank_class(row_map['row2']['row_vacuum']) }}{% endif %}"></td><td><input name="row2_concentrate_ri" value="{{ display_or_blank(row_map['row2']['row_concentrate_ri'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row2') else (row_map['row2']['row_concentrate_ri'] if row_map and row_map.get('row2') else '') }}" class="{% if view_only and row_map and row_map.get('row2') %}{{ blank_class(row_map['row2']['row_concentrate_ri']) }}{% endif %}"></td></tr>
+          <tr><td><input name="row3_time" value="{{ display_or_blank(row_map['row3']['row_time'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row3') else (row_map['row3']['row_time'] if row_map and row_map.get('row3') else '') }}" class="{% if view_only and row_map and row_map.get('row3') %}{{ blank_class(row_map['row3']['row_time']) }}{% endif %}"></td><td><input name="row3_feed_rate" value="{{ display_or_blank(row_map['row3']['feed_rate'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row3') else (row_map['row3']['feed_rate'] if row_map and row_map.get('row3') else '') }}" class="{% if view_only and row_map and row_map.get('row3') %}{{ blank_class(row_map['row3']['feed_rate']) }}{% endif %}"></td><td><input name="row3_evap_temp" value="{{ display_or_blank(row_map['row3']['evap_temp'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row3') else (row_map['row3']['evap_temp'] if row_map and row_map.get('row3') else '') }}" class="{% if view_only and row_map and row_map.get('row3') %}{{ blank_class(row_map['row3']['evap_temp']) }}{% endif %}"></td><td><input name="row3_vacuum" value="{{ display_or_blank(row_map['row3']['row_vacuum'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row3') else (row_map['row3']['row_vacuum'] if row_map and row_map.get('row3') else '') }}" class="{% if view_only and row_map and row_map.get('row3') %}{{ blank_class(row_map['row3']['row_vacuum']) }}{% endif %}"></td><td><input name="row3_concentrate_ri" value="{{ display_or_blank(row_map['row3']['row_concentrate_ri'], entry['entry_date'], entry['operator_initials']) if view_only and row_map and row_map.get('row3') else (row_map['row3']['row_concentrate_ri'] if row_map and row_map.get('row3') else '') }}" class="{% if view_only and row_map and row_map.get('row3') %}{{ blank_class(row_map['row3']['row_concentrate_ri']) }}{% endif %}"></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid two-up">
+        <div>
+          <label>Notes</label>
+          <textarea name="notes" rows="4">{{ entry['comments'] if entry else '' }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <div data-image-field-container data-upload-endpoint="/upload-image">
+            <textarea name="photo_path" rows="4" placeholder="Saved image links will appear here after capture or upload." data-image-field>{{ entry['photo_path'] if entry else '' }}</textarea>
+            <div class="image-tools">
+              <button class="btn ghost" type="button" data-image-camera-button>Take Photo</button>
+              <button class="btn ghost" type="button" data-image-upload-button>Upload Images</button>
+              <input type="file" accept="image/*" capture="environment" data-image-camera-input>
+              <input type="file" accept="image/*" multiple data-image-upload-input>
+            </div>
+            <p class="muted small image-status" data-image-status>No image selected yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    </fieldset>
+
+    <div class="actions">
+      {% if not view_only or is_edit %}
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save Evaporation') }}</button>
+      {% endif %}
+      {% if view_only and not is_edit and edit_href %}
+      <a class="btn" href="{{ edit_href }}">Correct Saved Entry</a>
+      {% endif %}
+      <a class="btn ghost" href="/run/edit">Edit Run</a>
+      <a class="btn ghost" href="/stages">Back</a>
+    </div>
+  </form>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/image_upload.js?v={{ asset_version }}"></script>
+<script src="/static/signature_session.js?v={{ asset_version }}"></script>
+{% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}
+</body>
+</html>

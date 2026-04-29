@@ -1,0 +1,137 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin {{ section_title }}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+{% from "partials/template_helpers.html" import run_label %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<div class="settings-root">
+  <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+  <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+    <p class="settings-title">Display Settings</p>
+    <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+    <div class="settings-group">
+      <span class="settings-label">Theme</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+        <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <span class="settings-label">Text Size</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+        <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+        <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Admin</div>
+    <div class="navlinks">
+      <a class="pill" href="/admin/dashboard">Dashboard</a>
+      <a class="pill" href="/admin/data/runs">Runs</a>
+      <a class="pill" href="/admin/data/blends">Blends</a>
+      <a class="pill" href="/admin/data/splits">Splits</a>
+      <a class="pill" href="/admin/users">Users</a>
+      <a class="pill" href="/logout">Logout</a>
+      <span class="pill">{{ user }}</span>
+    </div>
+  </div>
+
+  <div class="card page-intro">
+    <div class="section-title">
+      <h2>{{ section_title }}</h2>
+      <span class="info-chip">{{ total }} record{{ 's' if total != 1 else '' }}</span>
+    </div>
+    <p class="muted">{{ section_copy }}</p>
+    <div class="summary-line">
+      {% for item in admin_sections %}
+      <a class="pill" href="/admin/data/{{ item['key'] }}">{{ item['title'] }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <form method="get" action="{{ section_path }}">
+      <div class="section-title">
+        <h2>Search &amp; Filter</h2>
+        <span class="info-chip">{{ total_pages }} Page{{ 's' if total_pages != 1 else '' }}</span>
+      </div>
+      <div class="actions">
+        <input type="text" name="search" value="{{ search }}" placeholder="Run number, product type, or batch label" style="flex:1; padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+        <select name="status" style="padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="Open" {% if status_filter == 'Open' %}selected{% endif %}>Open</option>
+          <option value="Complete" {% if status_filter == 'Complete' %}selected{% endif %}>Complete</option>
+        </select>
+        <button class="btn" type="submit">Search</button>
+        <a class="btn ghost" href="{{ section_path }}">Clear</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      <h2>{{ section_title }} Results</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <tr>
+          <th>Run</th>
+          <th>Product Type</th>
+          <th>{{ section_label_column }}</th>
+          <th>Status</th>
+          <th>Stages with Data</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+        {% for run in runs %}
+        <tr>
+          <td><strong>{{ run_label(run) }}</strong></td>
+          <td>{{ run.product_name or '-' }}</td>
+          <td>
+            {% if section_key == 'runs' %}
+              {{ run.blend_number or run.split_batch_number or '-' }}
+            {% elif section_key == 'blends' %}
+              {{ run.blend_number or '-' }}
+            {% else %}
+              {{ run.split_batch_number or '-' }}
+            {% endif %}
+          </td>
+          <td><span class="status-badge">{{ run.status or 'Open' }}</span></td>
+          <td>{{ run.stage_count }}</td>
+          <td>{{ run.created_at or '' }}</td>
+          <td class="table-actions">
+            <a class="table-action" href="/admin/data/{{ run.id }}?section={{ section_key }}">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not runs %}
+        <tr><td colspan="7" class="muted center">No {{ section_title|lower }} match your search.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="actions" style="margin-top:1rem; justify-content:center;">
+      {% if page > 1 %}
+      <a class="pill" href="{{ section_path }}?page={{ page - 1 }}&search={{ search }}&status={{ status_filter }}">Previous</a>
+      {% endif %}
+      <span class="pill">Page {{ page }} of {{ total_pages }}</span>
+      {% if page < total_pages %}
+      <a class="pill" href="{{ section_path }}?page={{ page + 1 }}&search={{ search }}&status={{ status_filter }}">Next</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+</body>
+</html>
