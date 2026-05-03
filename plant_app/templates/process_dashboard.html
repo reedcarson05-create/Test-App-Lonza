@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -32,7 +32,7 @@
   </div>
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Extraction & Filtration</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Extraction, Filtration & Clarifier</div>
       <div class="navlinks">
         <a class="pill" href="{{ user_home_path }}">Home</a>
         <a class="pill" href="/process-dashboard">Machines</a>
@@ -46,7 +46,7 @@
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Extraction &amp; Filtration</h2>
+        <h2>Extraction, Filtration &amp; Clarifier</h2>
       </div>
       <p class="muted">
         {% if user_can_edit_data %}
@@ -70,7 +70,7 @@
 
     <div class="card">
       <div class="section-title">
-        <h2>Recent Extraction & Filtration Entries</h2>
+        <h2>Recent Extraction, Filtration &amp; Clarifier Entries</h2>
         <span class="info-chip">{{ items|length }} Saved Entries</span>
       </div>
       <div class="table-wrap">
@@ -91,7 +91,7 @@
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="{{ 7 if user_can_edit_data else 6 }}" class="muted center">No extraction or filtration entries have been saved yet.</td></tr>
+          <tr><td colspan="{{ 7 if user_can_edit_data else 6 }}" class="muted center">No extraction, filtration, or clarifier entries have been saved yet.</td></tr>
           {% endif %}
         </table>
       </div>

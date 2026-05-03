@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
   <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -31,105 +31,157 @@
     </div>
   </div>
 </div>
-<div class="wrap">
-  <div class="nav">
-    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Admin</div>
-    <div class="navlinks">
-      <a class="pill" href="/admin/dashboard">Dashboard</a>
-      <a class="pill" href="/admin/data/runs">Runs</a>
-      <a class="pill" href="/admin/data/blends">Blends</a>
-      <a class="pill" href="/admin/data/splits">Splits</a>
-      <a class="pill" href="/admin/users">Users</a>
-      <a class="pill" href="/logout">Logout</a>
-      <span class="pill">{{ user }}</span>
-    </div>
-  </div>
-
-  <div class="card page-intro">
-    <div class="section-title">
-      <h2>{{ section_title }}</h2>
-      <span class="info-chip">{{ total }} record{{ 's' if total != 1 else '' }}</span>
-    </div>
-    <p class="muted">{{ section_copy }}</p>
-    <div class="summary-line">
-      {% for item in admin_sections %}
-      <a class="pill" href="/admin/data/{{ item['key'] }}">{{ item['title'] }}</a>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <form method="get" action="{{ section_path }}">
-      <div class="section-title">
-        <h2>Search &amp; Filter</h2>
-        <span class="info-chip">{{ total_pages }} Page{{ 's' if total_pages != 1 else '' }}</span>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">
+      <div>
+        <div class="admin-sidebar-title">LAG Admin</div>
+        <div class="admin-sidebar-subtitle">{{ user }}</div>
       </div>
-      <div class="actions">
-        <input type="text" name="search" value="{{ search }}" placeholder="Run number, product type, or batch label" style="flex:1; padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
-        <select name="status" style="padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
-          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
-          <option value="Open" {% if status_filter == 'Open' %}selected{% endif %}>Open</option>
-          <option value="Complete" {% if status_filter == 'Complete' %}selected{% endif %}>Complete</option>
-        </select>
-        <button class="btn" type="submit">Search</button>
-        <a class="btn ghost" href="{{ section_path }}">Clear</a>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
-    <div class="section-title">
-      <h2>{{ section_title }} Results</h2>
     </div>
-    <div class="table-wrap">
-      <table class="table">
-        <tr>
-          <th>Run</th>
-          <th>Product Type</th>
-          <th>{{ section_label_column }}</th>
-          <th>Status</th>
-          <th>Stages with Data</th>
-          <th>Created</th>
-          <th>Actions</th>
-        </tr>
-        {% for run in runs %}
-        <tr>
-          <td><strong>{{ run_label(run) }}</strong></td>
-          <td>{{ run.product_name or '-' }}</td>
-          <td>
-            {% if section_key == 'runs' %}
-              {{ run.blend_number or run.split_batch_number or '-' }}
-            {% elif section_key == 'blends' %}
-              {{ run.blend_number or '-' }}
-            {% else %}
-              {{ run.split_batch_number or '-' }}
+    <nav>
+      <div class="admin-nav-section">Overview</div>
+      <a class="admin-nav-link" href="/admin/dashboard">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Dashboard
+      </a>
+      <div class="admin-nav-section">Data</div>
+      <a class="admin-nav-link{% if section_key == 'runs' %} is-active{% endif %}" href="/admin/data/runs">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Runs
+      </a>
+      <a class="admin-nav-link{% if section_key == 'blends' %} is-active{% endif %}" href="/admin/data/blends">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+        Blends
+      </a>
+      <a class="admin-nav-link{% if section_key == 'splits' %} is-active{% endif %}" href="/admin/data/splits">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+        Splits
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/extraction">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Extraction Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/filtration">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Filtration Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/clarifier">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Clarifier Entries
+      </a>
+      <div class="admin-nav-section">Tools</div>
+      <a class="admin-nav-link" href="/admin/export">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Export
+      </a>
+      <a class="admin-nav-link" href="/admin/users">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </a>
+    </nav>
+    <div class="admin-sidebar-footer">
+      <a class="admin-nav-link" href="/home">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Operator View
+      </a>
+      <a class="admin-nav-link" href="/logout">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <span class="admin-topbar-title">{{ section_title }}</span>
+      <div class="admin-topbar-right">
+        <span class="info-chip">{{ total }} record{{ 's' if total != 1 else '' }}</span>
+      </div>
+    </div>
+    <div class="admin-page">
+
+      <div class="card">
+        <div class="summary-line">
+          {% for item in admin_sections %}
+          <a class="pill{% if item['key'] == section_key %} is-active{% endif %}" href="/admin/data/{{ item['key'] }}">{{ item['title'] }}</a>
+          {% endfor %}
+        </div>
+        <p class="muted" style="margin-top:10px;">{{ section_copy }}</p>
+      </div>
+
+      <div class="card">
+        <form method="get" action="{{ section_path }}">
+          <div class="section-title">
+            <h2>Search &amp; Filter</h2>
+            <span class="info-chip">{{ total_pages }} Page{{ 's' if total_pages != 1 else '' }}</span>
+          </div>
+          <div class="actions">
+            <input type="text" name="search" value="{{ search }}" placeholder="Run number, product type, or batch label" style="flex:1; padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+            <select name="status" style="padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+              <option value="Open" {% if status_filter == 'Open' %}selected{% endif %}>Open</option>
+              <option value="Complete" {% if status_filter == 'Complete' %}selected{% endif %}>Complete</option>
+            </select>
+            <button class="btn" type="submit">Search</button>
+            <a class="btn ghost" href="{{ section_path }}">Clear</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="table">
+            <tr>
+              <th>Run</th>
+              <th>Product Type</th>
+              <th>{{ section_label_column }}</th>
+              <th>Status</th>
+              <th>Stages with Data</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+            {% for run in runs %}
+            <tr>
+              <td><strong>{{ run_label(run) }}</strong></td>
+              <td>{{ run.product_name or '-' }}</td>
+              <td>
+                {% if section_key == 'runs' %}
+                  {{ run.blend_number or run.split_batch_number or '-' }}
+                {% elif section_key == 'blends' %}
+                  {{ run.blend_number or '-' }}
+                {% else %}
+                  {{ run.split_batch_number or '-' }}
+                {% endif %}
+              </td>
+              <td><span class="status-badge">{{ run.status or 'Open' }}</span></td>
+              <td>{{ run.stage_count }}</td>
+              <td>{{ run.created_at or '' }}</td>
+              <td class="table-actions">
+                <a class="table-action" href="/admin/data/{{ run.id }}?section={{ section_key }}">View</a>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if not runs %}
+            <tr><td colspan="7" class="muted center">No {{ section_title|lower }} match your search.</td></tr>
             {% endif %}
-          </td>
-          <td><span class="status-badge">{{ run.status or 'Open' }}</span></td>
-          <td>{{ run.stage_count }}</td>
-          <td>{{ run.created_at or '' }}</td>
-          <td class="table-actions">
-            <a class="table-action" href="/admin/data/{{ run.id }}?section={{ section_key }}">View</a>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not runs %}
-        <tr><td colspan="7" class="muted center">No {{ section_title|lower }} match your search.</td></tr>
-        {% endif %}
-      </table>
-    </div>
+          </table>
+        </div>
 
-    {% if total_pages > 1 %}
-    <div class="actions" style="margin-top:1rem; justify-content:center;">
-      {% if page > 1 %}
-      <a class="pill" href="{{ section_path }}?page={{ page - 1 }}&search={{ search }}&status={{ status_filter }}">Previous</a>
-      {% endif %}
-      <span class="pill">Page {{ page }} of {{ total_pages }}</span>
-      {% if page < total_pages %}
-      <a class="pill" href="{{ section_path }}?page={{ page + 1 }}&search={{ search }}&status={{ status_filter }}">Next</a>
-      {% endif %}
+        {% if total_pages > 1 %}
+        <div class="actions" style="margin-top:1rem; justify-content:center;">
+          {% if page > 1 %}
+          <a class="pill" href="{{ section_path }}?page={{ page - 1 }}&search={{ search }}&status={{ status_filter }}">Previous</a>
+          {% endif %}
+          <span class="pill">Page {{ page }} of {{ total_pages }}</span>
+          {% if page < total_pages %}
+          <a class="pill" href="{{ section_path }}?page={{ page + 1 }}&search={{ search }}&status={{ status_filter }}">Next</a>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
     </div>
-    {% endif %}
   </div>
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>

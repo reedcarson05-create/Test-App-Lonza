@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -33,13 +33,24 @@
   <!-- Extraction entry and correction template used by both create and edit routes. -->
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Extraction Entry{% else %}Extraction Data Entry{% endif %}</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Extraction{% else %}Extraction Entry{% endif %}</div>
       <div class="navlinks">
-        <a class="pill" href="/home">Home</a>
-        <a class="pill" href="/process-dashboard">Current Work</a>
-        <a class="pill" href="/change-history">Change Log</a>
-        <a class="pill" href="/team">Team</a>
-        <a class="pill" href="/logout">Logout</a>
+        <a class="pill" href="/home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Home
+        </a>
+        <a class="pill hide-mobile" href="/process-dashboard">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          Current Work
+        </a>
+        <a class="pill hide-mobile" href="/change-history">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+          Change Log
+        </a>
+        <a class="pill hide-mobile" href="/logout">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          Logout
+        </a>
         <span class="pill">Standalone Machine</span>
       </div>
     </div>
@@ -47,7 +58,7 @@
   {% if saved %}
   <div class="banner success-banner">Entry saved. Fill in the form below to record another entry.</div>
   {% endif %}
-  <form method="post" action="{{ form_action or '/submit/extraction' }}" class="stack-gap">
+  <form method="post" action="{{ form_action or '/submit/extraction' }}" class="stack-gap" autocomplete="off">
     <div class="card page-intro">
       <h2>{% if is_edit %}Correct Saved Extraction Data{% else %}Enter Extraction Data{% endif %}</h2>
       <p class="muted">{% if is_edit %}Use correction mode for saved data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the values below and press save when this entry is complete.{% endif %}</p>
@@ -56,7 +67,7 @@
       {% if signature_session_ready %}
       Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Sign your initials below to get started — your signature stays active for this login.
+      Sign your initials below to get started â€” your signature stays active for this login.
       {% endif %}
     </div>
     <div class="card">
@@ -64,7 +75,7 @@
       <div class="grid three-up">
         <div><label>Process Area</label><input value="Extraction" disabled></div>
         <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
-        <div><label>Time</label><input type="time" name="entry_time" value="{{ entry['entry_time'] if entry else '' }}"></div>
+        <div><label>Time</label><input type="time" name="entry_time" value="{{ entry['entry_time'] if entry else now_time }}"></div>
         <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ entry['operator_initials'] if entry and entry['operator_initials'] else initials }}"></div>
         <div>
           <label>North / South / Pile</label>
@@ -95,7 +106,7 @@
         <div><label>Press Blowback Pressure (psi)</label><input name="press_blowback" value="{{ entry['press_blowback'] if entry else '' }}"></div>
         <div><label>Pressate RI @ P303 (%)</label><input name="pressate_ri" value="{{ entry['pressate_ri'] if entry else '' }}"></div>
         <div><label>Chip Bin Steam FT201 (lb/hr)</label><input name="chip_bin_steam" value="{{ entry['chip_bin_steam'] if entry else '' }}"></div>
-        <div><label>Chip Chute Temp (°F)</label><input name="chip_chute_temp" value="{{ entry['chip_chute_temp'] if entry else '' }}"></div>
+        <div><label>Chip Chute Temp (Â°F)</label><input name="chip_chute_temp" value="{{ entry['chip_chute_temp'] if entry else '' }}"></div>
       </div>
     </div>
 
@@ -127,7 +138,9 @@
     </div>
   </form>
 </div>
+
 <script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/entry_helpers.js?v={{ asset_version }}"></script>
 <script src="/static/image_upload.js?v={{ asset_version }}"></script>
 <script src="/static/signature_session.js?v={{ asset_version }}"></script>
 {% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}

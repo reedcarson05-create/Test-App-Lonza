@@ -113,6 +113,7 @@ BEGIN
         signature_data NVARCHAR(MAX) NULL,
         signature_signed_at NVARCHAR(100) NULL,
         payload_json NVARCHAR(MAX) NULL,
+        completion_status NVARCHAR(20) NOT NULL CONSTRAINT DF_filtration_entries_completion_status DEFAULT (N'Complete'),
         version_no INT NOT NULL CONSTRAINT DF_filtration_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
         created_at NVARCHAR(50) NOT NULL
@@ -221,9 +222,23 @@ BEGIN
         signature_data NVARCHAR(MAX) NULL,
         signature_signed_at NVARCHAR(100) NULL,
         payload_json NVARCHAR(MAX) NOT NULL,
+        completion_status NVARCHAR(20) NOT NULL CONSTRAINT DF_sheet_entries_completion_status DEFAULT (N'Complete'),
         version_no INT NOT NULL CONSTRAINT DF_sheet_entries_version_no DEFAULT ((1)),
         previous_entry_id INT NULL,
         created_at NVARCHAR(50) NOT NULL
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.voided_stages', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.voided_stages (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        run_id INT NOT NULL,
+        stage_key NVARCHAR(100) NOT NULL,
+        voided_by NVARCHAR(50) NULL,
+        voided_at NVARCHAR(50) NOT NULL,
+        CONSTRAINT uq_voided_stages UNIQUE (run_id, stage_key)
     );
 END
 GO

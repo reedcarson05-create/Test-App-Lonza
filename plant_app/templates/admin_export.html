@@ -1,0 +1,218 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Export Run Files</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
+<div class="settings-root">
+  <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+  <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+    <p class="settings-title">Display Settings</p>
+    <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+    <div class="settings-group">
+      <span class="settings-label">Theme</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+        <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <span class="settings-label">Text Size</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+        <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+        <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">
+      <div>
+        <div class="admin-sidebar-title">LAG Admin</div>
+        <div class="admin-sidebar-subtitle">{{ user }}</div>
+      </div>
+    </div>
+    <nav>
+      <div class="admin-nav-section">Overview</div>
+      <a class="admin-nav-link" href="/admin/dashboard">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Dashboard
+      </a>
+      <div class="admin-nav-section">Data</div>
+      <a class="admin-nav-link" href="/admin/data/runs">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Runs
+      </a>
+      <a class="admin-nav-link" href="/admin/data/blends">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+        Blends
+      </a>
+      <a class="admin-nav-link" href="/admin/data/splits">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+        Splits
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/extraction">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Extraction Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/filtration">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Filtration Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/clarifier">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Clarifier Entries
+      </a>
+      <div class="admin-nav-section">Tools</div>
+      <a class="admin-nav-link is-active" href="/admin/export">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Export
+      </a>
+      <a class="admin-nav-link" href="/admin/users">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </a>
+    </nav>
+    <div class="admin-sidebar-footer">
+      <a class="admin-nav-link" href="/home">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Operator View
+      </a>
+      <a class="admin-nav-link" href="/logout">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <span class="admin-topbar-title">Export Run Files</span>
+      <div class="admin-topbar-right">
+        <span class="info-chip">PDF data sheets</span>
+      </div>
+    </div>
+    <div class="admin-page">
+
+      {% if export_error %}
+      <div class="alert">{{ export_error }}</div>
+      {% endif %}
+
+      {% if export_job and not export_result %}
+      <div class="card" data-export-job data-export-status-url="/admin/export/status/{{ export_job['id'] }}">
+        <div class="section-title">
+          <h2>Export In Progress</h2>
+          <span class="info-chip">{{ export_job['scope_label'] }}</span>
+        </div>
+        <p class="muted" data-export-message>{{ export_job['message'] }}</p>
+        <div class="export-progress">
+          <div class="export-progress-bar" data-export-progress-bar style="width: {{ ((export_job['current'] / export_job['total']) * 100)|round(0, 'floor') }}%;"></div>
+        </div>
+        <p class="muted small" data-export-count>{{ export_job['current'] }} of {{ export_job['total'] }} data sheets processed</p>
+        <div class="alert" data-export-error hidden></div>
+      </div>
+      {% endif %}
+
+      {% if export_result %}
+      <div class="banner success-banner">
+        <strong>{{ export_result['export_name'] }}</strong> is ready — {{ export_result['data_sheet_count'] }} PDF data sheet{{ 's' if export_result['data_sheet_count'] != 1 else '' }}.
+      </div>
+      <div class="card">
+        <div class="section-title">
+          <h2>Export Ready</h2>
+          <span class="info-chip">{{ export_result['scope_label'] }}</span>
+        </div>
+        <p class="muted">Server folder: {{ export_result['folder_path'] }}</p>
+        {% if export_result['destination'] %}
+        <p class="muted">Copied folder: {{ export_result['destination']['folder'] }}</p>
+        <p class="muted">Copied ZIP: {{ export_result['destination']['zip'] }}</p>
+        {% endif %}
+        {% if export_result['destination_error'] %}
+        <div class="alert" style="margin-top:1rem;">ZIP created, but flash drive copy failed: {{ export_result['destination_error'] }}</div>
+        {% endif %}
+        <div class="actions" style="margin-top:1rem;">
+          <a class="btn" href="{{ export_result['download_href'] }}" download>Download PDF ZIP</a>
+          <a class="btn ghost" href="/admin/export">Build Another Export</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <form method="post" action="/admin/export" class="stack-gap">
+          <div class="section-title">
+            <h2>Build Data Sheets</h2>
+          </div>
+          <p class="muted">Select the run scope below and optionally enter a flash drive path to copy the export directly.</p>
+          <div class="grid two-up" style="margin-top:1rem;">
+            <div>
+              <label>Run Scope</label>
+              <select name="scope">
+                {% for scope_key, scope_label in export_scopes.items() %}
+                <option value="{{ scope_key }}" {% if selected_scope == scope_key %}selected{% endif %}>{{ scope_label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label>Flash Drive Folder <span class="muted">(optional)</span></label>
+              <input name="destination_path" value="{{ destination_path }}" placeholder="E:\Lonza_Run_Exports" autocomplete="off">
+            </div>
+          </div>
+          <p class="muted small">Leave the flash drive folder blank to create a downloadable ZIP only. The path must be visible to the computer running the app.</p>
+          <div class="actions">
+            <button class="btn" type="submit">Build PDF Export</button>
+            <a class="btn ghost" href="/admin/dashboard">Cancel</a>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+<script>
+(function () {
+  var card = document.querySelector('[data-export-job]');
+  if (!card) return;
+
+  var statusUrl = card.getAttribute('data-export-status-url');
+  var messageEl = card.querySelector('[data-export-message]');
+  var countEl = card.querySelector('[data-export-count]');
+  var barEl = card.querySelector('[data-export-progress-bar]');
+  var errorEl = card.querySelector('[data-export-error]');
+
+  function poll() {
+    fetch(statusUrl, { cache: 'no-store' })
+      .then(function (response) { return response.json(); })
+      .then(function (job) {
+        if (job.error && !job.status) { throw new Error(job.error); }
+        var current = Number(job.current || 0);
+        var total = Math.max(1, Number(job.total || 1));
+        var percent = Math.max(0, Math.min(100, Math.floor((current / total) * 100)));
+        messageEl.textContent = job.message || 'Working on export...';
+        countEl.textContent = current + ' of ' + total + ' data sheets processed';
+        barEl.style.width = percent + '%';
+        if (job.status === 'complete') { window.location.reload(); return; }
+        if (job.status === 'error') {
+          errorEl.hidden = false;
+          errorEl.textContent = 'Export failed: ' + (job.error || job.message || 'Unknown error');
+          return;
+        }
+        setTimeout(poll, 1500);
+      })
+      .catch(function (error) {
+        errorEl.hidden = false;
+        errorEl.textContent = 'Could not check export status: ' + error.message;
+      });
+  }
+
+  setTimeout(poll, 1000);
+}());
+</script>
+</body>
+</html>

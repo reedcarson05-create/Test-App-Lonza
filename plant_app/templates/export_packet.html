@@ -1,0 +1,61 @@
+<!doctype html>
+<html data-theme="light" style="--font-scale: 1;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Run {{ packet['run_label'] }} Data Sheet</title>
+  {% include "partials/print_packet_styles.html" %}
+  <style>
+    :root {
+      --font-sans: "Aptos", "Segoe UI", Arial, sans-serif;
+      --card: #ffffff;
+      --text: #111111;
+      --muted: #555555;
+      --line: #d7dde3;
+      --radius-sm: 6px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f4f6f8;
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .info-chip {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    .muted { color: var(--muted); }
+    @media print {
+      body { background: #fff; }
+      .wrap { max-width: none; padding: 0; }
+      .card { border: 0; padding: 0; margin: 0; }
+      .print-hidden { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    {% include "partials/print_packet.html" %}
+  </div>
+</body>
+</html>

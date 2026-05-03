@@ -1,0 +1,24 @@
+﻿run,sheet,sheet_name,section,row_no,field,value,status
+31126,Clarifier,Data Sheet - Clarifier,Header,,Date,2026-04-21,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Clarification Sequential No.,,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Retentate Flow Set Point (gpm),30,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Zero Refract,Y,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Start-up Time,,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Shut-down Time,,Complete
+31126,Clarifier,Data Sheet - Clarifier,Header,,Operator Initials,OP,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Time,1:00,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Initials,CR,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Feed Tank Level (%),20,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Feed Pressure (psi),10,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Perm C (gpm),5,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Perm D (gpm),5,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Feed RI (%),5,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Retentate RI (%),4,Complete
+31126,Clarifier,Data Sheet - Clarifier,Filtration,1,Permeate RI (%),,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Time,2:00,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Initials,CR,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Feed Tank Level (%),30,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Feed Pressure (psi),60,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Feed RI (%),20,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Retentate RI (%),10,Complete
+31126,Clarifier,Data Sheet - Clarifier,Diafiltration,1,Permeate RI (%),11,Complete

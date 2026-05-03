@@ -28,9 +28,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const newRow = sourceRow.cloneNode(true);
+      newRow.querySelectorAll('input[type="hidden"]').forEach((field) => field.remove());
       newRow.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
         const fieldKey = field.dataset.repeatField || (field.name || "").split("_").pop();
         field.name = `${prefix}_${nextIndex}_${fieldKey}`;
+        field.disabled = false;
+        field.readOnly = false;
 
         const defaultValue = field.dataset.defaultValue || "";
         if (field.tagName === "SELECT") {
@@ -38,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (field.type !== "hidden") {
           field.value = defaultValue;
         }
-        field.classList.remove("blank-stamped", "blank-value");
+        field.classList.remove("blank-stamped", "blank-value", "saved-locked");
       });
 
       body.appendChild(newRow);

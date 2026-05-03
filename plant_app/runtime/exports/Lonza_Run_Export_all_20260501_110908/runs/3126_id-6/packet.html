@@ -1,0 +1,2624 @@
+<!doctype html>
+<html data-theme="light" style="--font-scale: 1;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Run 3126 Export Packet</title>
+  <link rel="stylesheet" href="../../assets/style.css">
+  <style>
+  .ps-run-header { border-bottom: 2px solid #000; padding-bottom: .5rem; margin-bottom: 1rem; }
+  .ps-run-title { display: flex; align-items: baseline; gap: .75rem; margin-bottom: .25rem; }
+  .ps-run-title h2 { margin: 0; font-size: 1.25rem; }
+  .ps-run-meta { font-size: .85rem; color: #000; margin-bottom: .25rem; }
+  .ps-sheet { margin-bottom: 1.5rem; }
+  .ps-sheet-heading { display: flex; align-items: baseline; gap: .5rem; border-bottom: 1px solid #bbb; padding-bottom: .2rem; margin-bottom: .6rem; }
+  .ps-sheet-heading h3 { margin: 0; font-size: 1rem; }
+  .ps-sheet-name { margin: 0; font-size: .8rem; color: #555; font-style: italic; }
+  .ps-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem .75rem; margin-bottom: .75rem; }
+  .ps-field { display: flex; flex-direction: column; }
+  .ps-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; color: #555; letter-spacing: .03em; }
+  .ps-value { font-size: .85rem; border-bottom: 1px solid #999; padding: .1rem 0; min-height: 1.2rem; word-break: break-word; }
+  .ps-signature { display: flex; align-items: center; gap: .5rem; margin: .25rem 0 .75rem; }
+  .ps-signature-img { width: 220px; max-width: 45%; height: 54px; object-fit: contain; border-bottom: 1px solid #999; background: #fff; padding: .1rem .25rem; }
+  .ps-signature-meta { font-size: .78rem; color: #555; }
+  .ps-table-wrap { overflow-x: auto; margin-bottom: .75rem; }
+  .ps-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  .ps-table th { background: #f0f0f0; border: 1px solid #bbb; padding: .2rem .4rem; text-align: left; font-weight: 600; white-space: nowrap; }
+  .ps-table td { border: 1px solid #ccc; padding: .2rem .4rem; min-width: 3rem; }
+  .ps-table-title { font-size: .85rem; font-weight: 600; margin: .5rem 0 .2rem; }
+  .ps-notes { font-size: .82rem; color: #333; border-left: 3px solid #ccc; padding-left: .5rem; margin-top: .5rem; }
+  .ps-no-entries { color: #777; font-style: italic; font-size: .85rem; padding: .5rem 0; }
+  .ps-sheet-voided { border: 1px solid #888; padding: .5rem; }
+  .ps-void-box { border: 1px solid #888; background: #f6f6f6; padding: .5rem; font-weight: 700; }
+
+  @media print {
+    @page { margin: 0.5in 0.4in; size: letter portrait; }
+
+    .print-hidden, .settings-root, .nav, .settings-toggle,
+    .settings-panel, .app-loading-overlay, .print-toolbar,
+    .actions { display: none !important; }
+
+    html, body { width: 100% !important; margin: 0 !important; padding: 0 !important;
+      background: #fff !important; color: #000 !important; font-size: 9pt !important; }
+    * { color: #000 !important; }
+    .wrap { max-width: 100% !important; width: 100% !important;
+      margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+
+    .card, .print-packet {
+      overflow: visible !important;
+      position: static !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .card::before, .card::after,
+    .print-packet::before, .print-packet::after { display: none !important; }
+
+    .print-packet { break-after: page; page-break-after: always; }
+    .print-packet:last-of-type { break-after: auto; page-break-after: auto; }
+
+    .ps-run-header { border-bottom: 1.5pt solid #000 !important; padding-bottom: 5pt; margin-bottom: 10pt; }
+    .ps-run-title h2 { font-size: 14pt; margin: 0; color: #000; }
+    .ps-run-meta { font-size: 8pt; color: #000; }
+    .ps-sheet { margin-bottom: 10pt; break-inside: avoid; page-break-inside: avoid; }
+    .ps-sheet-heading { border-bottom: 0.75pt solid #000 !important; margin-bottom: 4pt; }
+    .ps-sheet-heading h3 { font-size: 10pt; color: #000; }
+    .ps-sheet-name { font-size: 7.5pt; color: #000; }
+    .ps-fields { display: grid !important; grid-template-columns: repeat(4,1fr) !important;
+      gap: 3pt 8pt; margin-bottom: 6pt; }
+    .ps-label { font-size: 6.5pt !important; color: #000 !important; }
+    .ps-value { font-size: 8pt !important; color: #000 !important; border-bottom: 0.5pt solid #000 !important;
+      min-height: 10pt; padding: 1pt 0; word-break: break-word; }
+    .ps-signature { gap: 4pt; margin: 2pt 0 6pt; break-inside: avoid; page-break-inside: avoid; }
+    .ps-signature-img { width: 1.9in; max-width: 1.9in; height: 0.45in; border-bottom: 0.5pt solid #000 !important;
+      padding: 1pt 2pt; object-fit: contain; background: #fff !important; }
+    .ps-signature-meta { font-size: 7pt; color: #000 !important; }
+    .ps-table-wrap { overflow: visible !important; margin-bottom: 6pt; }
+    .ps-table { width: 100% !important; border-collapse: collapse !important;
+      font-size: 7pt !important; table-layout: fixed; color: #000 !important; }
+    .ps-table th { background: #ddd !important; -webkit-print-color-adjust: exact;
+      print-color-adjust: exact; border: 0.5pt solid #000 !important;
+      padding: 2pt 3pt !important; font-size: 6.5pt !important; color: #000 !important;
+      white-space: normal !important; word-break: break-word; }
+    .ps-table td { border: 0.5pt solid #000 !important; padding: 2pt 3pt !important;
+      color: #000 !important; word-break: break-word; }
+    .ps-table-title { font-size: 8pt; font-weight: 700; margin: 4pt 0 2pt; color: #000; }
+    .ps-notes { font-size: 7.5pt; border-left: 2pt solid #000 !important;
+      padding-left: 4pt; margin-top: 4pt; color: #000; }
+    .ps-no-entries { font-size: 8pt; color: #000; }
+    .ps-sheet-voided { border: 0.75pt solid #000 !important; padding: 5pt !important; }
+    .ps-void-box { border: 0.75pt solid #000 !important; background: #eee !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 4pt !important; font-size: 8pt !important; }
+  }
+</style>
+  <style>
+    .export-meta { margin-bottom: 1rem; }
+    .export-meta h1 { margin: 0 0 .25rem; font-size: 1.35rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card export-meta print-hidden">
+      <h1>Run 3126</h1>
+      <p class="muted">Lonza_Run_Export_all_20260501_110908 generated 2026-05-01T11:09:08</p>
+    </div>
+    
+
+<section class="card print-packet">
+  <div class="ps-run-header">
+    <div class="ps-run-title">
+      <h2>Batch Record &mdash; Run 3126</h2>
+      <span class="info-chip">Complete</span>
+    </div>
+    <div class="ps-run-meta">
+      
+       &nbsp;|&nbsp; Blend: BLEND-20260421-105954
+      
+       &nbsp;|&nbsp; Created: 2026-04-10T10:25:41
+    </div>
+    
+  </div>
+
+  
+
+  
+
+  
+  
+  
+  <div class="ps-sheet">
+    <div class="ps-sheet-heading">
+      <h3>Clarifier</h3>
+      <span class="ps-sheet-name">Data Sheet - Clarifier</span>
+    </div>
+    
+
+    <div class="ps-fields">
+      
+      <div class="ps-field">
+        <span class="ps-label">Date</span>
+        <span class="ps-value">2026-04-10</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Clarification Sequential No.</span>
+        <span class="ps-value">2026-04-10 | OP</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Retentate Flow Set Point (gpm)</span>
+        <span class="ps-value">30</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Zero Refract</span>
+        <span class="ps-value">2026-04-10 | OP</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Start-up Time</span>
+        <span class="ps-value">12:30</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Shut-down Time</span>
+        <span class="ps-value">01:30</span>
+      </div>
+      
+      <div class="ps-field">
+        <span class="ps-label">Operator Initials</span>
+        <span class="ps-value">OP</span>
+      </div>
+      
+    </div>
+
+    
+    <p class="ps-table-title">Filtration</p>
+    <div class="ps-table-wrap">
+      <table class="ps-table">
+        <tr>
+          
+          <th>Time</th>
+          
+          <th>Initials</th>
+          
+          <th>Feed Tank Level (%)</th>
+          
+          <th>Feed Pressure (psi)</th>
+          
+          <th>Perm C (gpm)</th>
+          
+          <th>Perm D (gpm)</th>
+          
+          <th>Feed RI (%)</th>
+          
+          <th>Retentate RI (%)</th>
+          
+          <th>Permeate RI (%)</th>
+          
+        </tr>
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>1:00</td>
+          
+          <td>OP</td>
+          
+          <td>20</td>
+          
+          <td>10</td>
+          
+          <td>5</td>
+          
+          <td>5</td>
+          
+          <td>5</td>
+          
+          <td>4</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+      </table>
+    </div>
+    
+    <p class="ps-table-title">Diafiltration</p>
+    <div class="ps-table-wrap">
+      <table class="ps-table">
+        <tr>
+          
+          <th>Time</th>
+          
+          <th>Initials</th>
+          
+          <th>Feed Tank Level (%)</th>
+          
+          <th>Feed Pressure (psi)</th>
+          
+          <th>Feed RI (%)</th>
+          
+          <th>Retentate RI (%)</th>
+          
+          <th>Permeate RI (%)</th>
+          
+        </tr>
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        <tr>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+          <td>2026-04-10 | OP</td>
+          
+        </tr>
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+        
+        
+      </table>
+    </div>
+    
+
+    
+  </div>
+  
+
+  
+</section>
+  </div>
+</body>
+</html>

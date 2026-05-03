@@ -1,0 +1,268 @@
+{
+  "run": {
+    "id": 11,
+    "batch_number": "BLEND-20260421-105954",
+    "split_batch_number": "",
+    "blend_number": "BLEND-20260421-105954",
+    "run_number": "BLEND-20260421-105954",
+    "batch_type": "blend",
+    "reused_batch": 1,
+    "product_name": "",
+    "shift_name": "",
+    "operator_id": "1101",
+    "notes": "",
+    "status": "Complete",
+    "finalized_at": "2026-04-28T22:04:09",
+    "finalized_by": "1101",
+    "created_at": "2026-04-28T21:46:18",
+    "updated_at": "2026-04-28T22:21:04",
+    "final_edit_initials": null,
+    "final_edit_notes": null
+  },
+  "run_label": "BLEND-20260421-105954",
+  "generated_at": "2026-05-01T11:09:08",
+  "has_entries": true,
+  "generic_entries": [
+    {
+      "stage_key": "clarifier",
+      "title": "Clarifier",
+      "sheet_name": "Data Sheet - Clarifier",
+      "entry": {
+        "id": 6,
+        "run_id": 11,
+        "stage_key": "clarifier",
+        "stage_title": "Clarifier",
+        "employee": "1001",
+        "operator_initials": "OP",
+        "entry_date": "2026-04-21",
+        "comments": "",
+        "payload_json": "{\"entry_date\": \"2026-04-21\", \"clarification_sequential_no\": \"\", \"retentate_flow_set_point\": \"30\", \"zero_refract\": \"Y\", \"startup_time\": \"\", \"shutdown_time\": \"\", \"operator_initials\": \"OP\", \"clarifier_filtration_1_time\": \"1:00\", \"clarifier_filtration_1_operator_initials\": \"CR\", \"clarifier_filtration_1_feed_tank_level\": \"20\", \"clarifier_filtration_1_feed_pressure\": \"10\", \"clarifier_filtration_1_permeate_flow_c\": \"5\", \"clarifier_filtration_1_permeate_flow_d\": \"5\", \"clarifier_filtration_1_feed_ri\": \"5\", \"clarifier_filtration_1_retentate_ri\": \"4\", \"clarifier_filtration_1_permeate_ri\": \"\", \"clarifier_dia_1_time\": \"2:00\", \"clarifier_dia_1_operator_initials\": \"CR\", \"clarifier_dia_1_feed_tank_level\": \"30\", \"clarifier_dia_1_feed_pressure\": \"60\", \"clarifier_dia_1_feed_ri\": \"20\", \"clarifier_dia_1_retentate_ri\": \"10\", \"clarifier_dia_1_permeate_ri\": \"11\", \"comments\": \"\", \"photo_path\": \"\"}",
+        "version_no": 1,
+        "previous_entry_id": null,
+        "created_at": "2026-04-28T21:46:18",
+        "signature_data": null,
+        "signature_signed_at": null,
+        "completion_status": "Complete"
+      },
+      "payload": {
+        "entry_date": "2026-04-21",
+        "clarification_sequential_no": "",
+        "retentate_flow_set_point": "30",
+        "zero_refract": "Y",
+        "startup_time": "",
+        "shutdown_time": "",
+        "operator_initials": "OP",
+        "clarifier_filtration_1_time": "1:00",
+        "clarifier_filtration_1_operator_initials": "CR",
+        "clarifier_filtration_1_feed_tank_level": "20",
+        "clarifier_filtration_1_feed_pressure": "10",
+        "clarifier_filtration_1_permeate_flow_c": "5",
+        "clarifier_filtration_1_permeate_flow_d": "5",
+        "clarifier_filtration_1_feed_ri": "5",
+        "clarifier_filtration_1_retentate_ri": "4",
+        "clarifier_filtration_1_permeate_ri": "",
+        "clarifier_dia_1_time": "2:00",
+        "clarifier_dia_1_operator_initials": "CR",
+        "clarifier_dia_1_feed_tank_level": "30",
+        "clarifier_dia_1_feed_pressure": "60",
+        "clarifier_dia_1_feed_ri": "20",
+        "clarifier_dia_1_retentate_ri": "10",
+        "clarifier_dia_1_permeate_ri": "11",
+        "comments": "",
+        "photo_path": ""
+      },
+      "stage": {
+        "title": "Clarifier",
+        "sheet_name": "Data Sheet - Clarifier",
+        "headers": [
+          [
+            "entry_date",
+            "Date",
+            "date",
+            [],
+            ""
+          ],
+          [
+            "clarification_sequential_no",
+            "Clarification Sequential No.",
+            "text",
+            [],
+            ""
+          ],
+          [
+            "retentate_flow_set_point",
+            "Retentate Flow Set Point (gpm)",
+            "text",
+            [],
+            ""
+          ],
+          [
+            "zero_refract",
+            "Zero Refract",
+            "select",
+            [
+              "Y",
+              "N"
+            ],
+            ""
+          ],
+          [
+            "startup_time",
+            "Start-up Time",
+            "time",
+            [],
+            ""
+          ],
+          [
+            "shutdown_time",
+            "Shut-down Time",
+            "time",
+            [],
+            ""
+          ],
+          [
+            "operator_initials",
+            "Operator Initials",
+            "text",
+            [],
+            ""
+          ]
+        ],
+        "tables": [
+          {
+            "title": "Filtration",
+            "prefix": "clarifier_filtration",
+            "rows": 50,
+            "initial_rows": 1,
+            "columns": [
+              [
+                "time",
+                "Time",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "operator_initials",
+                "Initials",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_tank_level",
+                "Feed Tank Level (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_pressure",
+                "Feed Pressure (psi)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "permeate_flow_c",
+                "Perm C (gpm)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "permeate_flow_d",
+                "Perm D (gpm)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_ri",
+                "Feed RI (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "retentate_ri",
+                "Retentate RI (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "permeate_ri",
+                "Permeate RI (%)",
+                "text",
+                [],
+                ""
+              ]
+            ]
+          },
+          {
+            "title": "Diafiltration",
+            "prefix": "clarifier_dia",
+            "rows": 50,
+            "initial_rows": 1,
+            "columns": [
+              [
+                "time",
+                "Time",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "operator_initials",
+                "Initials",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_tank_level",
+                "Feed Tank Level (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_pressure",
+                "Feed Pressure (psi)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "feed_ri",
+                "Feed RI (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "retentate_ri",
+                "Retentate RI (%)",
+                "text",
+                [],
+                ""
+              ],
+              [
+                "permeate_ri",
+                "Permeate RI (%)",
+                "text",
+                [],
+                ""
+              ]
+            ]
+          }
+        ]
+      },
+      "completion_status": "Complete"
+    }
+  ],
+  "voided_entries": [],
+  "attachments": [],
+  "field_change_history": []
+}

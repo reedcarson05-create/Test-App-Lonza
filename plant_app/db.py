@@ -334,6 +334,29 @@ def column_exists(conn, cur, table_name: str, column_name: str) -> bool:
     return cur.fetchone() is not None
 
 
+def column_is_nullable(conn, cur, table_name: str, column_name: str) -> bool:
+    """Return True when an existing column permits NULL values."""
+    if _is_sqlite_connection(conn):
+        cur.execute(f"PRAGMA table_info({table_name})")
+        for row in cur.fetchall():
+            if row[1] == column_name:
+                return not bool(row[3])
+        return True
+
+    cur.execute(
+        """
+        SELECT IS_NULLABLE
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = 'dbo'
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        """,
+        (table_name, column_name),
+    )
+    row = cur.fetchone()
+    return not row or str(row[0]).upper() == "YES"
+
+
 def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_type: str, sqlserver_type: str) -> None:
     """Add a nullable column when an existing installation is behind the app schema."""
     if column_exists(conn, cur, table_name, column_name):
@@ -343,6 +366,35 @@ def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_t
         cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}")
     else:
         cur.execute(f"ALTER TABLE dbo.{table_name} ADD {column_name} {sqlserver_type} NULL")
+
+
+def make_column_nullable_if_needed(conn, cur, table_name: str, column_name: str, sqlserver_type: str) -> None:
+    """Loosen a SQL Server column to nullable when standalone machine entries need it."""
+    if not column_exists(conn, cur, table_name, column_name) or column_is_nullable(conn, cur, table_name, column_name):
+        return
+    if _is_sqlite_connection(conn):
+        return
+    if table_name == "sheet_entries" and column_name == "run_id":
+        cur.execute("""
+            IF EXISTS (
+                SELECT 1
+                FROM sys.indexes
+                WHERE name = N'idx_sheet_run_stage_created'
+                  AND object_id = OBJECT_ID(N'dbo.sheet_entries')
+            )
+            DROP INDEX idx_sheet_run_stage_created ON dbo.sheet_entries
+        """)
+    cur.execute(f"ALTER TABLE dbo.{table_name} ALTER COLUMN {column_name} {sqlserver_type} NULL")
+    if table_name == "sheet_entries" and column_name == "run_id":
+        cur.execute("""
+            IF NOT EXISTS (
+                SELECT 1
+                FROM sys.indexes
+                WHERE name = N'idx_sheet_run_stage_created'
+                  AND object_id = OBJECT_ID(N'dbo.sheet_entries')
+            )
+            CREATE INDEX idx_sheet_run_stage_created ON dbo.sheet_entries(run_id, stage_key, created_at DESC)
+        """)
 
 
 def _table_exists(conn, cur, table_name: str) -> bool:
@@ -367,6 +419,7 @@ def ensure_schema_migrations(conn) -> None:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id INTEGER NOT NULL,
                     stage_key TEXT NOT NULL,
+                    voided_by TEXT,
                     voided_at TEXT NOT NULL,
                     UNIQUE(run_id, stage_key)
                 )
@@ -377,6 +430,7 @@ def ensure_schema_migrations(conn) -> None:
                     id INT IDENTITY(1,1) PRIMARY KEY,
                     run_id INT NOT NULL,
                     stage_key NVARCHAR(100) NOT NULL,
+                    voided_by NVARCHAR(50) NULL,
                     voided_at NVARCHAR(50) NOT NULL,
                     CONSTRAINT uq_voided_stages UNIQUE (run_id, stage_key)
                 )
@@ -387,10 +441,13 @@ def ensure_schema_migrations(conn) -> None:
         ("extraction_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
         ("filtration_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
         ("filtration_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
+        ("filtration_entries", "completion_status", "TEXT", "NVARCHAR(20)"),
         ("evaporation_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
         ("evaporation_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
         ("sheet_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
         ("sheet_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
+        ("sheet_entries", "completion_status", "TEXT", "NVARCHAR(20)"),
+        ("voided_stages", "voided_by", "TEXT", "NVARCHAR(50)"),
         ("filtration_entries", "cycle_volume_set_point", "TEXT", "NVARCHAR(100)"),
         ("filtration_entries", "payload_json", "TEXT", "NVARCHAR(MAX)"),
         ("filtration_rows", "operator_initials", "TEXT", "NVARCHAR(50)"),
@@ -408,6 +465,9 @@ def ensure_schema_migrations(conn) -> None:
     )
     for table_name, column_name, sqlite_type, sqlserver_type in additions:
         add_column_if_missing(conn, cur, table_name, column_name, sqlite_type, sqlserver_type)
+    make_column_nullable_if_needed(conn, cur, "sheet_entries", "run_id", "INT")
+    cur.execute("UPDATE filtration_entries SET completion_status = ? WHERE completion_status IS NULL OR completion_status = ''", ("Complete",))
+    cur.execute("UPDATE sheet_entries SET completion_status = ? WHERE completion_status IS NULL OR completion_status = ''", ("Complete",))
     conn.commit()
 
 
@@ -532,14 +592,19 @@ def update_user_preferences(employee: str, theme: str, font_scale: str) -> dict[
 
 
 def get_completed_stage_keys_for_run(run_id: int) -> set:
-    """Return the set of stage keys that have at least one saved entry for this run."""
+    """Return the set of stage keys that have at least one complete entry for this run."""
     conn = get_conn()
     cur = conn.cursor()
     completed = set()
-    cur.execute("SELECT 1 FROM evaporation_entries WHERE run_id = ? LIMIT 1", (run_id,)) if _is_sqlite_connection(conn) else cur.execute("SELECT TOP 1 1 FROM evaporation_entries WHERE run_id = ?", (run_id,))
-    if cur.fetchone():
-        completed.add("evaporation")
-    cur.execute("SELECT DISTINCT stage_key FROM sheet_entries WHERE run_id = ?", (run_id,))
+    cur.execute(
+        """
+        SELECT DISTINCT stage_key
+        FROM sheet_entries
+        WHERE run_id = ?
+          AND COALESCE(completion_status, 'Complete') = 'Complete'
+        """,
+        (run_id,),
+    )
     for row in cur.fetchall():
         completed.add(row[0])
     conn.close()
@@ -556,7 +621,18 @@ def get_voided_stage_keys_for_run(run_id: int) -> set:
     return keys
 
 
-def toggle_stage_void(run_id: int, stage_key: str) -> bool:
+def get_voided_stages_for_run(run_id: int) -> dict:
+    """Return voided stage metadata keyed by stage_key for print/review display."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT stage_key, voided_by, voided_at FROM voided_stages WHERE run_id = ?", (run_id,))
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return {row["stage_key"]: row for row in rows}
+
+
+def toggle_stage_void(run_id: int, stage_key: str, voided_by: str = "") -> bool:
     """Toggle a stage void. Returns True if now voided, False if now restored."""
     conn = get_conn()
     cur = conn.cursor()
@@ -572,8 +648,8 @@ def toggle_stage_void(run_id: int, stage_key: str) -> bool:
         )
     else:
         cur.execute(
-            "INSERT INTO voided_stages (run_id, stage_key, voided_at) VALUES (?, ?, ?)",
-            (run_id, stage_key, datetime.now().isoformat(timespec="seconds")),
+            "INSERT INTO voided_stages (run_id, stage_key, voided_by, voided_at) VALUES (?, ?, ?, ?)",
+            (run_id, stage_key, voided_by.strip(), datetime.now().isoformat(timespec="seconds")),
         )
     conn.commit()
     conn.close()
@@ -856,8 +932,8 @@ def list_runs_paginated(
         params_data.append(batch_type)
 
     stage_subquery = (
-        "(SELECT COUNT(DISTINCT stage_key) FROM sheet_entries WHERE run_id = pr.id) + "
-        "(CASE WHEN EXISTS(SELECT 1 FROM evaporation_entries WHERE run_id = pr.id) THEN 1 ELSE 0 END)"
+        "(SELECT COUNT(DISTINCT stage_key) FROM sheet_entries "
+        "WHERE run_id = pr.id AND COALESCE(completion_status, 'Complete') = 'Complete')"
     )
 
     cur.execute(f"""
@@ -1211,6 +1287,7 @@ def insert_filtration(employee: str, data: dict) -> int:
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
         data.get("payload_json", "{}"),
+        data.get("completion_status", "Complete"),
         data.get("version_no", 1),
         data.get("previous_entry_id"),
         now_stamp(),
@@ -1223,9 +1300,9 @@ def insert_filtration(employee: str, data: dict) -> int:
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
                 comments, photo_path, signature_data, signature_signed_at,
-                payload_json, version_no, previous_entry_id, created_at
+                payload_json, completion_status, version_no, previous_entry_id, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.lastrowid)
     else:
@@ -1236,10 +1313,10 @@ def insert_filtration(employee: str, data: dict) -> int:
                 clarification_sequential_no, retentate_flow_set_point, zero_refract,
                 startup_time, shutdown_time, start_time, stop_time,
                 comments, photo_path, signature_data, signature_signed_at,
-                payload_json, version_no, previous_entry_id, created_at
+                payload_json, completion_status, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.fetchone()[0])
 
@@ -1561,6 +1638,48 @@ def get_latest_filtration_for_run(run_id: int):
     return entry, rows
 
 
+def get_latest_filtration_draft():
+    """Fetch the most recent incomplete Microflow Filtration entry."""
+    conn = get_conn()
+    cur = conn.cursor()
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT *
+            FROM filtration_entries
+            WHERE COALESCE(completion_status, 'Complete') = 'Draft'
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM filtration_entries
+            WHERE COALESCE(completion_status, 'Complete') = 'Draft'
+            ORDER BY id DESC
+            """
+        )
+    entry_columns = [col[0] for col in cur.description]
+    entry = row_to_dict(entry_columns, cur.fetchone())
+    rows = []
+    if entry:
+        cur.execute(
+            """
+            SELECT *
+            FROM filtration_rows
+            WHERE filtration_entry_id = ?
+            ORDER BY row_group, row_no
+            """,
+            (entry["id"],),
+        )
+        row_columns = [col[0] for col in cur.description]
+        rows = rows_to_dicts(row_columns, cur.fetchall())
+    conn.close()
+    return entry, rows
+
+
 def update_filtration(entry_id: int, employee: str, data: dict) -> None:
     """Replace an existing filtration entry and its child rows with corrected values."""
     conn = get_conn()
@@ -1571,6 +1690,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
             cycle_volume_set_point = ?, retentate_flow_set_point = ?, zero_refract = ?, startup_time = ?, shutdown_time = ?,
             start_time = ?, stop_time = ?, comments = ?, photo_path = ?,
             signature_data = ?, signature_signed_at = ?, payload_json = ?,
+            completion_status = ?,
             version_no = COALESCE(version_no, 1) + 1
         WHERE id = ?
     """, (
@@ -1590,6 +1710,7 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
         data.get("payload_json", "{}"),
+        data.get("completion_status", "Complete"),
         entry_id,
     ))
     # Rebuild the child rows from the submitted form so the saved set always matches the current screen.
@@ -1628,6 +1749,127 @@ def update_filtration(entry_id: int, employee: str, data: dict) -> None:
         ))
     conn.commit()
     conn.close()
+
+
+def list_all_extraction_entries(search: str = "", limit: int = 300) -> list[dict]:
+    """Return extraction entries joined to their run number, newest first."""
+    conn = get_conn()
+    cur = conn.cursor()
+    pattern = f"%{search}%"
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date, e.entry_time,
+                   e.location, e.start_time, e.stop_time, e.comments, e.version_no, e.created_at,
+                   r.run_number
+            FROM extraction_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+            ORDER BY e.created_at DESC
+            LIMIT ?
+            """,
+            (search, pattern, pattern, pattern, limit),
+        )
+    else:
+        cur.execute(
+            f"""
+            SELECT TOP (?) e.id, e.run_id, e.employee, e.operator_initials, e.entry_date, e.entry_time,
+                   e.location, e.start_time, e.stop_time, e.comments, e.version_no, e.created_at,
+                   r.run_number
+            FROM extraction_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+            ORDER BY e.created_at DESC
+            """,
+            (limit, search, pattern, pattern, pattern),
+        )
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
+def list_all_filtration_entries(search: str = "", limit: int = 300) -> list[dict]:
+    """Return filtration entries joined to their run number, newest first."""
+    conn = get_conn()
+    cur = conn.cursor()
+    pattern = f"%{search}%"
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date,
+                   e.cycle_volume_set_point, e.startup_time, e.shutdown_time,
+                   e.completion_status, e.comments, e.version_no, e.created_at,
+                   r.run_number
+            FROM filtration_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+            ORDER BY e.created_at DESC
+            LIMIT ?
+            """,
+            (search, pattern, pattern, pattern, limit),
+        )
+    else:
+        cur.execute(
+            f"""
+            SELECT TOP (?) e.id, e.run_id, e.employee, e.operator_initials, e.entry_date,
+                   e.cycle_volume_set_point, e.startup_time, e.shutdown_time,
+                   e.completion_status, e.comments, e.version_no, e.created_at,
+                   r.run_number
+            FROM filtration_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+            ORDER BY e.created_at DESC
+            """,
+            (limit, search, pattern, pattern, pattern),
+        )
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
+def list_all_clarifier_entries(search: str = "", limit: int = 300) -> list[dict]:
+    """Return standalone clarifier sheet entries, newest first."""
+    import json as _json
+    conn = get_conn()
+    cur = conn.cursor()
+    pattern = f"%{search}%"
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT e.id, e.employee, e.operator_initials, e.entry_date,
+                   e.completion_status, e.version_no, e.created_at, e.payload_json
+            FROM sheet_entries e
+            WHERE e.stage_key = 'clarifier'
+              AND (? = '' OR e.operator_initials LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?)
+            ORDER BY e.created_at DESC
+            LIMIT ?
+            """,
+            (search, pattern, pattern, pattern, limit),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP (?) e.id, e.employee, e.operator_initials, e.entry_date,
+                   e.completion_status, e.version_no, e.created_at, e.payload_json
+            FROM sheet_entries e
+            WHERE e.stage_key = 'clarifier'
+              AND (? = '' OR e.operator_initials LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?)
+            ORDER BY e.created_at DESC
+            """,
+            (limit, search, pattern, pattern, pattern),
+        )
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    for row in rows:
+        try:
+            payload = _json.loads(row.get("payload_json") or "{}")
+            row["clarification_sequential_no"] = payload.get("clarification_sequential_no", "")
+        except (TypeError, ValueError):
+            row["clarification_sequential_no"] = ""
+    return rows
 
 
 def get_evaporation_entry(entry_id: int):
@@ -1767,6 +2009,41 @@ def get_latest_sheet_entry_for_run_stage(run_id: int, stage_key: str):
     return row
 
 
+def get_latest_standalone_sheet_draft(stage_key: str):
+    """Fetch the newest draft generic sheet that is not tied to a run."""
+    conn = get_conn()
+    cur = conn.cursor()
+    if _is_sqlite_connection(conn):
+        cur.execute(
+            """
+            SELECT *
+            FROM sheet_entries
+            WHERE run_id IS NULL
+              AND stage_key = ?
+              AND COALESCE(completion_status, 'Complete') = 'Draft'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (stage_key,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM sheet_entries
+            WHERE run_id IS NULL
+              AND stage_key = ?
+              AND COALESCE(completion_status, 'Complete') = 'Draft'
+            ORDER BY id DESC
+            """,
+            (stage_key,),
+        )
+    columns = [col[0] for col in cur.description]
+    row = row_to_dict(columns, cur.fetchone())
+    conn.close()
+    return row
+
+
 def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
     """Update a generic stage sheet and increment its version number."""
     conn = get_conn()
@@ -1775,6 +2052,7 @@ def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
         UPDATE sheet_entries
         SET employee = ?, operator_initials = ?, entry_date = ?, comments = ?,
             signature_data = ?, signature_signed_at = ?, payload_json = ?,
+            completion_status = ?,
             version_no = COALESCE(version_no, 1) + 1
         WHERE id = ?
     """, (
@@ -1785,6 +2063,7 @@ def update_sheet_entry(entry_id: int, employee: str, data: dict) -> None:
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
         data.get("payload_json", "{}"),
+        data.get("completion_status", "Complete"),
         entry_id,
     ))
     conn.commit()
@@ -1807,6 +2086,7 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
         data.get("signature_data", ""),
         data.get("signature_signed_at", ""),
         data.get("payload_json", "{}"),
+        data.get("completion_status", "Complete"),
         data.get("version_no", 1),
         data.get("previous_entry_id"),
         now_stamp(),
@@ -1816,9 +2096,9 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
             INSERT INTO sheet_entries (
                 run_id, stage_key, stage_title, employee, operator_initials,
                 entry_date, comments, signature_data, signature_signed_at,
-                payload_json, version_no, previous_entry_id, created_at
+                payload_json, completion_status, version_no, previous_entry_id, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.lastrowid)
     else:
@@ -1826,10 +2106,10 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
             INSERT INTO sheet_entries (
                 run_id, stage_key, stage_title, employee, operator_initials,
                 entry_date, comments, signature_data, signature_signed_at,
-                payload_json, version_no, previous_entry_id, created_at
+                payload_json, completion_status, version_no, previous_entry_id, created_at
             )
             OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, params)
         entry_id = int(cur.fetchone()[0])
     conn.commit()

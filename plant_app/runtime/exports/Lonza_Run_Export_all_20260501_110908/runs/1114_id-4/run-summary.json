@@ -1,0 +1,29 @@
+{
+  "run": {
+    "id": 4,
+    "batch_number": "1114",
+    "split_batch_number": "",
+    "blend_number": "BLEND-20260421-105954",
+    "run_number": "",
+    "batch_type": "blend",
+    "reused_batch": 0,
+    "product_name": "",
+    "shift_name": "Day",
+    "operator_id": "1001",
+    "notes": "",
+    "status": "Complete",
+    "finalized_at": "2026-04-21T10:16:59",
+    "finalized_by": "1001",
+    "created_at": "2026-03-31T21:01:04",
+    "updated_at": "2026-04-21T10:59:54",
+    "final_edit_initials": null,
+    "final_edit_notes": null
+  },
+  "run_label": "1114",
+  "generated_at": "2026-05-01T11:09:08",
+  "has_entries": false,
+  "generic_entries": [],
+  "voided_entries": [],
+  "attachments": [],
+  "field_change_history": []
+}

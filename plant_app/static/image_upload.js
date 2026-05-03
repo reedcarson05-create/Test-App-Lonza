@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let closeButton = null;
   let activeStream = null;
   let activeUpload = null;
-  const prefersNativeCapture = window.matchMedia?.("(pointer: coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const stopCamera = () => {
     if (!activeStream) return;
@@ -153,10 +152,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     cameraButton.addEventListener("click", async () => {
-      if (prefersNativeCapture) {
-        cameraInput.click();
-        return;
-      }
       if (navigator.mediaDevices?.getUserMedia) {
         const opened = await openDesktopCamera();
         if (opened) return;

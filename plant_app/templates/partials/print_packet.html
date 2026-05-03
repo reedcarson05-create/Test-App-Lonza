@@ -131,4 +131,17 @@
     {% endif %}
   </div>
   {% endfor %}
+
+  {% for item in packet['voided_entries'] %}
+  <div class="ps-sheet ps-sheet-voided">
+    <div class="ps-sheet-heading">
+      <h3>{{ item['title'] }}</h3>
+      <span class="ps-sheet-name">{{ item['sheet_name'] }}</span>
+      <span class="info-chip">Void / N/A</span>
+    </div>
+    <div class="ps-void-box">
+      This sheet was marked Void / N/A for this run{% if item['voided_by'] %} by {{ item['voided_by'] }}{% endif %}{% if item['voided_at'] %} at {{ item['voided_at'] }}{% endif %}.
+    </div>
+  </div>
+  {% endfor %}
 </section>
