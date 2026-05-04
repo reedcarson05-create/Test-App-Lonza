@@ -31,7 +31,7 @@ This guide explains what each active file does, what to change when requirements
 - Insert/update helpers: one helper per saved entry type.
 - Read helpers: fetch single entries, latest run-linked entries, and dashboard history.
 - Safe edit notes:
-- Add new columns in table creation SQL and with `ensure_column(...)` for existing databases.
+- Add new columns in the `CREATE TABLE` block and with `add_column_if_missing(...)` for existing databases.
 - Keep insert and update helpers aligned with the payloads built in `app.py`.
 - If a table has repeating rows, update both the parent-table helper and the child-row helper/query.
 - Avoid hand-editing `plant.db`; let schema changes happen through `init_db()`.

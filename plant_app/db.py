@@ -1,27 +1,11 @@
-"""SQL Server persistence helpers for authentication, runs, stage entries, and audit history."""
+"""Local SQLite persistence helpers for authentication, runs, entries, and audit history."""
 
 import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-import pyodbc
-
-DEFAULT_SQL_DRIVER = "ODBC Driver 18 for SQL Server"
-DEFAULT_SQL_SERVER = "localhost"
-PREFERRED_SQL_DRIVERS = (
-    "ODBC Driver 18 for SQL Server",
-    "ODBC Driver 17 for SQL Server",
-    "ODBC Driver 13 for SQL Server",
-    "ODBC Driver 11 for SQL Server",
-    "SQL Server Native Client 11.0",
-    "SQL Server",
-)
-PREFERRED_SQL_DATABASE = "LonzaPlantOpsApp"
-FALLBACK_SQL_DATABASE = "LAGPlantOpsApp"
-SQLITE_FALLBACK_PATH = Path(__file__).resolve().parent / "plant.db"
-_resolved_sql_database: str | None = None
-_active_backend: str | None = None
+DEFAULT_DB_PATH = Path(__file__).resolve().parent / "plant.db"
 DEFAULT_ADMIN_PASSCODE = "1234"
 LEGACY_DEFAULT_ADMIN_PASSWORD = "LagAdmin2024!"
 LEGACY_SAMPLE_PASSWORD = "test123"
@@ -34,25 +18,6 @@ def _env_text(name: str, default: str = "") -> str:
         return default
     trimmed = raw_value.strip()
     return trimmed if trimmed else default
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    """Parse a common yes/no style environment flag safely."""
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-
-    normalized = raw_value.strip().lower()
-    if normalized in {"1", "true", "yes", "y", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
-
-
-def _yes_no(value: bool) -> str:
-    """Convert a boolean into the yes/no string SQL Server expects."""
-    return "yes" if value else "no"
 
 
 def _valid_passcode(value: str) -> bool:
@@ -70,231 +35,35 @@ def _configured_admin_passcode() -> str:
     return DEFAULT_ADMIN_PASSCODE
 
 
-def _resolved_sql_driver() -> str:
-    """Pick an installed SQL Server ODBC driver, unless one is explicitly configured."""
-    configured_driver = _env_text("PLANT_APP_SQL_DRIVER")
-    if configured_driver:
-        return configured_driver.strip("{}")
-
-    installed_drivers = {driver.strip(): driver.strip() for driver in pyodbc.drivers() if driver.strip()}
-    for driver_name in PREFERRED_SQL_DRIVERS:
-        if driver_name in installed_drivers:
-            return installed_drivers[driver_name]
-
-    return DEFAULT_SQL_DRIVER
-
-
-def _default_encrypt_enabled(driver: str) -> bool:
-    """Keep secure defaults for modern drivers and broad compatibility for legacy ones."""
-    return driver != "SQL Server"
-
-
-def _supports_secure_connection_flags(driver: str) -> bool:
-    """Return True when the selected driver supports Encrypt/TrustServerCertificate flags."""
-    return driver != "SQL Server"
-
-
-def _requested_backend() -> str:
-    """Return the preferred backend mode, defaulting globally to SQL Server."""
-    requested = _env_text("PLANT_APP_DB_BACKEND", "sqlserver").lower()
-    if requested in {"sqlite", "sqlite3"}:
-        return "sqlite"
-    if requested in {"sql", "sqlserver", "mssql"}:
-        return "sqlserver"
-    return "sqlserver"
-
-
-def _sql_configuration_present() -> bool:
-    """Return True when the environment explicitly points at a shared SQL Server."""
-    relevant_names = (
-        "PLANT_APP_SQL_CONNECTION_STRING",
-        "PLANT_APP_SQL_SERVER",
-        "PLANT_APP_SQL_PORT",
-        "PLANT_APP_SQL_DATABASE",
-        "PLANT_APP_SQL_USER",
-        "PLANT_APP_SQL_PASSWORD",
-        "PLANT_APP_SQL_DRIVER",
-        "PLANT_APP_SQL_TRUSTED_CONNECTION",
-    )
-    return any(os.getenv(name) not in {None, ""} for name in relevant_names)
-
-
-def _sqlite_available() -> bool:
-    """Return True when the bundled local SQLite fallback database exists."""
-    return SQLITE_FALLBACK_PATH.exists()
+def database_path() -> Path:
+    """Return the local database file used by the portable app."""
+    configured = _env_text("PLANT_APP_DB_PATH", str(DEFAULT_DB_PATH))
+    path = Path(configured).expanduser()
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent / path
+    return path
 
 
 def _open_sqlite_conn():
-    """Open the bundled SQLite fallback used when shared SQL is unavailable."""
-    conn = sqlite3.connect(SQLITE_FALLBACK_PATH)
+    """Open the bundled SQLite database used by the local app."""
+    db_path = database_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def _is_sqlite_connection(conn) -> bool:
-    """Return True when the supplied DB-API connection is SQLite."""
-    return isinstance(conn, sqlite3.Connection)
-
-
-def _connect_sql_server():
-    """Open the configured SQL Server database."""
-    return pyodbc.connect(build_sql_connection_string(resolve_sql_database()))
-
-
-def _sql_server_target() -> str:
-    """Return the configured SQL Server host or host:port target."""
-    server = _env_text("PLANT_APP_SQL_SERVER", DEFAULT_SQL_SERVER)
-    port = _env_text("PLANT_APP_SQL_PORT")
-
-    if port and "\\" not in server and "," not in server:
-        prefix = "" if server.lower().startswith("tcp:") else "tcp:"
-        return f"{prefix}{server},{port}"
-
-    return server
-
-
-def _with_database(connection_string: str, database: str) -> str:
-    """Inject the target database into a caller-supplied connection string."""
-    parts: list[str] = []
-    for segment in connection_string.split(";"):
-        segment = segment.strip()
-        if not segment:
-            continue
-        key = segment.split("=", 1)[0].strip().lower()
-        if key in {"database", "initial catalog"}:
-            continue
-        parts.append(segment)
-
-    parts.append(f"DATABASE={database}")
-    return ";".join(parts) + ";"
-
-
-def build_sql_connection_string(database: str) -> str:
-    """Build a SQL Server connection string for local or shared multi-device access."""
-    override = _env_text("PLANT_APP_SQL_CONNECTION_STRING")
-    if override:
-        return _with_database(override, database)
-
-    driver = _resolved_sql_driver()
-    username = os.getenv("PLANT_APP_SQL_USER", "").strip()
-    password = os.getenv("PLANT_APP_SQL_PASSWORD", "")
-    timeout = _env_text("PLANT_APP_SQL_TIMEOUT", "5")
-    encrypt_enabled = _env_bool("PLANT_APP_SQL_ENCRYPT", _default_encrypt_enabled(driver))
-    trust_server_certificate = _env_bool("PLANT_APP_SQL_TRUST_SERVER_CERTIFICATE", encrypt_enabled)
-
-    parts = [
-        f"DRIVER={{{driver}}}",
-        f"SERVER={_sql_server_target()}",
-        f"DATABASE={database}",
-    ]
-
-    if username:
-        parts.extend([f"UID={username}", f"PWD={password}"])
-    else:
-        parts.append(
-            f"Trusted_Connection={_yes_no(_env_bool('PLANT_APP_SQL_TRUSTED_CONNECTION', True))}"
-        )
-
-    if _supports_secure_connection_flags(driver):
-        parts.extend(
-            [
-                f"Encrypt={_yes_no(encrypt_enabled)}",
-                f"TrustServerCertificate={_yes_no(trust_server_certificate)}",
-            ]
-        )
-
-    if timeout:
-        parts.append(f"Connection Timeout={timeout}")
-
-    return ";".join(parts) + ";"
-
-
-def resolve_sql_database() -> str:
-    """Pick an explicit, preferred, or discovered Plant App database name."""
-    global _resolved_sql_database
-
-    explicit_database = os.getenv("PLANT_APP_SQL_DATABASE", "").strip()
-    if explicit_database:
-        return explicit_database
-
-    if _resolved_sql_database:
-        return _resolved_sql_database
-
-    try:
-        conn = pyodbc.connect(build_sql_connection_string("master"))
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT TOP (1) name
-                FROM sys.databases
-                WHERE name IN (?, ?) OR name LIKE ?
-                ORDER BY CASE
-                    WHEN name = ? THEN 0
-                    WHEN name = ? THEN 1
-                    ELSE 2
-                END, name
-                """,
-                (
-                    PREFERRED_SQL_DATABASE,
-                    FALLBACK_SQL_DATABASE,
-                    "%PlantOpsApp",
-                    PREFERRED_SQL_DATABASE,
-                    FALLBACK_SQL_DATABASE,
-                ),
-            )
-            row = cur.fetchone()
-        finally:
-            conn.close()
-    except pyodbc.Error:
-        row = None
-
-    if row and row[0]:
-        _resolved_sql_database = str(row[0])
-        return _resolved_sql_database
-
-    _resolved_sql_database = PREFERRED_SQL_DATABASE
-    return _resolved_sql_database
-
-
 def get_conn():
-    """Open the active application database, preferring SQL Server with SQLite fallback."""
-    global _active_backend
-
-    requested_backend = _requested_backend()
-    if requested_backend == "sqlite":
-        _active_backend = "sqlite"
-        return _open_sqlite_conn()
-
-    # When SQL Server is only the default and no shared SQL target was configured,
-    # prefer the bundled SQLite database so the desktop app still boots locally.
-    if (not _sql_configuration_present()) and _sqlite_available():
-        _active_backend = "sqlite"
-        return _open_sqlite_conn()
-
-    try:
-        conn = _connect_sql_server()
-        _active_backend = "sqlserver"
-        return conn
-    except pyodbc.Error:
-        allow_sqlite_fallback = _sqlite_available() and (
-            requested_backend != "sqlserver" or not _sql_configuration_present()
-        )
-        if not allow_sqlite_fallback:
-            raise
-        _active_backend = "sqlite"
-        return _open_sqlite_conn()
+    """Open the local SQLite application database."""
+    return _open_sqlite_conn()
 
 
 def backend_status() -> dict[str, str]:
-    """Return the configured and active database targets for diagnostics."""
-    configured_database = os.getenv("PLANT_APP_SQL_DATABASE", "").strip() or _resolved_sql_database or PREFERRED_SQL_DATABASE
+    """Return the local database target for diagnostics."""
     return {
-        "requested_backend": _requested_backend(),
-        "active_backend": _active_backend or "uninitialized",
-        "sql_server": _sql_server_target(),
-        "sql_database": configured_database,
-        "sqlite_fallback_path": str(SQLITE_FALLBACK_PATH),
+        "backend": "sqlite",
+        "database_path": str(database_path()),
+        "export_mode": "flash_drive_pdf",
     }
 
 
@@ -304,7 +73,7 @@ def now_stamp() -> str:
 
 
 def row_to_dict(columns: list[str], row) -> dict | None:
-    """Convert a pyodbc row into a plain dictionary."""
+    """Convert a database row into a plain dictionary."""
     if row is None:
         return None
     return dict(zip(columns, row))
@@ -317,155 +86,298 @@ def rows_to_dicts(columns: list[str], rows) -> list[dict]:
 
 def column_exists(conn, cur, table_name: str, column_name: str) -> bool:
     """Return True when a table already has the requested column."""
-    if _is_sqlite_connection(conn):
-        cur.execute(f"PRAGMA table_info({table_name})")
-        return any(row[1] == column_name for row in cur.fetchall())
-
-    cur.execute(
-        """
-        SELECT 1
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = 'dbo'
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
-        """,
-        (table_name, column_name),
-    )
-    return cur.fetchone() is not None
+    cur.execute(f"PRAGMA table_info({table_name})")
+    return any(row[1] == column_name for row in cur.fetchall())
 
 
 def column_is_nullable(conn, cur, table_name: str, column_name: str) -> bool:
     """Return True when an existing column permits NULL values."""
-    if _is_sqlite_connection(conn):
-        cur.execute(f"PRAGMA table_info({table_name})")
-        for row in cur.fetchall():
-            if row[1] == column_name:
-                return not bool(row[3])
-        return True
-
-    cur.execute(
-        """
-        SELECT IS_NULLABLE
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = 'dbo'
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
-        """,
-        (table_name, column_name),
-    )
-    row = cur.fetchone()
-    return not row or str(row[0]).upper() == "YES"
+    cur.execute(f"PRAGMA table_info({table_name})")
+    for row in cur.fetchall():
+        if row[1] == column_name:
+            return not bool(row[3])
+    return True
 
 
-def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_type: str, sqlserver_type: str) -> None:
+def add_column_if_missing(conn, cur, table_name: str, column_name: str, sqlite_type: str) -> None:
     """Add a nullable column when an existing installation is behind the app schema."""
     if column_exists(conn, cur, table_name, column_name):
         return
-
-    if _is_sqlite_connection(conn):
-        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}")
-    else:
-        cur.execute(f"ALTER TABLE dbo.{table_name} ADD {column_name} {sqlserver_type} NULL")
+    cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {sqlite_type}")
 
 
-def make_column_nullable_if_needed(conn, cur, table_name: str, column_name: str, sqlserver_type: str) -> None:
-    """Loosen a SQL Server column to nullable when standalone machine entries need it."""
-    if not column_exists(conn, cur, table_name, column_name) or column_is_nullable(conn, cur, table_name, column_name):
-        return
-    if _is_sqlite_connection(conn):
-        return
-    if table_name == "sheet_entries" and column_name == "run_id":
-        cur.execute("""
-            IF EXISTS (
-                SELECT 1
-                FROM sys.indexes
-                WHERE name = N'idx_sheet_run_stage_created'
-                  AND object_id = OBJECT_ID(N'dbo.sheet_entries')
-            )
-            DROP INDEX idx_sheet_run_stage_created ON dbo.sheet_entries
-        """)
-    cur.execute(f"ALTER TABLE dbo.{table_name} ALTER COLUMN {column_name} {sqlserver_type} NULL")
-    if table_name == "sheet_entries" and column_name == "run_id":
-        cur.execute("""
-            IF NOT EXISTS (
-                SELECT 1
-                FROM sys.indexes
-                WHERE name = N'idx_sheet_run_stage_created'
-                  AND object_id = OBJECT_ID(N'dbo.sheet_entries')
-            )
-            CREATE INDEX idx_sheet_run_stage_created ON dbo.sheet_entries(run_id, stage_key, created_at DESC)
-        """)
+def make_column_nullable_if_needed(conn, cur, table_name: str, column_name: str, _column_type: str = "") -> None:
+    """SQLite keeps existing column nullability as-is; new installs already use nullable columns."""
+    return None
 
 
 def _table_exists(conn, cur, table_name: str) -> bool:
     """Return True when the named table already exists in the database."""
-    if _is_sqlite_connection(conn):
-        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
-    else:
-        cur.execute(
-            "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=?",
-            (table_name,),
-        )
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
     return cur.fetchone() is not None
+
+
+def ensure_core_schema(conn) -> None:
+    """Create the local SQLite tables when the app is installed on a fresh drive."""
+    cur = conn.cursor()
+    cur.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_number TEXT UNIQUE NOT NULL,
+            full_name TEXT,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'operator',
+            active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            initials TEXT,
+            theme_preference TEXT DEFAULT 'light',
+            font_scale_preference TEXT DEFAULT '1'
+        );
+
+        CREATE TABLE IF NOT EXISTS production_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_number TEXT,
+            split_batch_number TEXT,
+            blend_number TEXT,
+            run_number TEXT,
+            batch_type TEXT DEFAULT 'standard',
+            reused_batch INTEGER DEFAULT 0,
+            product_name TEXT,
+            shift_name TEXT,
+            operator_id TEXT,
+            notes TEXT,
+            status TEXT DEFAULT 'Open',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            final_edit_initials TEXT,
+            final_edit_notes TEXT,
+            finalized_at TEXT,
+            finalized_by TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS extraction_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            entry_time TEXT,
+            location TEXT DEFAULT 'Pile',
+            time_on_pile TEXT,
+            start_time TEXT,
+            stop_time TEXT,
+            psf1_speed TEXT,
+            psf1_load TEXT,
+            psf1_blowback TEXT,
+            psf2_speed TEXT,
+            psf2_load TEXT,
+            psf2_blowback TEXT,
+            press_speed TEXT,
+            press_load TEXT,
+            press_blowback TEXT,
+            pressate_ri TEXT,
+            chip_bin_steam TEXT,
+            chip_chute_temp TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            signature_data TEXT,
+            signature_signed_at TEXT,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS filtration_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            cycle_volume_set_point TEXT,
+            clarification_sequential_no TEXT,
+            retentate_flow_set_point TEXT,
+            zero_refract TEXT,
+            startup_time TEXT,
+            shutdown_time TEXT,
+            start_time TEXT,
+            stop_time TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            signature_data TEXT,
+            signature_signed_at TEXT,
+            payload_json TEXT,
+            completion_status TEXT DEFAULT 'Complete',
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS filtration_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filtration_entry_id INTEGER NOT NULL,
+            row_group TEXT,
+            row_no INTEGER,
+            row_time TEXT,
+            operator_initials TEXT,
+            fic1_gpm TEXT,
+            tit1 TEXT,
+            tit2 TEXT,
+            dpt TEXT,
+            dpm TEXT,
+            perm_total TEXT,
+            f12_gpm TEXT,
+            feed_ri TEXT,
+            retentate_ri TEXT,
+            permeate_ri TEXT,
+            perm_flow_c TEXT,
+            perm_flow_d TEXT,
+            qic1_ntu_turbidity TEXT,
+            pressure_pt1 TEXT,
+            pressure_pt2 TEXT,
+            pressure_pt3 TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS evaporation_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            evaporator_no TEXT,
+            startup_time TEXT,
+            shutdown_time TEXT,
+            feed_ri TEXT,
+            concentrate_ri TEXT,
+            steam_pressure TEXT,
+            vacuum TEXT,
+            sump_level TEXT,
+            product_temp TEXT,
+            comments TEXT,
+            photo_path TEXT,
+            signature_data TEXT,
+            signature_signed_at TEXT,
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS evaporation_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evaporation_entry_id INTEGER NOT NULL,
+            row_no INTEGER,
+            row_time TEXT,
+            feed_rate TEXT,
+            evap_temp TEXT,
+            row_vacuum TEXT,
+            row_concentrate_ri TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS sheet_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            stage_key TEXT NOT NULL,
+            stage_title TEXT NOT NULL,
+            employee TEXT NOT NULL,
+            operator_initials TEXT,
+            entry_date TEXT,
+            comments TEXT,
+            signature_data TEXT,
+            signature_signed_at TEXT,
+            payload_json TEXT NOT NULL,
+            completion_status TEXT DEFAULT 'Complete',
+            version_no INTEGER DEFAULT 1,
+            previous_entry_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS voided_stages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL,
+            stage_key TEXT NOT NULL,
+            voided_by TEXT,
+            voided_at TEXT NOT NULL,
+            UNIQUE(run_id, stage_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_name TEXT NOT NULL,
+            record_id INTEGER NOT NULL,
+            action_type TEXT NOT NULL,
+            changed_by TEXT,
+            old_data TEXT,
+            new_data TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS field_change_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER,
+            entry_table TEXT NOT NULL,
+            record_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            original_value TEXT,
+            corrected_value TEXT,
+            field_value TEXT,
+            correction_reason TEXT,
+            change_initials TEXT NOT NULL,
+            changed_by_employee TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_runs_updated_at ON production_runs(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_extraction_created_at ON extraction_entries(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_filtration_created_at ON filtration_entries(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_sheet_created_at ON sheet_entries(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_sheet_run_stage_created ON sheet_entries(run_id, stage_key, created_at DESC);
+    """)
+    conn.commit()
 
 
 def ensure_schema_migrations(conn) -> None:
     """Apply small additive schema updates needed by newer forms."""
     cur = conn.cursor()
     if not _table_exists(conn, cur, "voided_stages"):
-        if _is_sqlite_connection(conn):
-            cur.execute("""
-                CREATE TABLE voided_stages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id INTEGER NOT NULL,
-                    stage_key TEXT NOT NULL,
-                    voided_by TEXT,
-                    voided_at TEXT NOT NULL,
-                    UNIQUE(run_id, stage_key)
-                )
-            """)
-        else:
-            cur.execute("""
-                CREATE TABLE dbo.voided_stages (
-                    id INT IDENTITY(1,1) PRIMARY KEY,
-                    run_id INT NOT NULL,
-                    stage_key NVARCHAR(100) NOT NULL,
-                    voided_by NVARCHAR(50) NULL,
-                    voided_at NVARCHAR(50) NOT NULL,
-                    CONSTRAINT uq_voided_stages UNIQUE (run_id, stage_key)
-                )
-            """)
+        cur.execute("""
+            CREATE TABLE voided_stages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id INTEGER NOT NULL,
+                stage_key TEXT NOT NULL,
+                voided_by TEXT,
+                voided_at TEXT NOT NULL,
+                UNIQUE(run_id, stage_key)
+            )
+        """)
         conn.commit()
     additions = (
-        ("extraction_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
-        ("extraction_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
-        ("filtration_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
-        ("filtration_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
-        ("filtration_entries", "completion_status", "TEXT", "NVARCHAR(20)"),
-        ("evaporation_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
-        ("evaporation_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
-        ("sheet_entries", "signature_data", "TEXT", "NVARCHAR(MAX)"),
-        ("sheet_entries", "signature_signed_at", "TEXT", "NVARCHAR(100)"),
-        ("sheet_entries", "completion_status", "TEXT", "NVARCHAR(20)"),
-        ("voided_stages", "voided_by", "TEXT", "NVARCHAR(50)"),
-        ("filtration_entries", "cycle_volume_set_point", "TEXT", "NVARCHAR(100)"),
-        ("filtration_entries", "payload_json", "TEXT", "NVARCHAR(MAX)"),
-        ("filtration_rows", "operator_initials", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "fic1_gpm", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "tit1", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "tit2", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "dpt", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "dpm", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "perm_total", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "f12_gpm", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "qic1_ntu_turbidity", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "pressure_pt1", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "pressure_pt2", "TEXT", "NVARCHAR(50)"),
-        ("filtration_rows", "pressure_pt3", "TEXT", "NVARCHAR(50)"),
+        ("extraction_entries", "signature_data", "TEXT"),
+        ("extraction_entries", "signature_signed_at", "TEXT"),
+        ("filtration_entries", "signature_data", "TEXT"),
+        ("filtration_entries", "signature_signed_at", "TEXT"),
+        ("filtration_entries", "completion_status", "TEXT"),
+        ("evaporation_entries", "signature_data", "TEXT"),
+        ("evaporation_entries", "signature_signed_at", "TEXT"),
+        ("sheet_entries", "signature_data", "TEXT"),
+        ("sheet_entries", "signature_signed_at", "TEXT"),
+        ("sheet_entries", "completion_status", "TEXT"),
+        ("voided_stages", "voided_by", "TEXT"),
+        ("filtration_entries", "cycle_volume_set_point", "TEXT"),
+        ("filtration_entries", "payload_json", "TEXT"),
+        ("filtration_rows", "operator_initials", "TEXT"),
+        ("filtration_rows", "fic1_gpm", "TEXT"),
+        ("filtration_rows", "tit1", "TEXT"),
+        ("filtration_rows", "tit2", "TEXT"),
+        ("filtration_rows", "dpt", "TEXT"),
+        ("filtration_rows", "dpm", "TEXT"),
+        ("filtration_rows", "perm_total", "TEXT"),
+        ("filtration_rows", "f12_gpm", "TEXT"),
+        ("filtration_rows", "qic1_ntu_turbidity", "TEXT"),
+        ("filtration_rows", "pressure_pt1", "TEXT"),
+        ("filtration_rows", "pressure_pt2", "TEXT"),
+        ("filtration_rows", "pressure_pt3", "TEXT"),
     )
-    for table_name, column_name, sqlite_type, sqlserver_type in additions:
-        add_column_if_missing(conn, cur, table_name, column_name, sqlite_type, sqlserver_type)
-    make_column_nullable_if_needed(conn, cur, "sheet_entries", "run_id", "INT")
+    for table_name, column_name, sqlite_type in additions:
+        add_column_if_missing(conn, cur, table_name, column_name, sqlite_type)
     cur.execute("UPDATE filtration_entries SET completion_status = ? WHERE completion_status IS NULL OR completion_status = ''", ("Complete",))
     cur.execute("UPDATE sheet_entries SET completion_status = ? WHERE completion_status IS NULL OR completion_status = ''", ("Complete",))
     conn.commit()
@@ -509,17 +421,16 @@ def _migrate_legacy_user_passcodes(conn) -> None:
 
 
 def init_db() -> None:
-    """Validate that the configured database backend is reachable."""
+    """Validate and prepare the local SQLite database file."""
     conn = get_conn()
     try:
         cur = conn.cursor()
         try:
-            # SQL Server keeps the result set active until it is consumed, which
-            # blocks the migration cursor from querying INFORMATION_SCHEMA.
             cur.execute("SELECT 1")
             cur.fetchone()
         finally:
             cur.close()
+        ensure_core_schema(conn)
         ensure_schema_migrations(conn)
         _seed_admin_user(conn)
         _migrate_legacy_user_passcodes(conn)
@@ -765,7 +676,6 @@ def create_run(
 
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     # One shared timestamp is used for both created/updated values on the first insert.
     stamp = now_stamp()
     params = (
@@ -782,27 +692,15 @@ def create_run(
         stamp,
         stamp,
     )
-    if sqlite_backend:
-        cur.execute("""
-            INSERT INTO production_runs (
-                batch_number, split_batch_number, blend_number, run_number, batch_type,
-                reused_batch, product_name, shift_name, operator_id, notes, status,
-                created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?)
-        """, params)
-        run_id = int(cur.lastrowid)
-    else:
-        cur.execute("""
-            INSERT INTO production_runs (
-                batch_number, split_batch_number, blend_number, run_number, batch_type,
-                reused_batch, product_name, shift_name, operator_id, notes, status,
-                created_at, updated_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?)
-        """, params)
-        run_id = int(cur.fetchone()[0])
+    cur.execute("""
+        INSERT INTO production_runs (
+            batch_number, split_batch_number, blend_number, run_number, batch_type,
+            reused_batch, product_name, shift_name, operator_id, notes, status,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?)
+    """, params)
+    run_id = int(cur.lastrowid)
     conn.commit()
     conn.close()
     return run_id
@@ -827,27 +725,16 @@ def get_run_by_number(run_number: str):
 
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT *
-            FROM production_runs
-            WHERE run_number = ? OR batch_number = ?
-            ORDER BY CASE WHEN status = 'Open' THEN 0 ELSE 1 END, updated_at DESC
-            LIMIT 1
-            """,
-            (normalized, normalized),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP 1 *
-            FROM production_runs
-            WHERE run_number = ? OR batch_number = ?
-            ORDER BY CASE WHEN status = 'Open' THEN 0 ELSE 1 END, updated_at DESC
-            """,
-            (normalized, normalized),
-        )
+    cur.execute(
+        """
+        SELECT *
+        FROM production_runs
+        WHERE run_number = ? OR batch_number = ?
+        ORDER BY CASE WHEN status = 'Open' THEN 0 ELSE 1 END, updated_at DESC
+        LIMIT 1
+        """,
+        (normalized, normalized),
+    )
     columns = [col[0] for col in cur.description]
     row = row_to_dict(columns, cur.fetchone())
     conn.close()
@@ -858,21 +745,13 @@ def list_runs(limit: int = 50):
     """Return the most recently updated production runs for the selection screen."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     safe_limit = max(1, int(limit))
-    if sqlite_backend:
-        cur.execute(f"""
-            SELECT *
-            FROM production_runs
-            ORDER BY updated_at DESC
-            LIMIT {safe_limit}
-        """)
-    else:
-        cur.execute(f"""
-            SELECT TOP ({safe_limit}) *
-            FROM production_runs
-            ORDER BY updated_at DESC
-        """)
+    cur.execute(f"""
+        SELECT *
+        FROM production_runs
+        ORDER BY updated_at DESC
+        LIMIT {safe_limit}
+    """)
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -913,7 +792,6 @@ def list_runs_paginated(
     """Return a page of runs with total count; each row includes a stage_count field."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
 
     safe_page = max(1, int(page))
     safe_per_page = max(1, int(per_page))
@@ -921,7 +799,7 @@ def list_runs_paginated(
     like = f"%{search.strip()}%" if search.strip() else "%"
 
     status_clause = "" if status == "all" else "AND pr.status = ?"
-    batch_type_clause = "" if batch_type == "all" else "AND COALESCE(NULLIF(LTRIM(RTRIM(pr.batch_type)), ''), 'standard') = ?"
+    batch_type_clause = "" if batch_type == "all" else "AND COALESCE(NULLIF(TRIM(pr.batch_type), ''), 'standard') = ?"
     params_count = [like, like, like]
     params_data = [like, like, like]
     if status != "all":
@@ -944,26 +822,15 @@ def list_runs_paginated(
     """, params_count)
     total = cur.fetchone()[0] or 0
 
-    if sqlite_backend:
-        cur.execute(f"""
-            SELECT pr.*, ({stage_subquery}) AS stage_count
-            FROM production_runs pr
-            WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
-            {status_clause}
-            {batch_type_clause}
-            ORDER BY pr.updated_at DESC
-            LIMIT {safe_per_page} OFFSET {offset}
-        """, params_data)
-    else:
-        cur.execute(f"""
-            SELECT pr.*, ({stage_subquery}) AS stage_count
-            FROM production_runs pr
-            WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
-            {status_clause}
-            {batch_type_clause}
-            ORDER BY pr.updated_at DESC
-            OFFSET {offset} ROWS FETCH NEXT {safe_per_page} ROWS ONLY
-        """, params_data)
+    cur.execute(f"""
+        SELECT pr.*, ({stage_subquery}) AS stage_count
+        FROM production_runs pr
+        WHERE (pr.run_number LIKE ? OR pr.batch_number LIKE ? OR pr.product_name LIKE ?)
+        {status_clause}
+        {batch_type_clause}
+        ORDER BY pr.updated_at DESC
+        LIMIT {safe_per_page} OFFSET {offset}
+    """, params_data)
 
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
@@ -975,23 +842,14 @@ def list_open_runs(limit: int = 100):
     """Return currently open runs ordered by the most recent activity."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     safe_limit = max(1, int(limit))
-    if sqlite_backend:
-        cur.execute(f"""
-            SELECT *
-            FROM production_runs
-            WHERE status = 'Open'
-            ORDER BY updated_at DESC
-            LIMIT {safe_limit}
-        """)
-    else:
-        cur.execute(f"""
-            SELECT TOP ({safe_limit}) *
-            FROM production_runs
-            WHERE status = 'Open'
-            ORDER BY updated_at DESC
-        """)
+    cur.execute(f"""
+        SELECT *
+        FROM production_runs
+        WHERE status = 'Open'
+        ORDER BY updated_at DESC
+        LIMIT {safe_limit}
+    """)
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -1060,36 +918,21 @@ def list_recent_group_labels(action_type: str, limit: int = 12) -> list[dict]:
 
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     safe_limit = max(1, int(limit))
 
-    if sqlite_backend:
-        cur.execute(
-            f"""
-            SELECT
-                {column_name} AS label,
-                MAX(updated_at) AS updated_at,
-                COUNT(*) AS run_count
-            FROM production_runs
-            WHERE TRIM(COALESCE({column_name}, '')) != ''
-            GROUP BY {column_name}
-            ORDER BY MAX(updated_at) DESC
-            LIMIT {safe_limit}
-            """
-        )
-    else:
-        cur.execute(
-            f"""
-            SELECT TOP ({safe_limit})
-                {column_name} AS label,
-                MAX(updated_at) AS updated_at,
-                COUNT(*) AS run_count
-            FROM production_runs
-            WHERE LTRIM(RTRIM(ISNULL({column_name}, ''))) != ''
-            GROUP BY {column_name}
-            ORDER BY MAX(updated_at) DESC
-            """
-        )
+    cur.execute(
+        f"""
+        SELECT
+            {column_name} AS label,
+            MAX(updated_at) AS updated_at,
+            COUNT(*) AS run_count
+        FROM production_runs
+        WHERE TRIM(COALESCE({column_name}, '')) != ''
+        GROUP BY {column_name}
+        ORDER BY MAX(updated_at) DESC
+        LIMIT {safe_limit}
+        """
+    )
 
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
@@ -1196,7 +1039,6 @@ def insert_extraction(employee: str, data: dict) -> int:
     """Insert a new extraction entry and return its id."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     params = (
         data["run_id"],
         employee,
@@ -1227,37 +1069,20 @@ def insert_extraction(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     )
-    if sqlite_backend:
-        cur.execute("""
-            INSERT INTO extraction_entries (
-                run_id, employee, operator_initials, entry_date, entry_time, location,
-                time_on_pile, start_time, stop_time,
-                psf1_speed, psf1_load, psf1_blowback,
-                psf2_speed, psf2_load, psf2_blowback,
-                press_speed, press_load, press_blowback,
-                pressate_ri, chip_bin_steam, chip_chute_temp,
-                comments, photo_path, signature_data, signature_signed_at,
-                version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.lastrowid)
-    else:
-        cur.execute("""
-            INSERT INTO extraction_entries (
-                run_id, employee, operator_initials, entry_date, entry_time, location,
-                time_on_pile, start_time, stop_time,
-                psf1_speed, psf1_load, psf1_blowback,
-                psf2_speed, psf2_load, psf2_blowback,
-                press_speed, press_load, press_blowback,
-                pressate_ri, chip_bin_steam, chip_chute_temp,
-                comments, photo_path, signature_data, signature_signed_at,
-                version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.fetchone()[0])
+    cur.execute("""
+        INSERT INTO extraction_entries (
+            run_id, employee, operator_initials, entry_date, entry_time, location,
+            time_on_pile, start_time, stop_time,
+            psf1_speed, psf1_load, psf1_blowback,
+            psf2_speed, psf2_load, psf2_blowback,
+            press_speed, press_load, press_blowback,
+            pressate_ri, chip_bin_steam, chip_chute_temp,
+            comments, photo_path, signature_data, signature_signed_at,
+            version_no, previous_entry_id, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, params)
+    entry_id = int(cur.lastrowid)
     conn.commit()
     conn.close()
     touch_run(data["run_id"])
@@ -1268,7 +1093,6 @@ def insert_filtration(employee: str, data: dict) -> int:
     """Insert a new filtration entry plus its repeating child rows."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     params = (
         data["run_id"],
         employee,
@@ -1292,33 +1116,18 @@ def insert_filtration(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     )
-    if sqlite_backend:
-        cur.execute("""
-            INSERT INTO filtration_entries (
-                run_id, employee, operator_initials, entry_date,
-                cycle_volume_set_point,
-                clarification_sequential_no, retentate_flow_set_point, zero_refract,
-                startup_time, shutdown_time, start_time, stop_time,
-                comments, photo_path, signature_data, signature_signed_at,
-                payload_json, completion_status, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.lastrowid)
-    else:
-        cur.execute("""
-            INSERT INTO filtration_entries (
-                run_id, employee, operator_initials, entry_date,
-                cycle_volume_set_point,
-                clarification_sequential_no, retentate_flow_set_point, zero_refract,
-                startup_time, shutdown_time, start_time, stop_time,
-                comments, photo_path, signature_data, signature_signed_at,
-                payload_json, completion_status, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.fetchone()[0])
+    cur.execute("""
+        INSERT INTO filtration_entries (
+            run_id, employee, operator_initials, entry_date,
+            cycle_volume_set_point,
+            clarification_sequential_no, retentate_flow_set_point, zero_refract,
+            startup_time, shutdown_time, start_time, stop_time,
+            comments, photo_path, signature_data, signature_signed_at,
+            payload_json, completion_status, version_no, previous_entry_id, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, params)
+    entry_id = int(cur.lastrowid)
 
     # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
@@ -1364,7 +1173,6 @@ def insert_evaporation(employee: str, data: dict) -> int:
     """Insert a new evaporation entry plus its repeating child rows."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     params = (
         data["run_id"],
         employee,
@@ -1387,29 +1195,16 @@ def insert_evaporation(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     )
-    if sqlite_backend:
-        cur.execute("""
-            INSERT INTO evaporation_entries (
-                run_id, employee, operator_initials, entry_date, evaporator_no,
-                startup_time, shutdown_time, feed_ri, concentrate_ri, steam_pressure,
-                vacuum, sump_level, product_temp, comments, photo_path,
-                signature_data, signature_signed_at, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.lastrowid)
-    else:
-        cur.execute("""
-            INSERT INTO evaporation_entries (
-                run_id, employee, operator_initials, entry_date, evaporator_no,
-                startup_time, shutdown_time, feed_ri, concentrate_ri, steam_pressure,
-                vacuum, sump_level, product_temp, comments, photo_path,
-                signature_data, signature_signed_at, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.fetchone()[0])
+    cur.execute("""
+        INSERT INTO evaporation_entries (
+            run_id, employee, operator_initials, entry_date, evaporator_no,
+            startup_time, shutdown_time, feed_ri, concentrate_ri, steam_pressure,
+            vacuum, sump_level, product_temp, comments, photo_path,
+            signature_data, signature_signed_at, version_no, previous_entry_id, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, params)
+    entry_id = int(cur.lastrowid)
 
     # Child rows are inserted after the parent so they can reference the generated parent id.
     for row in data.get("rows", []):
@@ -1504,27 +1299,16 @@ def get_latest_extraction_for_run(run_id: int):
     """Fetch the latest extraction entry recorded for a specific run."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT *
-            FROM extraction_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (run_id,),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP 1 *
-            FROM extraction_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-            """,
-            (run_id,),
-        )
+    cur.execute(
+        """
+        SELECT *
+        FROM extraction_entries
+        WHERE run_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (run_id,),
+    )
     columns = [col[0] for col in cur.description]
     row = row_to_dict(columns, cur.fetchone())
     conn.close()
@@ -1598,27 +1382,16 @@ def get_latest_filtration_for_run(run_id: int):
     """Fetch the latest filtration entry recorded for a specific run."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT *
-            FROM filtration_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (run_id,),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP 1 *
-            FROM filtration_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-            """,
-            (run_id,),
-        )
+    cur.execute(
+        """
+        SELECT *
+        FROM filtration_entries
+        WHERE run_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (run_id,),
+    )
     entry_columns = [col[0] for col in cur.description]
     entry = row_to_dict(entry_columns, cur.fetchone())
     rows = []
@@ -1642,25 +1415,15 @@ def get_latest_filtration_draft():
     """Fetch the most recent incomplete Microflow Filtration entry."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT *
-            FROM filtration_entries
-            WHERE COALESCE(completion_status, 'Complete') = 'Draft'
-            ORDER BY id DESC
-            LIMIT 1
-            """
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP 1 *
-            FROM filtration_entries
-            WHERE COALESCE(completion_status, 'Complete') = 'Draft'
-            ORDER BY id DESC
-            """
-        )
+    cur.execute(
+        """
+        SELECT *
+        FROM filtration_entries
+        WHERE COALESCE(completion_status, 'Complete') = 'Draft'
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    )
     entry_columns = [col[0] for col in cur.description]
     entry = row_to_dict(entry_columns, cur.fetchone())
     rows = []
@@ -1756,33 +1519,19 @@ def list_all_extraction_entries(search: str = "", limit: int = 300) -> list[dict
     conn = get_conn()
     cur = conn.cursor()
     pattern = f"%{search}%"
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date, e.entry_time,
-                   e.location, e.start_time, e.stop_time, e.comments, e.version_no, e.created_at,
-                   r.run_number
-            FROM extraction_entries e
-            LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
-            ORDER BY e.created_at DESC
-            LIMIT ?
-            """,
-            (search, pattern, pattern, pattern, limit),
-        )
-    else:
-        cur.execute(
-            f"""
-            SELECT TOP (?) e.id, e.run_id, e.employee, e.operator_initials, e.entry_date, e.entry_time,
-                   e.location, e.start_time, e.stop_time, e.comments, e.version_no, e.created_at,
-                   r.run_number
-            FROM extraction_entries e
-            LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
-            ORDER BY e.created_at DESC
-            """,
-            (limit, search, pattern, pattern, pattern),
-        )
+    cur.execute(
+        """
+        SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date, e.entry_time,
+               e.location, e.start_time, e.stop_time, e.comments, e.version_no, e.created_at,
+               r.run_number
+        FROM extraction_entries e
+        LEFT JOIN production_runs r ON r.id = e.run_id
+        WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+        ORDER BY e.created_at DESC
+        LIMIT ?
+        """,
+        (search, pattern, pattern, pattern, limit),
+    )
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -1794,35 +1543,20 @@ def list_all_filtration_entries(search: str = "", limit: int = 300) -> list[dict
     conn = get_conn()
     cur = conn.cursor()
     pattern = f"%{search}%"
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date,
-                   e.cycle_volume_set_point, e.startup_time, e.shutdown_time,
-                   e.completion_status, e.comments, e.version_no, e.created_at,
-                   r.run_number
-            FROM filtration_entries e
-            LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
-            ORDER BY e.created_at DESC
-            LIMIT ?
-            """,
-            (search, pattern, pattern, pattern, limit),
-        )
-    else:
-        cur.execute(
-            f"""
-            SELECT TOP (?) e.id, e.run_id, e.employee, e.operator_initials, e.entry_date,
-                   e.cycle_volume_set_point, e.startup_time, e.shutdown_time,
-                   e.completion_status, e.comments, e.version_no, e.created_at,
-                   r.run_number
-            FROM filtration_entries e
-            LEFT JOIN production_runs r ON r.id = e.run_id
-            WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
-            ORDER BY e.created_at DESC
-            """,
-            (limit, search, pattern, pattern, pattern),
-        )
+    cur.execute(
+        """
+        SELECT e.id, e.run_id, e.employee, e.operator_initials, e.entry_date,
+               e.cycle_volume_set_point, e.startup_time, e.shutdown_time,
+               e.completion_status, e.comments, e.version_no, e.created_at,
+               r.run_number
+        FROM filtration_entries e
+        LEFT JOIN production_runs r ON r.id = e.run_id
+        WHERE ? = '' OR r.run_number LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?
+        ORDER BY e.created_at DESC
+        LIMIT ?
+        """,
+        (search, pattern, pattern, pattern, limit),
+    )
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -1835,31 +1569,18 @@ def list_all_clarifier_entries(search: str = "", limit: int = 300) -> list[dict]
     conn = get_conn()
     cur = conn.cursor()
     pattern = f"%{search}%"
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT e.id, e.employee, e.operator_initials, e.entry_date,
-                   e.completion_status, e.version_no, e.created_at, e.payload_json
-            FROM sheet_entries e
-            WHERE e.stage_key = 'clarifier'
-              AND (? = '' OR e.operator_initials LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?)
-            ORDER BY e.created_at DESC
-            LIMIT ?
-            """,
-            (search, pattern, pattern, pattern, limit),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP (?) e.id, e.employee, e.operator_initials, e.entry_date,
-                   e.completion_status, e.version_no, e.created_at, e.payload_json
-            FROM sheet_entries e
-            WHERE e.stage_key = 'clarifier'
-              AND (? = '' OR e.operator_initials LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?)
-            ORDER BY e.created_at DESC
-            """,
-            (limit, search, pattern, pattern, pattern),
-        )
+    cur.execute(
+        """
+        SELECT e.id, e.employee, e.operator_initials, e.entry_date,
+               e.completion_status, e.version_no, e.created_at, e.payload_json
+        FROM sheet_entries e
+        WHERE e.stage_key = 'clarifier'
+          AND (? = '' OR e.operator_initials LIKE ? OR e.employee LIKE ? OR e.entry_date LIKE ?)
+        ORDER BY e.created_at DESC
+        LIMIT ?
+        """,
+        (search, pattern, pattern, pattern, limit),
+    )
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -1894,19 +1615,12 @@ def get_latest_evaporation_for_run(run_id: int):
     """Fetch the latest evaporation entry recorded for a specific run."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute("""
-            SELECT * FROM evaporation_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-            LIMIT 1
-        """, (run_id,))
-    else:
-        cur.execute("""
-            SELECT TOP 1 * FROM evaporation_entries
-            WHERE run_id = ?
-            ORDER BY id DESC
-        """, (run_id,))
+    cur.execute("""
+        SELECT * FROM evaporation_entries
+        WHERE run_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (run_id,))
     entry_columns = [col[0] for col in cur.description]
     entry = row_to_dict(entry_columns, cur.fetchone())
     rows = []
@@ -1990,19 +1704,12 @@ def get_latest_sheet_entry_for_run_stage(run_id: int, stage_key: str):
     """Fetch the most recent generic stage entry for a run/stage combination."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute("""
-            SELECT * FROM sheet_entries
-            WHERE run_id = ? AND stage_key = ?
-            ORDER BY id DESC
-            LIMIT 1
-        """, (run_id, stage_key))
-    else:
-        cur.execute("""
-            SELECT TOP 1 * FROM sheet_entries
-            WHERE run_id = ? AND stage_key = ?
-            ORDER BY id DESC
-        """, (run_id, stage_key))
+    cur.execute("""
+        SELECT * FROM sheet_entries
+        WHERE run_id = ? AND stage_key = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (run_id, stage_key))
     columns = [col[0] for col in cur.description]
     row = row_to_dict(columns, cur.fetchone())
     conn.close()
@@ -2013,31 +1720,18 @@ def get_latest_standalone_sheet_draft(stage_key: str):
     """Fetch the newest draft generic sheet that is not tied to a run."""
     conn = get_conn()
     cur = conn.cursor()
-    if _is_sqlite_connection(conn):
-        cur.execute(
-            """
-            SELECT *
-            FROM sheet_entries
-            WHERE run_id IS NULL
-              AND stage_key = ?
-              AND COALESCE(completion_status, 'Complete') = 'Draft'
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (stage_key,),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT TOP 1 *
-            FROM sheet_entries
-            WHERE run_id IS NULL
-              AND stage_key = ?
-              AND COALESCE(completion_status, 'Complete') = 'Draft'
-            ORDER BY id DESC
-            """,
-            (stage_key,),
-        )
+    cur.execute(
+        """
+        SELECT *
+        FROM sheet_entries
+        WHERE run_id IS NULL
+          AND stage_key = ?
+          AND COALESCE(completion_status, 'Complete') = 'Draft'
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (stage_key,),
+    )
     columns = [col[0] for col in cur.description]
     row = row_to_dict(columns, cur.fetchone())
     conn.close()
@@ -2074,7 +1768,6 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
     """Insert a new generic stage sheet and return its id."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     params = (
         data["run_id"],
         data["stage_key"],
@@ -2091,27 +1784,15 @@ def insert_sheet_entry(employee: str, data: dict) -> int:
         data.get("previous_entry_id"),
         now_stamp(),
     )
-    if sqlite_backend:
-        cur.execute("""
-            INSERT INTO sheet_entries (
-                run_id, stage_key, stage_title, employee, operator_initials,
-                entry_date, comments, signature_data, signature_signed_at,
-                payload_json, completion_status, version_no, previous_entry_id, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.lastrowid)
-    else:
-        cur.execute("""
-            INSERT INTO sheet_entries (
-                run_id, stage_key, stage_title, employee, operator_initials,
-                entry_date, comments, signature_data, signature_signed_at,
-                payload_json, completion_status, version_no, previous_entry_id, created_at
-            )
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, params)
-        entry_id = int(cur.fetchone()[0])
+    cur.execute("""
+        INSERT INTO sheet_entries (
+            run_id, stage_key, stage_title, employee, operator_initials,
+            entry_date, comments, signature_data, signature_signed_at,
+            payload_json, completion_status, version_no, previous_entry_id, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, params)
+    entry_id = int(cur.lastrowid)
     conn.commit()
     conn.close()
     touch_run(data["run_id"])
@@ -2172,58 +1853,32 @@ def get_field_change_history(run_id: int | None = None, limit: int = 200):
     """Return recent field-level correction history, optionally filtered to one run."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     safe_limit = max(1, int(limit))
     if run_id:
-        if sqlite_backend:
-            cur.execute(f"""
-                SELECT
-                    f.*,
-                    r.batch_number,
-                    r.run_number,
-                    r.blend_number
-                FROM field_change_log f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                WHERE f.run_id = ?
-                ORDER BY f.created_at DESC
-                LIMIT {safe_limit}
-            """, (run_id,))
-        else:
-            cur.execute(f"""
-                SELECT TOP ({safe_limit})
-                    f.*,
-                    r.batch_number,
-                    r.run_number,
-                    r.blend_number
-                FROM field_change_log f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                WHERE f.run_id = ?
-                ORDER BY f.created_at DESC
-            """, (run_id,))
+        cur.execute(f"""
+            SELECT
+                f.*,
+                r.batch_number,
+                r.run_number,
+                r.blend_number
+            FROM field_change_log f
+            LEFT JOIN production_runs r ON r.id = f.run_id
+            WHERE f.run_id = ?
+            ORDER BY f.created_at DESC
+            LIMIT {safe_limit}
+        """, (run_id,))
     else:
-        if sqlite_backend:
-            cur.execute(f"""
-                SELECT
-                    f.*,
-                    r.batch_number,
-                    r.run_number,
-                    r.blend_number
-                FROM field_change_log f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                ORDER BY f.created_at DESC
-                LIMIT {safe_limit}
-            """)
-        else:
-            cur.execute(f"""
-                SELECT TOP ({safe_limit})
-                    f.*,
-                    r.batch_number,
-                    r.run_number,
-                    r.blend_number
-                FROM field_change_log f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                ORDER BY f.created_at DESC
-            """)
+        cur.execute(f"""
+            SELECT
+                f.*,
+                r.batch_number,
+                r.run_number,
+                r.blend_number
+            FROM field_change_log f
+            LEFT JOIN production_runs r ON r.id = f.run_id
+            ORDER BY f.created_at DESC
+            LIMIT {safe_limit}
+        """)
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()
@@ -2234,196 +1889,102 @@ def last_12_hour_activity(hours: int = 12, limit: int = 300):
     """Return a flat recent-activity feed across all supported entry tables."""
     conn = get_conn()
     cur = conn.cursor()
-    sqlite_backend = _is_sqlite_connection(conn)
     safe_hours = max(1, int(hours))
     safe_limit = max(1, int(limit))
     # The UNION keeps dashboard rendering simple by projecting every section into one common shape.
-    if sqlite_backend:
-        age_filter = f"-{safe_hours} hours"
-        cur.execute(f"""
-            SELECT *
-            FROM (
-                SELECT
-                    r.id AS run_id,
-                    e.id AS record_id,
-                    'extraction_entries' AS entry_table,
-                    e.created_at AS activity_time,
-                    'Extraction' AS section,
-                    '' AS stage_key,
-                    e.employee,
-                    e.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    e.comments,
-                    e.start_time AS start_label,
-                    e.stop_time AS end_label
-                FROM extraction_entries e
-                LEFT JOIN production_runs r ON r.id = e.run_id
-                WHERE datetime(replace(e.created_at, 'T', ' ')) >= datetime('now', ?)
+    age_filter = f"-{safe_hours} hours"
+    cur.execute(f"""
+        SELECT *
+        FROM (
+            SELECT
+                r.id AS run_id,
+                e.id AS record_id,
+                'extraction_entries' AS entry_table,
+                e.created_at AS activity_time,
+                'Extraction' AS section,
+                '' AS stage_key,
+                e.employee,
+                e.operator_initials,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                r.status,
+                e.comments,
+                e.start_time AS start_label,
+                e.stop_time AS end_label
+            FROM extraction_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE datetime(replace(e.created_at, 'T', ' ')) >= datetime('now', ?)
 
-                UNION ALL
+            UNION ALL
 
-                SELECT
-                    r.id AS run_id,
-                    f.id AS record_id,
-                    'filtration_entries' AS entry_table,
-                    f.created_at AS activity_time,
-                    'Filtration' AS section,
-                    '' AS stage_key,
-                    f.employee,
-                    f.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    f.comments,
-                    f.startup_time AS start_label,
-                    f.shutdown_time AS end_label
-                FROM filtration_entries f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                WHERE datetime(replace(f.created_at, 'T', ' ')) >= datetime('now', ?)
+            SELECT
+                r.id AS run_id,
+                f.id AS record_id,
+                'filtration_entries' AS entry_table,
+                f.created_at AS activity_time,
+                'Filtration' AS section,
+                '' AS stage_key,
+                f.employee,
+                f.operator_initials,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                r.status,
+                f.comments,
+                f.startup_time AS start_label,
+                f.shutdown_time AS end_label
+            FROM filtration_entries f
+            LEFT JOIN production_runs r ON r.id = f.run_id
+            WHERE datetime(replace(f.created_at, 'T', ' ')) >= datetime('now', ?)
 
-                UNION ALL
+            UNION ALL
 
-                SELECT
-                    r.id AS run_id,
-                    v.id AS record_id,
-                    'evaporation_entries' AS entry_table,
-                    v.created_at AS activity_time,
-                    'Evaporation' AS section,
-                    '' AS stage_key,
-                    v.employee,
-                    v.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    v.comments,
-                    v.startup_time AS start_label,
-                    v.shutdown_time AS end_label
-                FROM evaporation_entries v
-                LEFT JOIN production_runs r ON r.id = v.run_id
-                WHERE datetime(replace(v.created_at, 'T', ' ')) >= datetime('now', ?)
+            SELECT
+                r.id AS run_id,
+                v.id AS record_id,
+                'evaporation_entries' AS entry_table,
+                v.created_at AS activity_time,
+                'Evaporation' AS section,
+                '' AS stage_key,
+                v.employee,
+                v.operator_initials,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                r.status,
+                v.comments,
+                v.startup_time AS start_label,
+                v.shutdown_time AS end_label
+            FROM evaporation_entries v
+            LEFT JOIN production_runs r ON r.id = v.run_id
+            WHERE datetime(replace(v.created_at, 'T', ' ')) >= datetime('now', ?)
 
-                UNION ALL
+            UNION ALL
 
-                SELECT
-                    r.id AS run_id,
-                    s.id AS record_id,
-                    'sheet_entries' AS entry_table,
-                    s.created_at AS activity_time,
-                    s.stage_title AS section,
-                    s.stage_key AS stage_key,
-                    s.employee,
-                    s.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    s.comments,
-                    '' AS start_label,
-                    '' AS end_label
-                FROM sheet_entries s
-                LEFT JOIN production_runs r ON r.id = s.run_id
-                WHERE datetime(replace(s.created_at, 'T', ' ')) >= datetime('now', ?)
-            ) activity
-            ORDER BY datetime(replace(activity_time, 'T', ' ')) DESC
-            LIMIT {safe_limit}
-        """, (age_filter, age_filter, age_filter, age_filter))
-    else:
-        cur.execute(f"""
-            SELECT TOP ({safe_limit}) *
-            FROM (
-                SELECT
-                    r.id AS run_id,
-                    e.id AS record_id,
-                    'extraction_entries' AS entry_table,
-                    e.created_at AS activity_time,
-                    'Extraction' AS section,
-                    '' AS stage_key,
-                    e.employee,
-                    e.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    e.comments,
-                    e.start_time AS start_label,
-                    e.stop_time AS end_label
-                FROM extraction_entries e
-                LEFT JOIN production_runs r ON r.id = e.run_id
-                WHERE TRY_CONVERT(datetime2, e.created_at) >= DATEADD(HOUR, -{safe_hours}, GETDATE())
-
-                UNION ALL
-
-                SELECT
-                    r.id AS run_id,
-                    f.id AS record_id,
-                    'filtration_entries' AS entry_table,
-                    f.created_at AS activity_time,
-                    'Filtration' AS section,
-                    '' AS stage_key,
-                    f.employee,
-                    f.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    f.comments,
-                    f.startup_time AS start_label,
-                    f.shutdown_time AS end_label
-                FROM filtration_entries f
-                LEFT JOIN production_runs r ON r.id = f.run_id
-                WHERE TRY_CONVERT(datetime2, f.created_at) >= DATEADD(HOUR, -{safe_hours}, GETDATE())
-
-                UNION ALL
-
-                SELECT
-                    r.id AS run_id,
-                    v.id AS record_id,
-                    'evaporation_entries' AS entry_table,
-                    v.created_at AS activity_time,
-                    'Evaporation' AS section,
-                    '' AS stage_key,
-                    v.employee,
-                    v.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    v.comments,
-                    v.startup_time AS start_label,
-                    v.shutdown_time AS end_label
-                FROM evaporation_entries v
-                LEFT JOIN production_runs r ON r.id = v.run_id
-                WHERE TRY_CONVERT(datetime2, v.created_at) >= DATEADD(HOUR, -{safe_hours}, GETDATE())
-
-                UNION ALL
-
-                SELECT
-                    r.id AS run_id,
-                    s.id AS record_id,
-                    'sheet_entries' AS entry_table,
-                    s.created_at AS activity_time,
-                    s.stage_title AS section,
-                    s.stage_key AS stage_key,
-                    s.employee,
-                    s.operator_initials,
-                    r.run_number,
-                    r.batch_number,
-                    r.blend_number,
-                    r.status,
-                    s.comments,
-                    '' AS start_label,
-                    '' AS end_label
-                FROM sheet_entries s
-                LEFT JOIN production_runs r ON r.id = s.run_id
-                WHERE TRY_CONVERT(datetime2, s.created_at) >= DATEADD(HOUR, -{safe_hours}, GETDATE())
-            ) activity
-            ORDER BY activity_time DESC
-        """)
+            SELECT
+                r.id AS run_id,
+                s.id AS record_id,
+                'sheet_entries' AS entry_table,
+                s.created_at AS activity_time,
+                s.stage_title AS section,
+                s.stage_key AS stage_key,
+                s.employee,
+                s.operator_initials,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                r.status,
+                s.comments,
+                '' AS start_label,
+                '' AS end_label
+            FROM sheet_entries s
+            LEFT JOIN production_runs r ON r.id = s.run_id
+            WHERE datetime(replace(s.created_at, 'T', ' ')) >= datetime('now', ?)
+        ) activity
+        ORDER BY datetime(replace(activity_time, 'T', ' ')) DESC
+        LIMIT {safe_limit}
+    """, (age_filter, age_filter, age_filter, age_filter))
     columns = [col[0] for col in cur.description]
     rows = rows_to_dicts(columns, cur.fetchall())
     conn.close()

@@ -1481,10 +1481,26 @@ def embed_packet_assets(packet: dict) -> None:
             entry["signature_data"] = upload_reference_data_uri(signature_reference)
 
 
+def _run_date_prefix(run: dict) -> str:
+    """Return YYYY-MM-DD date string for a run, falling back to created_at."""
+    for field in ("entry_date", "created_at", "updated_at"):
+        val = clean_value(run.get(field, ""))
+        if val:
+            return val[:10]
+    return "undated"
+
+
+def _run_month_folder(run: dict) -> str:
+    """Return YYYY-MM string used to group exported PDFs by month."""
+    prefix = _run_date_prefix(run)
+    return prefix[:7] if len(prefix) >= 7 else "undated"
+
+
 def data_sheet_export_filename(run: dict) -> str:
     """Return the exported PDF filename for one run data sheet."""
+    date_prefix = _run_date_prefix(run)
     run_label = safe_export_filename(run_display_number(run), "run")
-    return f"Data_Sheet_Run_{run_label}_id-{run.get('id')}.pdf"
+    return f"{date_prefix}_Run_{run_label}_id-{run.get('id')}.pdf"
 
 
 def resolve_pdf_browser_exe() -> str:
@@ -1538,21 +1554,98 @@ def render_pdf_from_html(html_text: str, pdf_path: Path) -> None:
 
 
 def write_run_export_files(run: dict, export_root: Path) -> dict:
-    """Write one PDF data sheet for a run."""
+    """Write one PDF data sheet for a run, placed in a per-month subfolder."""
     packet = build_print_packets([run])[0]
     run_record = packet["run"]
     embed_packet_assets(packet)
-    sheet_path = unique_path(export_root / data_sheet_export_filename(run_record))
+    month_dir = export_root / _run_month_folder(run_record)
+    month_dir.mkdir(parents=True, exist_ok=True)
+    sheet_path = unique_path(month_dir / data_sheet_export_filename(run_record))
     render_pdf_from_html(render_export_packet_html(packet), sheet_path)
     return {
         "run_id": run_record["id"],
         "run_label": packet["run_label"],
+        "entry_date": _run_date_prefix(run_record),
         "status": run_record.get("status", ""),
         "product_name": run_record.get("product_name", ""),
         "created_at": run_record.get("created_at", ""),
-        "updated_at": run_record.get("updated_at", ""),
-        "file": sheet_path.name,
+        "file": sheet_path.relative_to(export_root).as_posix(),
     }
+
+
+def write_export_manifest(export_root: Path, run_rows: list[dict], scope_label: str, generated_at: str) -> None:
+    """Write a formatted manifest.xlsx at the root of the export folder."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    HEADER_BLUE = "FF1A3A52"
+    BAND_LIGHT  = "FFF0F6FB"
+    LABEL_GRAY  = "FF4A5568"
+
+    thin = Side(style="thin", color="FFD1D5DB")
+    cell_border = Border(bottom=thin)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Export Manifest"
+
+    # --- title block ---
+    ws.merge_cells("A1:E1")
+    title_cell = ws["A1"]
+    title_cell.value = "Lonza Data Sheet Export"
+    title_cell.font = Font(name="Calibri", bold=True, size=14, color="FF1A3A52")
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 24
+
+    ws["A2"] = "Scope"
+    ws["B2"] = scope_label
+    ws["A3"] = "Generated"
+    ws["B3"] = generated_at
+    ws["A4"] = "Run Count"
+    ws["B4"] = len(run_rows)
+    for row_no in (2, 3, 4):
+        ws.cell(row_no, 1).font = Font(name="Calibri", bold=True, size=10, color=LABEL_GRAY)
+        ws.cell(row_no, 2).font = Font(name="Calibri", size=10)
+    ws.row_dimensions[5].height = 6  # spacer
+
+    # --- column headers ---
+    col_headers = ["Entry Date", "Run Number", "Product", "Status", "File Path"]
+    for col_idx, label in enumerate(col_headers, start=1):
+        cell = ws.cell(6, col_idx, label)
+        cell.font = Font(name="Calibri", bold=True, size=10, color="FFFFFFFF")
+        cell.fill = PatternFill("solid", fgColor=HEADER_BLUE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[6].height = 18
+
+    # --- data rows ---
+    sorted_rows = sorted(run_rows, key=lambda r: (r.get("entry_date", ""), r.get("run_label", "")))
+    for data_idx, row in enumerate(sorted_rows):
+        excel_row = 7 + data_idx
+        values = [
+            row.get("entry_date", ""),
+            row.get("run_label", ""),
+            row.get("product_name", ""),
+            row.get("status", ""),
+            row.get("file", ""),
+        ]
+        fill = PatternFill("solid", fgColor=BAND_LIGHT) if data_idx % 2 == 1 else None
+        for col_idx, val in enumerate(values, start=1):
+            cell = ws.cell(excel_row, col_idx, val)
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = cell_border
+            if fill:
+                cell.fill = fill
+
+    # --- column widths ---
+    col_widths = [14, 18, 28, 14, 55]
+    for col_idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    # --- freeze panes below header row ---
+    ws.freeze_panes = "A7"
+
+    wb.save(export_root / "manifest.xlsx")
 
 
 def zip_export_folder(export_root: Path, zip_path: Path) -> None:
@@ -1582,10 +1675,12 @@ def copy_export_to_destination(export_root: Path, zip_path: Path, destination_pa
 
 def compile_run_export(runs: list[dict], scope: str, destination_path: str = "", progress_callback=None) -> dict:
     """Compile selected runs into data-sheet-only PDFs and a downloadable ZIP."""
-    generated_at = datetime.now().isoformat(timespec="seconds")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    now = datetime.now()
+    generated_at = now.isoformat(timespec="seconds")
+    export_date = now.strftime("%Y-%m-%d")
+    export_time = now.strftime("%H%M")
     scope_key = clean_value(scope) if clean_value(scope) in EXPORT_SCOPE_LABELS else "all"
-    export_name = safe_export_filename(f"Lonza_Data_Sheet_PDFs_{scope_key}_{timestamp}", "Lonza_Data_Sheet_PDFs")
+    export_name = safe_export_filename(f"Lonza_Export_{export_date}_{export_time}_{scope_key}", "Lonza_Export")
     export_root = unique_path(EXPORT_DIR / export_name)
     export_root.mkdir(parents=True, exist_ok=True)
 
@@ -1611,6 +1706,8 @@ def compile_run_export(runs: list[dict], scope: str, destination_path: str = "",
         futures = [pool.submit(_build_one, run) for run in runs]
         for fut in as_completed(futures):
             run_rows.append(fut.result())
+
+    write_export_manifest(export_root, run_rows, export_scope_label(scope_key), generated_at)
 
     zip_path = unique_path(EXPORT_DIR / f"{export_root.name}.zip")
     if progress_callback:
@@ -1951,10 +2048,9 @@ def app_status():
             "disk_build_label": current_build["build_label"],
             "disk_changed_file": current_build["changed_file"],
             "restart_required": current_build["version"] != LOADED_APP_BUILD["version"],
-            "requested_backend": db_status["requested_backend"],
-            "active_backend": db_status["active_backend"],
-            "sql_server": db_status["sql_server"],
-            "sql_database": db_status["sql_database"],
+            "database_backend": db_status["backend"],
+            "database_path": db_status["database_path"],
+            "export_mode": db_status["export_mode"],
         }
     )
 
