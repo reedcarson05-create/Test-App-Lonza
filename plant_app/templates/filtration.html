@@ -50,7 +50,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
           Logout
         </a>
-        <span class="pill">Standalone Machine</span>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -62,19 +62,27 @@
     {% endif %}
   {% endif %}
   <form method="post" action="{{ form_action or '/submit/filtration' }}" class="stack-gap" autocomplete="off" data-lock-saved-values="{{ 'true' if draft_mode and not is_edit else 'false' }}">
-    <div class="card page-intro">
-      <h2>{% if is_edit %}Correct Saved Filtration Data{% elif draft_mode %}Continue Microflow Filtration Draft{% else %}Enter Microflow Filtration Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif draft_mode %}Add the next cycle readings as they are collected, then save draft again or save complete when all six cycles are finished.{% else %}Fill in the Microflow Filtration fields, save draft while the run is in progress, or save complete when the six-cycle rotation is finished.{% endif %}</p>
+    <div class=”card page-intro”>
+      <div class=”section-title”>
+        <h2>{% if is_edit %}Correct Filtration Entry{% elif draft_mode %}Continue Filtration Draft{% else %}Microflow Filtration Entry{% endif %}</h2>
+        {% if not is_edit %}
+        <div style=”display:flex;gap:8px;flex-shrink:0;”>
+          <button class=”btn ghost” type=”submit” name=”save_mode” value=”Draft”>Save Draft</button>
+          <button class=”btn” type=”submit” name=”save_mode” value=”Complete”>Save Complete</button>
+        </div>
+        {% endif %}
+      </div>
+      <p class=”muted”>{% if is_edit %}Enter the corrected value, keep the original below it, and initial the changed field.{% elif draft_mode %}Add the next cycle readings, then save draft or save complete when all cycles are finished.{% else %}Fill in the header, then add cycle readings as they are collected. Save draft at any time.{% endif %}</p>
     </div>
-    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+    <div class=”banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}” data-signature-session-banner>
       {% if signature_session_ready %}
       Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Sign your initials below to get started â€” your signature stays active for this login.
+      Sign your initials below to get started — your signature stays active for this login.
       {% endif %}
     </div>
-    <div class="card">
-      <h2>Header Information</h2>
+    <div class=”card”>
+      <div class=”section-title”><h2>Header Information</h2></div>
       <div class="grid three-up">
         <div><label>Process Area</label><input value="Microflow Filtration" disabled></div>
         <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
@@ -94,7 +102,7 @@
     {% for cycle in filtration_cycles %}
     {% set prefix = cycle['prefix'] %}
     <div class="card">
-      <h2>Cycle {{ cycle['number'] }}</h2>
+      <div class="section-title"><h2>Cycle {{ cycle['number'] }}</h2></div>
       <div class="grid four-up">
         <div><label>Cycle #</label><input name="{{ prefix }}_cycle_number" value="{{ entry_payload.get(prefix ~ '_cycle_number', cycle['number']) }}"></div>
         <div><label>RI to Sewer</label><input name="{{ prefix }}_ri_to_sewer" value="{{ entry_payload.get(prefix ~ '_ri_to_sewer', '') }}"></div>
@@ -162,6 +170,7 @@
     {% endfor %}
 
     <div class="card">
+      <div class="section-title"><h2>Notes &amp; Photos</h2></div>
       <div class="grid two-up">
         <div>
           <label>Notes</label>

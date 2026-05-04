@@ -53,8 +53,10 @@
   <form method="post" action="{{ form_action or ('/submit/generic/' ~ stage_key) }}" class="stack-gap" autocomplete="off">
     <!-- Intro card explains whether the operator is creating, viewing, or correcting a sheet. -->
     <div class="card page-intro">
-      <h2>{% if is_edit %}Correct Saved {{ stage['title'] }} Data{% elif view_only %}Saved {{ stage['title'] }} Data{% elif draft_mode %}Continue {{ stage['title'] }} Draft{% else %}Enter {{ stage['title'] }} Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Use this correction page to fix saved records. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This sheet is complete for the active run. The saved values stay here and can only be changed from the correction tab.{% elif draft_mode %}Add the next readings, then save draft again or save complete when the stage is finished.{% elif is_standalone_stage %}Fill in the machine log below. This entry is saved without a batch or run number.{% else %}Fill in the sheet below, save a draft while work is still in progress, or save complete when the stage is finished.{% endif %}</p>
+      <div class="section-title">
+        <h2>{% if is_edit %}Correct {{ stage['title'] }} Entry{% elif view_only %}Saved {{ stage['title'] }} Entry{% elif draft_mode %}Continue {{ stage['title'] }} Draft{% else %}{{ stage['title'] }} Entry{% endif %}</h2>
+      </div>
+      <p class="muted">{% if is_edit %}Enter the corrected value, keep the original below it, and initial the changed field.{% elif view_only %}This sheet is saved. Values are locked — use Correct Saved Entry to make changes.{% elif draft_mode %}Add the next readings, then save draft or save complete when the stage is finished.{% elif is_standalone_stage %}Fill in the fields below. This entry saves without a run number.{% else %}Fill in the sheet below. Save draft while work is in progress, or save complete when finished.{% endif %}</p>
     </div>
     {% if saved == 'draft' %}
     <div class="banner success-banner">Draft saved. You can come back here and add the next row when more data is collected.</div>
@@ -65,7 +67,7 @@
       {% if signature_session_ready %}
       Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Sign your initials below to get started â€” your signature stays active for this login.
+      Sign your initials below to get started — your signature stays active for this login.
       {% endif %}
     </div>
     {% if view_only and not is_edit %}
@@ -76,8 +78,7 @@
     {% endif %}
     <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
     <div class="card">
-      <!-- Header fields come from `stage['headers']` in `stage_defs.py`. -->
-      <h2>{{ stage['sheet_name'] }}</h2>
+      <div class="section-title"><h2>{{ stage['sheet_name'] }}</h2></div>
       <div class="grid three-up">
         {% for field in stage['headers'] %}
         {% set field_name = field[0] %}
@@ -124,8 +125,7 @@
 
     {% for table in stage['tables'] %}
     <div class="card">
-      <!-- Repeating table rows come from each table definition in `stage_defs.py`. -->
-      <h2>{{ table['title'] }}</h2>
+      <div class="section-title"><h2>{{ table['title'] }}</h2></div>
       <div class="table-wrap">
         <table class="table entry-table" data-repeat-table data-repeat-prefix="{{ table['prefix'] }}" data-repeat-max-rows="{{ table['rows'] }}">
           <tr>

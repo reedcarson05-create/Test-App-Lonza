@@ -34,13 +34,24 @@
   <!-- Evaporation entry, read-only, and correction template for run-linked work. -->
   <div class="wrap">
   <div class="nav">
-    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Evaporation Entry{% else %}Evaporation Data Entry{% endif %}</div>
+    <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Evaporation{% else %}Evaporation Entry{% endif %}</div>
     <div class="navlinks">
-      <a class="pill" href="/home">Home</a>
-      <a class="pill" href="/stages">Current Work</a>
-      <a class="pill" href="/change-history">Change Log</a>
-      <a class="pill" href="/team">Team</a>
-      <a class="pill" href="/logout">Logout</a>
+      <a class="pill" href="/home">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </a>
+      <a class="pill" href="/stages">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+        Current Work
+      </a>
+      <a class="pill hide-mobile" href="/change-history">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        Change Log
+      </a>
+      <a class="pill hide-mobile" href="/logout">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
       <span class="pill">Run: {% if run %}{{ run_label(run) }}{% else %}No run{% endif %}</span>
     </div>
   </div>
@@ -49,15 +60,17 @@
   <div class="banner success-banner">Entry saved. Fill in the form below to record another entry.</div>
   {% endif %}
   <form method="post" action="{{ form_action or '/submit/evaporation' }}" class="stack-gap" autocomplete="off">
-    <div class="card page-intro">
-      <h2>{% if is_edit %}Correct Saved Evaporation Data{% elif view_only %}Saved Evaporation Data{% else %}Enter Evaporation Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Use this correction page to fix saved run records. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% elif view_only %}This run already has a saved evaporation entry. The values stay locked here and can only be changed from the correction tab.{% else %}Enter the run-linked readings below and save when the sheet is complete.{% endif %}</p>
+    <div class=”card page-intro”>
+      <div class=”section-title”>
+        <h2>{% if is_edit %}Correct Evaporation Entry{% elif view_only %}Saved Evaporation Entry{% else %}Evaporation Data Entry{% endif %}</h2>
+      </div>
+      <p class=”muted”>{% if is_edit %}Enter the corrected value, keep the original below it, and initial the changed field.{% elif view_only %}This entry is saved. Values are locked — use Correct Saved Entry to make changes.{% else %}Fill in the fields below and save when the sheet is complete.{% endif %}</p>
     </div>
-    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+    <div class=”banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}” data-signature-session-banner>
       {% if signature_session_ready %}
       Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Sign your initials below to get started â€” your signature stays active for this login.
+      Sign your initials below to get started — your signature stays active for this login.
       {% endif %}
     </div>
     {% if view_only and not is_edit %}
@@ -65,7 +78,7 @@
     {% endif %}
     <fieldset {% if view_only and not is_edit %}disabled{% endif %}>
     <div class="card">
-      <h2>Header Information</h2>
+      <div class="section-title"><h2>Header Information</h2></div>
       <div class="grid three-up">
         <div><label>Run Number</label><input value="{% if run %}{{ run_label(run) }}{% else %}No run{% endif %}" disabled></div>
         <div><label>Date</label><input type="{{ 'text' if view_only and not is_edit else 'date' }}" name="entry_date" value="{{ display_or_blank(entry['entry_date'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['entry_date'] if entry else today) }}" class="{% if view_only and entry %}{{ blank_class(entry['entry_date']) }}{% endif %}"></div>
@@ -77,7 +90,7 @@
     </div>
 
     <div class="card">
-      <h2>Process Readings</h2>
+      <div class="section-title"><h2>Process Readings</h2></div>
       <div class="grid three-up">
         <div><label>Feed RI (%)</label><input name="feed_ri" value="{{ display_or_blank(entry['feed_ri'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['feed_ri'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['feed_ri']) }}{% endif %}"></div>
         <div><label>Concentrate RI (%)</label><input name="concentrate_ri" value="{{ display_or_blank(entry['concentrate_ri'], entry['entry_date'], entry['operator_initials']) if view_only and entry else (entry['concentrate_ri'] if entry else '') }}" class="{% if view_only and entry %}{{ blank_class(entry['concentrate_ri']) }}{% endif %}"></div>
@@ -89,7 +102,7 @@
     </div>
 
     <div class="card">
-      <h2>Hourly Readings</h2>
+      <div class="section-title"><h2>Hourly Readings</h2></div>
       <div class="table-wrap">
         <table class="table entry-table">
           <tr><th>Time</th><th>Feed Rate (gpm)</th><th>Evap Temp (Â°F)</th><th>Vacuum (in Hg)</th><th>Concentrate RI (%)</th></tr>

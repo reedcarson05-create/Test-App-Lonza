@@ -51,7 +51,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
           Logout
         </a>
-        <span class="pill">Standalone Machine</span>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -59,19 +59,21 @@
   <div class="banner success-banner">Entry saved. Fill in the form below to record another entry.</div>
   {% endif %}
   <form method="post" action="{{ form_action or '/submit/extraction' }}" class="stack-gap" autocomplete="off">
-    <div class="card page-intro">
-      <h2>{% if is_edit %}Correct Saved Extraction Data{% else %}Enter Extraction Data{% endif %}</h2>
-      <p class="muted">{% if is_edit %}Use correction mode for saved data. Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the values below and press save when this entry is complete.{% endif %}</p>
+    <div class=”card page-intro”>
+      <div class=”section-title”>
+        <h2>{% if is_edit %}Correct Extraction Entry{% else %}Extraction Data Entry{% endif %}</h2>
+      </div>
+      <p class=”muted”>{% if is_edit %}Enter the corrected value, keep the original below it, and initial the changed field.{% else %}Fill in the fields below and save when complete.{% endif %}</p>
     </div>
-    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+    <div class=”banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}” data-signature-session-banner>
       {% if signature_session_ready %}
       Signed in as {{ session_signature_initials }} at {{ session_signature_signed_at }}.
       {% else %}
-      Sign your initials below to get started â€” your signature stays active for this login.
+      Sign your initials below to get started — your signature stays active for this login.
       {% endif %}
     </div>
-    <div class="card">
-      <h2>Header Information</h2>
+    <div class=”card”>
+      <div class=”section-title”><h2>Header Information</h2></div>
       <div class="grid three-up">
         <div><label>Process Area</label><input value="Extraction" disabled></div>
         <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
@@ -93,7 +95,7 @@
     </div>
 
     <div class="card">
-      <h2>Machine Readings</h2>
+      <div class="section-title"><h2>Machine Readings</h2></div>
       <div class="grid three-up">
         <div><label>PSF 1 Speed (rpm)</label><input name="psf1_speed" value="{{ entry['psf1_speed'] if entry else '' }}"></div>
         <div><label>PSF 1 Load (%)</label><input name="psf1_load" value="{{ entry['psf1_load'] if entry else '' }}"></div>
@@ -106,11 +108,12 @@
         <div><label>Press Blowback Pressure (psi)</label><input name="press_blowback" value="{{ entry['press_blowback'] if entry else '' }}"></div>
         <div><label>Pressate RI @ P303 (%)</label><input name="pressate_ri" value="{{ entry['pressate_ri'] if entry else '' }}"></div>
         <div><label>Chip Bin Steam FT201 (lb/hr)</label><input name="chip_bin_steam" value="{{ entry['chip_bin_steam'] if entry else '' }}"></div>
-        <div><label>Chip Chute Temp (Â°F)</label><input name="chip_chute_temp" value="{{ entry['chip_chute_temp'] if entry else '' }}"></div>
+        <div><label>Chip Chute Temp (°F)</label><input name="chip_chute_temp" value="{{ entry['chip_chute_temp'] if entry else '' }}"></div>
       </div>
     </div>
 
     <div class="card">
+      <div class="section-title"><h2>Notes &amp; Photos</h2></div>
       <div class="grid two-up">
         <div>
           <label>Notes</label>
