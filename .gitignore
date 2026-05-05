@@ -1,2 +1,5 @@
 .vs/
 Lonza Test App Server/
+plant_app/dist/
+plant_app/wheelhouse/
+plant_app/.venv/

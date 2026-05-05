@@ -365,3 +365,6 @@
 [2026-04-21 10:14:19] Background host started with PID 36940.
 [2026-04-21 10:14:21] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
 >>>>>>> b12c07b38934a871caaebb4ab737acc7f7122552
+[2026-04-26 15:34:44] Server not running on port 8000, starting background host with C:\Users\Sam\AppData\Local\Python\bin\python.exe. Logs: stdout=C:\Users\Sam\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.out.log stderr=C:\Users\Sam\Desktop\Test-App-Lonza-main\plant_app\runtime\startup-8000.err.log
+[2026-04-26 15:34:44] Background host started with PID 18844.
+[2026-04-26 15:34:45] Opening desktop app window in C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
