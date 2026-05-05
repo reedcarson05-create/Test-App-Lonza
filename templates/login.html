@@ -1,0 +1,38 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAG Operator Login</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body class="login-page" data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="false">
+  <div class="wrap narrow">
+    <div class="card login-card">
+      <div class="login-logo"><img src="/static/logo.png?v={{ asset_version }}" alt="LAG"></div>
+      <p class="eyebrow center">Plant Operations</p>
+      <h1>Operator Login</h1>
+      <p class="muted center">Secure sign-in for run setup, machine entries, and audit history.</p>
+      <div class="login-meta">
+        <span class="info-chip">Run Setup</span>
+        <span class="info-chip">Machine Entries</span>
+        <span class="info-chip">Change History</span>
+      </div>
+      {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+      <form method="post" action="/login" class="stack">
+        <div>
+          <label>Employee Number</label>
+          <input name="employee" required autocomplete="username">
+        </div>
+        <div>
+          <label>Password</label>
+          <input type="password" name="password" required autocomplete="current-password">
+        </div>
+        <button class="btn" type="submit" data-loading-label="Signing in...">Login</button>
+      </form>
+    </div>
+  </div>
+  <script src="/static/settings.js?v={{ asset_version }}"></script>
+</body>
+</html>

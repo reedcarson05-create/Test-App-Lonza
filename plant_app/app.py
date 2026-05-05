@@ -1,67 +1,100 @@
 """FastAPI application for operator login, run setup, data entry, and correction flows."""
 
-# Standard-library imports used for path resolution, timestamp helpers, and JSON sheet payloads.
 import base64
 import binascii
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 import json
+import mimetypes
 import os
+import re
+import shutil
 import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import zipfile
 from time import perf_counter
+from urllib.parse import urlencode
 from uuid import uuid4
 
-# FastAPI framework imports used for route declarations, form parsing, and HTML responses.
 from fastapi import FastAPI, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-# Database helpers used by routes to create, read, update, and audit plant records.
 from db import (
-    init_db,  # Builds tables and applies lightweight schema migrations at startup.
-    backend_status,  # Reports which database backend and target this server is using.
-    validate_user,  # Authenticates an employee number and password pair.
-    get_user_initials,  # Loads the initials displayed and reused in forms.
-    get_user_preferences,  # Loads persisted per-user UI preferences.
-    update_user_preferences,  # Saves persisted per-user UI preferences.
-    create_run,  # Creates a new run record.
-    get_run,  # Fetches a single run record by id.
-    list_runs,  # Lists recent runs for the run selection screen.
-    list_open_runs,  # Lists open runs for the home quick-access panels.
-    get_runs_by_ids,  # Loads selected runs for multi-run actions and audit printing.
-    mark_run_complete,  # Finalizes a run after review.
-    apply_run_group_action,  # Applies shared split/blend labels across selected runs.
-    update_run,  # Saves edits to the active run header data.
-    get_extraction_entry,  # Loads a saved extraction entry for corrections.
-    update_extraction,  # Persists extraction corrections.
-    get_filtration_entry,  # Loads a saved filtration entry and its child rows.
-    update_filtration,  # Persists filtration corrections.
-    get_evaporation_entry,  # Loads a saved evaporation entry and its child rows.
-    get_latest_evaporation_for_run,  # Finds the current run's latest evaporation sheet.
-    update_evaporation,  # Persists evaporation corrections.
-    get_sheet_entry,  # Loads a saved generic stage sheet.
-    get_latest_sheet_entry_for_run_stage,  # Finds the latest generic sheet for a run/stage pair.
-    update_sheet_entry,  # Persists generic stage corrections.
-    insert_extraction,  # Creates a new extraction entry.
-    insert_filtration,  # Creates a new filtration entry and child rows.
-    insert_evaporation,  # Creates a new evaporation entry and child rows.
-    insert_sheet_entry,  # Creates a new generic stage entry.
-    insert_field_change_log,  # Records field-level correction details.
-    insert_audit,  # Records higher-level create/update/finalize events.
-    get_field_change_history,  # Reads correction history for dashboards.
-    last_12_hour_activity,  # Builds the recent-activity dashboard feed.
+    init_db,
+    backend_status,
+    validate_user,
+    get_user_initials,
+    get_user_preferences,
+    update_user_preferences,
+    get_user_role,
+    employee_number_exists,
+    create_pending_user,
+    get_run_stats,
+    list_runs_paginated,
+    get_all_users,
+    get_active_users,
+    list_recent_group_labels,
+    approve_user,
+    reject_user,
+    deactivate_user,
+    create_run,
+    get_run,
+    get_run_by_number,
+    list_runs,
+    list_open_runs,
+    get_runs_by_ids,
+    mark_run_complete,
+    set_run_product_name,
+    apply_run_group_action,
+    set_run_batch_type,
+    update_run,
+    get_extraction_entry,
+    get_latest_extraction_for_run,
+    update_extraction,
+    get_filtration_entry,
+    get_latest_filtration_for_run,
+    get_latest_filtration_draft,
+    update_filtration,
+    get_evaporation_entry,
+    get_latest_evaporation_for_run,
+    update_evaporation,
+    get_sheet_entry,
+    get_latest_sheet_entry_for_run_stage,
+    get_latest_standalone_sheet_draft,
+    update_sheet_entry,
+    insert_extraction,
+    insert_filtration,
+    insert_evaporation,
+    insert_sheet_entry,
+    insert_field_change_log,
+    insert_audit,
+    get_field_change_history,
+    last_12_hour_activity,
+    get_completed_stage_keys_for_run,
+    get_voided_stage_keys_for_run,
+    get_voided_stages_for_run,
+    toggle_stage_void,
+    list_all_extraction_entries,
+    list_all_filtration_entries,
+    list_all_clarifier_entries,
 )
 
-# Stage metadata controls the generic forms and dashboard navigation links.
-from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS
+from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS, CYCLE_CLEANING_OPTIONS
 
-# Main ASGI application object served by Uvicorn or another ASGI server.
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="lag-secret-key-change-me")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("PLANT_APP_SECRET_KEY", "lag-secret-key-change-me"),
+    max_age=60 * 60 * 24 * 30,
+)
 
-# Base directory used to resolve the bundled static assets and Jinja templates.
 BASE_DIR = Path(__file__).resolve().parent
 RUNTIME_DIR = BASE_DIR / "runtime"
 RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,6 +103,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 SIGNATURE_DIR = UPLOAD_DIR / "signatures"
 SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 SIGNATURE_DEBUG_LOG = RUNTIME_DIR / "signature_debug.log"
+EXPORT_DIR = RUNTIME_DIR / "exports"
+EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 BOOT_TEMPLATE_NAMES = tuple(
@@ -82,17 +117,29 @@ BOOT_STATIC_FILES = (
     "style.css",
     "settings.js",
     "dynamic_rows.js",
+    "entry_helpers.js",
     "signature_session.js",
     "form_corrections.js",
     "image_upload.js",
     "logo.png",
 )
 BOOT_MIN_DURATION_MS = 1200
+DRAFT_STATUS = "Draft"
+COMPLETE_STATUS = "Complete"
+FILTRATION_CYCLE_COUNT = 6
+FILTRATION_MAX_ROWS_PER_CYCLE = 12
 RUN_STAGE_KEYS = tuple(stage_key for stage_key in GENERIC_STAGE_DEFS if stage_key != "filtration_cycles")
+STANDALONE_GENERIC_STAGE_KEYS = {"clarifier"}
+EXPORT_SCOPE_LABELS = {
+    "all": "All Runs",
+    "current_month": "Current Month",
+}
+EXPORT_JOBS: dict[str, dict] = {}
+EXPORT_JOBS_LOCK = threading.Lock()
 MACHINE_DEFINITIONS = (
     {"section": "Extraction", "title": "Extraction", "href": "/stage/extraction"},
     {"section": "Filtration", "title": "Filtration", "href": "/stage/filtration"},
-    {"section": "Evaporation", "title": "Evaporation", "href": "/stage/evaporation"},
+    {"section": "Clarifier", "title": "Clarifier", "href": "/stage/generic/clarifier"},
 )
 
 
@@ -105,6 +152,7 @@ def current_app_build() -> dict[str, str]:
         BASE_DIR / "static" / "style.css",
         BASE_DIR / "static" / "settings.js",
         BASE_DIR / "static" / "dynamic_rows.js",
+        BASE_DIR / "static" / "entry_helpers.js",
         BASE_DIR / "static" / "signature_session.js",
         BASE_DIR / "static" / "form_corrections.js",
         BASE_DIR / "static" / "image_upload.js",
@@ -174,7 +222,10 @@ def warm_boot_cache() -> None:
 def build_boot_manifest(request: Request) -> dict:
     """Return the startup preload plan shown by the animated boot screen."""
     version = asset_version()
-    login_url = "/?fresh=1"
+    target_url = session_entry_path(request)
+    destination_label = "unlock screen" if target_url == "/unlock" else "operator login screen"
+    if logged_in(request) and target_url not in {"/", "/unlock"}:
+        destination_label = "workspace"
     tasks = [
         {
             "label": "Loading system stylesheet",
@@ -212,13 +263,13 @@ def build_boot_manifest(request: Request) -> dict:
             "kind": "json",
         },
         {
-            "label": "Preparing the operator login screen",
-            "url": login_url,
+            "label": f"Preparing the {destination_label}",
+            "url": target_url,
             "kind": "text",
         },
     ]
     return {
-        "target_url": login_url,
+        "target_url": target_url,
         "min_duration_ms": BOOT_MIN_DURATION_MS,
         "tasks": tasks,
         "local_port": request.url.port or configured_port(),
@@ -239,7 +290,7 @@ def configured_port() -> int:
         return 8000
     return port if 1 <= port <= 65535 else 8000
 
-# Ensure the configured database backend is reachable before any request handlers run.
+
 init_db()
 
 
@@ -275,6 +326,54 @@ def current_signature_signed_at(request: Request) -> str:
 def current_signature_data(request: Request) -> str:
     """Return the captured initials-stroke image for the current session, if any."""
     return request.session.get("signature_data", "")
+
+
+def current_signature_record(request: Request) -> dict[str, str]:
+    """Return the durable signature fields saved alongside a data-entry record."""
+    return {
+        "signature_data": current_signature_data(request),
+        "signature_signed_at": current_signature_signed_at(request),
+    }
+
+
+def attach_current_signature(request: Request, payload: dict) -> dict:
+    """Attach the current handwritten signature metadata to a record payload."""
+    payload.update(current_signature_record(request))
+    return payload
+
+
+def current_session_quick_code(request: Request) -> str:
+    """Return the active session-only quick unlock passcode, if one was set at login."""
+    return request.session.get("session_quick_code", "")
+
+
+def session_locked(request: Request) -> bool:
+    """Return True when the remembered session must be unlocked before app access continues."""
+    return bool(logged_in(request) and request.session.get("session_locked"))
+
+
+def set_session_quick_code(request: Request, quick_code: str) -> None:
+    """Persist the 4-digit session unlock passcode and mark the session as currently unlocked."""
+    request.session["session_quick_code"] = clean_value(quick_code)
+    request.session["session_locked"] = False
+
+
+def lock_session(request: Request) -> None:
+    """Lock the current authenticated session until the passcode is entered again."""
+    if logged_in(request) and current_session_quick_code(request):
+        request.session["session_locked"] = True
+
+
+def unlock_session(request: Request) -> None:
+    """Mark the current session as unlocked after a valid passcode entry."""
+    request.session["session_locked"] = False
+
+
+def session_entry_path(request: Request) -> str:
+    """Return the page the app should open next for the current remembered session state."""
+    if logged_in(request):
+        return "/unlock" if session_locked(request) else user_home_path(request)
+    return "/"
 
 
 def signature_session_ready(request: Request) -> bool:
@@ -370,10 +469,6 @@ def update_signature_session(request: Request, initials: str, signature_data: st
     if not signed_initials or not saved_signature or not saved_at:
         return False
 
-    previous_signature = clean_value(request.session.get("signature_data", ""))
-    if previous_signature and previous_signature != saved_signature:
-        delete_signature_asset(previous_signature)
-
     request.session["signature_initials"] = signed_initials
     request.session["signature_data"] = saved_signature
     request.session["signature_signed_at"] = saved_at
@@ -381,8 +476,7 @@ def update_signature_session(request: Request, initials: str, signature_data: st
 
 
 def clear_signature_session(request: Request) -> None:
-    """Remove any saved signature PNG for the session and clear its signature-specific keys."""
-    delete_signature_asset(clean_value(request.session.get("signature_data", "")))
+    """Clear signature session keys while keeping saved signature images for audit records."""
     request.session.pop("signature_initials", None)
     request.session.pop("signature_data", None)
     request.session.pop("signature_signed_at", None)
@@ -423,6 +517,18 @@ def run_display_number(record) -> str:
 def today_str() -> str:
     """Return today's date in the same format used by the HTML forms."""
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def current_time_str() -> str:
+    """Return the current time in the same format used by HTML time inputs."""
+    return datetime.now().strftime("%H:%M")
+
+
+def completion_status(entry: dict | None) -> str:
+    """Normalize saved draft/complete status for old and new records."""
+    if not entry:
+        return ""
+    return str(entry.get("completion_status") or COMPLETE_STATUS)
 
 
 def local_ipv4_addresses() -> list[str]:
@@ -503,13 +609,120 @@ def require_login(request: Request):
     """Redirect anonymous users back to the login page."""
     if not logged_in(request):
         return RedirectResponse("/", status_code=303)
+    if session_locked(request):
+        return RedirectResponse("/unlock", status_code=303)
     return None
 
 
 def require_run(request: Request):
     """Redirect users to run selection until an active run is chosen."""
     if not current_run_id(request):
-        return RedirectResponse("/run/select", status_code=303)
+        target_path = request.url.path
+        if request.url.query:
+            target_path = f"{target_path}?{request.url.query}"
+        return RedirectResponse(f"/run/select?{urlencode({'next': target_path})}", status_code=303)
+    return None
+
+
+def safe_next_path(value: str, fallback: str = "") -> str:
+    """Return an internal redirect target, rejecting empty or external-looking values."""
+    target = clean_value(value)
+    if target.startswith("/") and not target.startswith("//"):
+        return target
+    return fallback
+
+
+def run_select_next_label(next_path: str) -> str:
+    """Describe the destination that will open after a run is selected."""
+    if next_path.startswith("/stage/generic/clarifier"):
+        return "Clarifier"
+    if next_path.startswith("/stages"):
+        return "Run Sheets"
+    if next_path.startswith("/run/review") or next_path.startswith("/batch/review"):
+        return "Run Review"
+    return ""
+
+
+def current_user_role(request: Request) -> str:
+    """Return the session role when available, otherwise reload it from the database."""
+    role = request.session.get("role", "")
+    if role:
+        return str(role).strip()
+    user = current_user(request)
+    return get_user_role(user) if user else ""
+
+
+def is_admin(request: Request) -> bool:
+    """Return True when the logged-in user has the admin role."""
+    return current_user_role(request) == "admin"
+
+
+def can_edit_data(request: Request) -> bool:
+    """Return True when the current account may create or correct production data."""
+    user = current_user(request)
+    return bool(user) and current_user_role(request) != "admin"
+
+
+def user_home_path(request: Request) -> str:
+    """Return the best landing page for the current account."""
+    return "/admin/dashboard" if is_admin(request) else "/home"
+
+
+ADMIN_DATA_SECTIONS = {
+    "runs": {
+        "title": "Runs",
+        "batch_type": "standard",
+        "copy": "Browse standard run records. Original source runs tied to blends or splits still stay here.",
+        "label_column": "Linked Batch",
+    },
+    "blends": {
+        "title": "Blends",
+        "batch_type": "blend",
+        "copy": "Browse blend-derived run records created from one or more original runs.",
+        "label_column": "Blend Number",
+    },
+    "splits": {
+        "title": "Splits",
+        "batch_type": "split",
+        "copy": "Browse split-derived run records created from original source runs.",
+        "label_column": "Split Number",
+    },
+}
+
+
+def admin_data_section_meta(section: str) -> dict:
+    """Return the admin listing metadata for the requested section."""
+    normalized = clean_value(section).lower()
+    if normalized not in ADMIN_DATA_SECTIONS:
+        normalized = "runs"
+    return {"key": normalized, **ADMIN_DATA_SECTIONS[normalized]}
+
+
+def admin_data_section_for_run(run: dict | None) -> str:
+    """Map a run record to the admin listing section that owns it."""
+    batch_type = clean_value((run or {}).get("batch_type", "")).lower()
+    if batch_type == "blend":
+        return "blends"
+    if batch_type == "split":
+        return "splits"
+    return "runs"
+
+
+def require_admin(request: Request):
+    """Redirect non-admin users to home."""
+    if not logged_in(request):
+        return RedirectResponse("/", status_code=303)
+    if not is_admin(request):
+        return RedirectResponse("/home", status_code=303)
+    return None
+
+
+def require_data_entry_access(request: Request):
+    """Redirect read-only admin accounts out of production data entry flows."""
+    if not logged_in(request):
+        return RedirectResponse("/", status_code=303)
+    if not can_edit_data(request):
+        return RedirectResponse("/admin/dashboard", status_code=303)
     return None
 
 
@@ -566,11 +779,12 @@ def generic_stage_for_render(stage: dict, payload: dict | None = None) -> dict:
 
 def render_page(request: Request, template_name: str, **context):
     """Render a template with the standard navigation/session context already included."""
-    # Shared template values used by most pages for nav badges and defaults.
     loaded_build = LOADED_APP_BUILD
+    admin_user = is_admin(request)
     page_context = {
         "request": request,
         "user": current_user(request),
+        "user_role": current_user_role(request),
         "initials": current_initials(request),
         "default_initials": current_initials(request),
         "session_signature_initials": current_signature_initials(request),
@@ -585,7 +799,11 @@ def render_page(request: Request, template_name: str, **context):
         "app_loaded_build_label": loaded_build["build_label"],
         "app_loaded_changed_file": loaded_build["changed_file"],
         "today": today_str(),
+        "now_time": current_time_str(),
         "run": active_run(request),
+        "user_is_admin": admin_user,
+        "user_can_edit_data": can_edit_data(request),
+        "user_home_path": user_home_path(request),
         "local_access_urls": local_access_urls(request),
         "local_port": request.url.port or configured_port(),
         "blank_display": blank_display,
@@ -594,6 +812,7 @@ def render_page(request: Request, template_name: str, **context):
         "run_display_number": run_display_number,
         "field_default_value": field_default_value,
         "activity_open_href": activity_open_href,
+        "admin_data_section_for_run": admin_data_section_for_run,
     }
     page_context.update(context)
     return templates.TemplateResponse(template_name, page_context)
@@ -613,9 +832,7 @@ def image_upload_response(status_code: int, message: str):
 
 def collect_field_changes(form, old_values: dict, changed_by: str, correction_reason: str):
     """Build field-level change records for correction pages and validate initials coverage."""
-    # `changes` becomes the audit payload saved into `field_change_log`.
     changes = []
-    # `missing_details` tracks edited fields that still need operator initials.
     missing_details = []
 
     for key, value in form.multi_items():
@@ -638,7 +855,6 @@ def collect_field_changes(form, old_values: dict, changed_by: str, correction_re
             missing_details.append(key)
             continue
 
-        # Each dictionary describes one corrected field exactly as it will be stored in SQLite.
         changes.append(
             {
                 "field_name": key,
@@ -676,7 +892,6 @@ def display_sheet_name(entry_table: str, section: str = "", stage_title: str = "
         return stage_title
     if section:
         return section
-    # Fallback labels for tables that do not already carry a friendlier stage title.
     labels = {
         "extraction_entries": "Extraction",
         "filtration_entries": "Filtration",
@@ -700,11 +915,6 @@ def selected_run_ids_from_form(form) -> list[int]:
     return selected_ids
 
 
-def run_action_label(action_name: str) -> str:
-    """Build a deterministic timestamp-based group label for blend/split actions."""
-    return f"{action_name.upper()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-
-
 def activity_open_href(row: dict) -> str:
     """Return the quickest reopen link for a recent activity row."""
     section = clean_value(row.get("section", ""))
@@ -713,8 +923,6 @@ def activity_open_href(row: dict) -> str:
 
     if section in {"Extraction", "Filtration"}:
         return "/process-dashboard"
-    if section == "Evaporation" and run_id:
-        return f"/run/use/{run_id}?next=/stage/evaporation"
     if row.get("entry_table") == "sheet_entries" and run_id and stage_key:
         return f"/run/use/{run_id}?next=/stage/generic/{stage_key}"
     if run_id:
@@ -746,12 +954,8 @@ def machine_status_cards(rows=None, current_run=None):
             detail = " | ".join(part for part in detail_parts if part)
         else:
             status_label = "Not Used"
-            href = machine["href"] if machine["section"] in {"Extraction", "Filtration"} else (
-                "/stage/evaporation" if current_run else "/run/select"
-            )
-            button_label = "Start Entry" if machine["section"] in {"Extraction", "Filtration"} else (
-                "Open Machine" if current_run else "Choose Run"
-            )
+            href = machine["href"]
+            button_label = "Start Entry"
             detail = "Auto-populated as not in use until an operator starts this machine."
 
         cards.append(
@@ -835,9 +1039,13 @@ def run_record_groups(rows=None):
 
 
 def process_dashboard_rows(rows=None):
-    """Filter recent activity down to the standalone extraction and filtration sections."""
+    """Filter recent activity down to extraction, filtration, and clarifier work."""
     source_rows = rows if rows is not None else last_12_hour_activity()
-    return [row for row in source_rows if row["section"] in {"Extraction", "Filtration"}]
+    return [
+        row
+        for row in source_rows
+        if row["section"] in {"Extraction", "Filtration"} or row.get("stage_key") == "clarifier"
+    ]
 
 
 def build_filtration_row_map(rows):
@@ -888,16 +1096,16 @@ def filtration_cycle_render_rows(row_map: dict, prefix: str) -> int:
 
 
 def filtration_cycle_context(row_map: dict | None = None) -> list[dict]:
-    """Build the four Microflow cycle sections shown by the filtration template."""
+    """Build the Microflow cycle sections shown by the filtration template."""
     row_map = row_map or {}
     return [
         {
             "number": cycle_no,
             "prefix": f"cycle{cycle_no}",
             "render_rows": filtration_cycle_render_rows(row_map, f"cycle{cycle_no}"),
-            "max_rows": 4,
+            "max_rows": FILTRATION_MAX_ROWS_PER_CYCLE,
         }
-        for cycle_no in range(1, 5)
+        for cycle_no in range(1, FILTRATION_CYCLE_COUNT + 1)
     ]
 
 
@@ -908,7 +1116,6 @@ def build_evaporation_row_map(rows):
 
 def build_extraction_payload(form, operator_initials: str):
     """Map the extraction form fields into the database payload expected by `insert_extraction`."""
-    # Keys in this object are intentionally aligned with the columns in `extraction_entries`.
     return {
         "run_id": None,
         "operator_initials": operator_initials,
@@ -969,7 +1176,7 @@ def build_filtration_rows(form):
         "pressure_pt2",
         "pressure_pt3",
     )
-    for cycle_no in range(1, 5):
+    for cycle_no in range(1, FILTRATION_CYCLE_COUNT + 1):
         prefix = f"cycle{cycle_no}"
         for row_no in form_row_indexes(form, prefix):
             row = {
@@ -1003,7 +1210,7 @@ def build_filtration_extra_payload(form) -> dict:
     """Store cycle summary fields that do not belong to a repeating reading row."""
     payload = {}
     cycle_summary_fields = ("cycle_number", "ri_to_sewer", "total_filtrate_volume", "cleaning_method")
-    for cycle_no in range(1, 5):
+    for cycle_no in range(1, FILTRATION_CYCLE_COUNT + 1):
         prefix = f"cycle{cycle_no}"
         for field_name in cycle_summary_fields:
             key = f"{prefix}_{field_name}"
@@ -1013,7 +1220,6 @@ def build_filtration_extra_payload(form) -> dict:
 
 def build_filtration_payload(form, operator_initials: str):
     """Map the filtration form fields into the database payload expected by `insert_filtration`."""
-    # The parent record fields live beside the child `rows` collection in one payload object.
     return {
         "run_id": None,
         "operator_initials": operator_initials,
@@ -1029,6 +1235,7 @@ def build_filtration_payload(form, operator_initials: str):
         "comments": form.get("comments", "") or form.get("notes", ""),
         "photo_path": form.get("photo_path", ""),
         "payload_json": json.dumps(build_filtration_extra_payload(form)),
+        "completion_status": form.get("save_mode", COMPLETE_STATUS),
         "rows": build_filtration_rows(form),
     }
 
@@ -1037,7 +1244,6 @@ def build_evaporation_rows(form):
     """Build normalized evaporation row payloads for the repeating timed-reading table."""
     rows = []
     for i in range(1, 4):
-        # Each row maps directly to one record in the `evaporation_rows` child table.
         rows.append(
             {
                 "row_no": i,
@@ -1053,7 +1259,6 @@ def build_evaporation_rows(form):
 
 def build_evaporation_payload(form, run_id: int | None, operator_initials: str):
     """Map the evaporation form fields into the database payload expected by `insert_evaporation`."""
-    # Unlike extraction/filtration, evaporation is always tied to a selected run.
     return {
         "run_id": run_id,
         "operator_initials": operator_initials,
@@ -1078,12 +1283,13 @@ def process_dashboard_items(rows=None):
     items = []
     source_rows = rows if rows is not None else process_dashboard_rows()
     for row in source_rows:
-        # Edit links depend on section because each stage has a dedicated correction route.
         href = ""
         if row["section"] == "Extraction":
             href = f"/edit/extraction/{row['record_id']}"
         elif row["section"] == "Filtration":
             href = f"/edit/filtration/{row['record_id']}"
+        elif row.get("stage_key") == "clarifier" and row.get("record_id"):
+            href = f"/edit/generic/{row['record_id']}"
         items.append({**dict(row), "edit_href": href, "display_section": display_sheet_name(row["entry_table"], row["section"])})
     return items
 
@@ -1096,15 +1302,20 @@ def dashboard_batch_packs(rows=None):
 def build_batch_review(run_id: int):
     """Gather the latest saved run-linked sheets so the review page can summarize them."""
     run = get_run(run_id)
-    evaporation_entry, evaporation_rows = get_latest_evaporation_for_run(run_id)
+    voided_stages = get_voided_stages_for_run(run_id)
 
     # Generic stage entries are discovered from configuration instead of hard-coded one by one.
     generic_entries = []
+    saved_stage_keys = set()
     for stage_key in RUN_STAGE_KEYS:
         stage = GENERIC_STAGE_DEFS[stage_key]
         entry = get_latest_sheet_entry_for_run_stage(run_id, stage_key)
         if not entry:
             continue
+        entry_status = completion_status(entry)
+        if stage_key in voided_stages and entry_status != COMPLETE_STATUS:
+            continue
+        saved_stage_keys.add(stage_key)
         payload = json.loads(entry["payload_json"] or "{}")
         generic_entries.append(
             {
@@ -1114,16 +1325,33 @@ def build_batch_review(run_id: int):
                 "entry": entry,
                 "payload": payload,
                 "stage": stage,
+                "completion_status": entry_status,
+            }
+        )
+    voided_entries = []
+    for stage_key in RUN_STAGE_KEYS:
+        voided = voided_stages.get(stage_key)
+        if not voided or stage_key in saved_stage_keys:
+            continue
+        stage = GENERIC_STAGE_DEFS[stage_key]
+        voided_entries.append(
+            {
+                "stage_key": stage_key,
+                "title": stage["title"],
+                "sheet_name": stage["sheet_name"],
+                "voided_by": voided.get("voided_by", ""),
+                "voided_at": voided.get("voided_at", ""),
             }
         )
 
-    # This return object is passed straight into the run review template.
     return {
         "run": run,
-        "evaporation_entry": evaporation_entry,
-        "evaporation_rows": evaporation_rows,
+        "evaporation_entry": None,
+        "evaporation_rows": [],
         "generic_entries": generic_entries,
-        "has_entries": bool(evaporation_entry or generic_entries),
+        "voided_entries": voided_entries,
+        "has_entries": bool(generic_entries or voided_entries),
+        "has_complete_entries": any(item["completion_status"] == COMPLETE_STATUS for item in generic_entries),
     }
 
 
@@ -1151,29 +1379,623 @@ def build_print_packets(selected_runs):
                 "evaporation_entry": review["evaporation_entry"],
                 "evaporation_rows": review["evaporation_rows"],
                 "generic_entries": review["generic_entries"],
+                "voided_entries": review["voided_entries"],
                 "has_entries": review["has_entries"],
             }
         )
     return packets
 
 
-def run_action_page_context(action_name: str, selected_run_ids: list[int] | None = None, message: str = "", error: str = "") -> dict:
+def export_scope_label(scope: str) -> str:
+    """Return the human-friendly export scope label."""
+    return EXPORT_SCOPE_LABELS.get(clean_value(scope), EXPORT_SCOPE_LABELS["all"])
+
+
+def run_is_in_current_month(run: dict) -> bool:
+    """Return True when the run was created or updated during the current month."""
+    month_prefix = datetime.now().strftime("%Y-%m")
+    for field_name in ("created_at", "updated_at"):
+        if clean_value(run.get(field_name, "")).startswith(month_prefix):
+            return True
+    return False
+
+
+def export_runs_for_scope(scope: str) -> list[dict]:
+    """Load the run rows included in an export scope."""
+    runs = list_runs(limit=50000)
+    if clean_value(scope) == "current_month":
+        return [run for run in runs if run_is_in_current_month(run)]
+    return runs
+
+
+def safe_export_filename(value: str, fallback: str = "item") -> str:
+    """Convert a run label or export label into a filesystem-safe name."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", clean_value(value)).strip("._-")
+    return (cleaned or fallback)[:90]
+
+
+def unique_path(path: Path) -> Path:
+    """Return `path` or a numbered sibling when that name already exists."""
+    if not path.exists():
+        return path
+    for suffix_no in range(2, 1000):
+        if path.suffix:
+            candidate = path.with_name(f"{path.stem}-{suffix_no}{path.suffix}")
+        else:
+            candidate = path.with_name(f"{path.name}-{suffix_no}")
+        if not candidate.exists():
+            return candidate
+    raise OSError(f"Could not find an available export path near {path}")
+
+
+def resolve_upload_reference(reference: str) -> Path | None:
+    """Resolve a saved /static/uploads URL to an on-disk file owned by this app."""
+    cleaned = clean_value(reference).split("?", 1)[0].split("#", 1)[0]
+    if cleaned.startswith("/static/uploads/"):
+        candidate = BASE_DIR / cleaned.lstrip("/")
+    elif cleaned.startswith("static/uploads/"):
+        candidate = BASE_DIR / cleaned
+    else:
+        return None
+
+    try:
+        resolved = candidate.resolve()
+        upload_root = UPLOAD_DIR.resolve()
+        resolved.relative_to(upload_root)
+    except (OSError, ValueError):
+        return None
+
+    if not resolved.is_file():
+        return None
+    return resolved
+
+
+def upload_reference_data_uri(reference: str) -> str:
+    """Embed a saved upload URL as a data URI so exported sheets stand alone."""
+    if clean_value(reference).startswith("data:"):
+        return clean_value(reference)
+    source = resolve_upload_reference(reference)
+    if not source:
+        return clean_value(reference)
+    try:
+        raw_bytes = source.read_bytes()
+    except OSError:
+        return clean_value(reference)
+    media_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+    return f"data:{media_type};base64,{base64.b64encode(raw_bytes).decode('ascii')}"
+
+
+def embed_packet_assets(packet: dict) -> None:
+    """Inline signatures used by the data sheet so no attachment folder is needed."""
+    for item in packet.get("generic_entries", []):
+        entry = item.get("entry", {})
+        signature_reference = clean_value(entry.get("signature_data", ""))
+        if signature_reference:
+            entry["signature_data"] = upload_reference_data_uri(signature_reference)
+    for entry_key in ("evaporation_entry", "extraction_entry", "filtration_entry"):
+        entry = packet.get(entry_key)
+        if not isinstance(entry, dict):
+            continue
+        signature_reference = clean_value(entry.get("signature_data", ""))
+        if signature_reference:
+            entry["signature_data"] = upload_reference_data_uri(signature_reference)
+
+
+def _run_date_prefix(run: dict) -> str:
+    """Return YYYY-MM-DD date string for a run, falling back to created_at."""
+    for field in ("entry_date", "created_at", "updated_at"):
+        val = clean_value(run.get(field, ""))
+        if val:
+            return val[:10]
+    return "undated"
+
+
+def _run_month_folder(run: dict) -> str:
+    """Return YYYY-MM string used to group exported PDFs by month."""
+    prefix = _run_date_prefix(run)
+    return prefix[:7] if len(prefix) >= 7 else "undated"
+
+
+def data_sheet_export_filename(run: dict) -> str:
+    """Return the exported PDF filename for one run data sheet."""
+    date_prefix = _run_date_prefix(run)
+    run_label = safe_export_filename(run_display_number(run), "run")
+    return f"{date_prefix}_Run_{run_label}_id-{run.get('id')}.pdf"
+
+
+def resolve_pdf_browser_exe() -> str:
+    """Find a Chromium browser that can print the data-sheet HTML to PDF."""
+    configured = clean_value(os.getenv("PLANT_APP_PDF_BROWSER"))
+    candidates = [
+        configured,
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return candidate
+    raise RuntimeError("Microsoft Edge or Google Chrome is required to build PDF exports.")
+
+
+def render_export_packet_html(packet: dict) -> str:
+    """Render the data sheet HTML used as the print source for PDF export."""
+    template = templates.env.get_template("export_packet.html")
+    return template.render(packet=packet)
+
+
+def render_pdf_from_html(html_text: str, pdf_path: Path) -> None:
+    """Print one rendered data sheet to PDF using the local browser."""
+    browser_exe = resolve_pdf_browser_exe()
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="plant-pdf-") as temp_dir:
+        temp_root = Path(temp_dir)
+        html_path = temp_root / "data-sheet.html"
+        html_path.write_text(html_text, encoding="utf-8")
+        profile_dir = temp_root / "browser-profile"
+        command = [
+            browser_exe,
+            "--headless",
+            "--disable-gpu",
+            "--disable-background-networking",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--allow-file-access-from-files",
+            f"--user-data-dir={profile_dir}",
+            f"--print-to-pdf={pdf_path}",
+            "--no-pdf-header-footer",
+            html_path.as_uri(),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=90)
+    if result.returncode != 0 or not pdf_path.is_file() or pdf_path.stat().st_size <= 0:
+        details = (result.stderr or result.stdout or "unknown PDF rendering error").strip()
+        raise RuntimeError(f"PDF export failed: {details}")
+
+
+def write_run_export_files(run: dict, export_root: Path) -> dict:
+    """Write one PDF data sheet for a run, placed in a per-month subfolder."""
+    packet = build_print_packets([run])[0]
+    run_record = packet["run"]
+    embed_packet_assets(packet)
+    month_dir = export_root / _run_month_folder(run_record)
+    month_dir.mkdir(parents=True, exist_ok=True)
+    sheet_path = unique_path(month_dir / data_sheet_export_filename(run_record))
+    render_pdf_from_html(render_export_packet_html(packet), sheet_path)
+    return {
+        "run_id": run_record["id"],
+        "run_label": packet["run_label"],
+        "entry_date": _run_date_prefix(run_record),
+        "status": run_record.get("status", ""),
+        "product_name": run_record.get("product_name", ""),
+        "created_at": run_record.get("created_at", ""),
+        "file": sheet_path.relative_to(export_root).as_posix(),
+    }
+
+
+def write_export_manifest(export_root: Path, run_rows: list[dict], scope_label: str, generated_at: str) -> None:
+    """Write a formatted manifest.xlsx at the root of the export folder."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    HEADER_BLUE = "FF1A3A52"
+    BAND_LIGHT  = "FFF0F6FB"
+    LABEL_GRAY  = "FF4A5568"
+
+    thin = Side(style="thin", color="FFD1D5DB")
+    cell_border = Border(bottom=thin)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Export Manifest"
+
+    # --- title block ---
+    ws.merge_cells("A1:E1")
+    title_cell = ws["A1"]
+    title_cell.value = "Lonza Data Sheet Export"
+    title_cell.font = Font(name="Calibri", bold=True, size=14, color="FF1A3A52")
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 24
+
+    ws["A2"] = "Scope"
+    ws["B2"] = scope_label
+    ws["A3"] = "Generated"
+    ws["B3"] = generated_at
+    ws["A4"] = "Run Count"
+    ws["B4"] = len(run_rows)
+    for row_no in (2, 3, 4):
+        ws.cell(row_no, 1).font = Font(name="Calibri", bold=True, size=10, color=LABEL_GRAY)
+        ws.cell(row_no, 2).font = Font(name="Calibri", size=10)
+    ws.row_dimensions[5].height = 6  # spacer
+
+    # --- column headers ---
+    col_headers = ["Entry Date", "Run Number", "Product", "Status", "File Path"]
+    for col_idx, label in enumerate(col_headers, start=1):
+        cell = ws.cell(6, col_idx, label)
+        cell.font = Font(name="Calibri", bold=True, size=10, color="FFFFFFFF")
+        cell.fill = PatternFill("solid", fgColor=HEADER_BLUE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[6].height = 18
+
+    # --- data rows ---
+    sorted_rows = sorted(run_rows, key=lambda r: (r.get("entry_date", ""), r.get("run_label", "")))
+    for data_idx, row in enumerate(sorted_rows):
+        excel_row = 7 + data_idx
+        values = [
+            row.get("entry_date", ""),
+            row.get("run_label", ""),
+            row.get("product_name", ""),
+            row.get("status", ""),
+            row.get("file", ""),
+        ]
+        fill = PatternFill("solid", fgColor=BAND_LIGHT) if data_idx % 2 == 1 else None
+        for col_idx, val in enumerate(values, start=1):
+            cell = ws.cell(excel_row, col_idx, val)
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = cell_border
+            if fill:
+                cell.fill = fill
+
+    # --- column widths ---
+    col_widths = [14, 18, 28, 14, 55]
+    for col_idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    # --- freeze panes below header row ---
+    ws.freeze_panes = "A7"
+
+    wb.save(export_root / "manifest.xlsx")
+
+
+def zip_export_folder(export_root: Path, zip_path: Path) -> None:
+    """Create a ZIP package containing the timestamped export folder."""
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as archive:
+        for file_path in sorted(path for path in export_root.rglob("*") if path.is_file()):
+            archive.write(file_path, Path(export_root.name) / file_path.relative_to(export_root))
+
+
+def copy_export_to_destination(export_root: Path, zip_path: Path, destination_path: str) -> dict:
+    """Copy the export folder and ZIP to a server-visible destination such as a flash drive."""
+    destination_text = clean_value(destination_path)
+    if not destination_text:
+        return {}
+
+    destination_root = Path(destination_text).expanduser()
+    destination_root.mkdir(parents=True, exist_ok=True)
+    copied_folder = unique_path(destination_root / export_root.name)
+    shutil.copytree(export_root, copied_folder)
+    copied_zip = unique_path(destination_root / zip_path.name)
+    shutil.copy2(zip_path, copied_zip)
+    return {
+        "folder": str(copied_folder),
+        "zip": str(copied_zip),
+    }
+
+
+def compile_run_export(runs: list[dict], scope: str, destination_path: str = "", progress_callback=None) -> dict:
+    """Compile selected runs into data-sheet-only PDFs and a downloadable ZIP."""
+    now = datetime.now()
+    generated_at = now.isoformat(timespec="seconds")
+    export_date = now.strftime("%Y-%m-%d")
+    export_time = now.strftime("%H%M")
+    scope_key = clean_value(scope) if clean_value(scope) in EXPORT_SCOPE_LABELS else "all"
+    export_name = safe_export_filename(f"Lonza_Export_{export_date}_{export_time}_{scope_key}", "Lonza_Export")
+    export_root = unique_path(EXPORT_DIR / export_name)
+    export_root.mkdir(parents=True, exist_ok=True)
+
+    total_runs = len(runs)
+    run_rows = []
+    counter_lock = threading.Lock()
+    completed_count = [0]
+
+    def _build_one(run):
+        result = write_run_export_files(run, export_root)
+        with counter_lock:
+            completed_count[0] += 1
+            n = completed_count[0]
+        if progress_callback:
+            progress_callback(n, total_runs, f"Built PDF {n} of {total_runs}")
+        return result
+
+    if progress_callback:
+        progress_callback(0, total_runs, f"Starting export — {total_runs} PDF{'s' if total_runs != 1 else ''}")
+
+    max_workers = min(4, max(1, total_runs))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(_build_one, run) for run in runs]
+        for fut in as_completed(futures):
+            run_rows.append(fut.result())
+
+    write_export_manifest(export_root, run_rows, export_scope_label(scope_key), generated_at)
+
+    zip_path = unique_path(EXPORT_DIR / f"{export_root.name}.zip")
+    if progress_callback:
+        progress_callback(total_runs, total_runs, "Creating ZIP file")
+    zip_export_folder(export_root, zip_path)
+
+    destination_result = {}
+    destination_error = ""
+    if clean_value(destination_path):
+        if progress_callback:
+            progress_callback(total_runs, total_runs, "Copying export to flash drive folder")
+        try:
+            destination_result = copy_export_to_destination(export_root, zip_path, destination_path)
+        except Exception as exc:
+            destination_error = str(exc)
+
+    return {
+        "export_name": export_root.name,
+        "run_count": len(run_rows),
+        "data_sheet_count": len(run_rows),
+        "folder_path": str(export_root),
+        "zip_path": str(zip_path),
+        "zip_name": zip_path.name,
+        "download_href": f"/admin/export/download/{zip_path.name}",
+        "destination": destination_result,
+        "destination_error": destination_error,
+        "generated_at": generated_at,
+        "scope_label": export_scope_label(scope_key),
+    }
+
+
+def update_export_job(job_id: str, **fields) -> None:
+    """Update one background export job snapshot."""
+    with EXPORT_JOBS_LOCK:
+        job = EXPORT_JOBS.get(job_id)
+        if not job:
+            return
+        job.update(fields)
+
+
+def export_job_snapshot(job_id: str) -> dict | None:
+    """Return a copy of one export job for templates or JSON responses."""
+    with EXPORT_JOBS_LOCK:
+        job = EXPORT_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def run_export_job(job_id: str, runs: list[dict], scope: str, destination_path: str, actor: str) -> None:
+    """Build PDFs in the background so the web request can return immediately."""
+    total_runs = len(runs)
+
+    def remember_progress(current: int, total: int, message: str) -> None:
+        update_export_job(
+            job_id,
+            current=max(0, int(current)),
+            total=max(1, int(total)),
+            message=message,
+            updated_at=datetime.now().isoformat(timespec="seconds"),
+        )
+
+    update_export_job(
+        job_id,
+        status="running",
+        current=0,
+        total=max(1, total_runs),
+        message="Starting PDF export",
+        updated_at=datetime.now().isoformat(timespec="seconds"),
+    )
+    try:
+        export_result = compile_run_export(
+            runs=runs,
+            scope=scope,
+            destination_path=destination_path,
+            progress_callback=remember_progress,
+        )
+        try:
+            insert_audit(
+                table_name="production_runs",
+                record_id=0,
+                action_type="export",
+                changed_by=actor,
+                old_data="",
+                new_data=f"{export_result['export_name']} built with {export_result['run_count']} runs",
+            )
+        except Exception:
+            pass
+        update_export_job(
+            job_id,
+            status="complete",
+            current=max(1, total_runs),
+            total=max(1, total_runs),
+            message="PDF export ready",
+            result=export_result,
+            updated_at=datetime.now().isoformat(timespec="seconds"),
+        )
+    except Exception as exc:
+        update_export_job(
+            job_id,
+            status="error",
+            message=f"{type(exc).__name__}: {exc}",
+            error=f"{type(exc).__name__}: {exc}",
+            updated_at=datetime.now().isoformat(timespec="seconds"),
+        )
+
+
+def start_export_job(runs: list[dict], scope: str, destination_path: str, actor: str) -> str:
+    """Create and start a background export job."""
+    job_id = uuid4().hex
+    now = datetime.now().isoformat(timespec="seconds")
+    with EXPORT_JOBS_LOCK:
+        EXPORT_JOBS[job_id] = {
+            "id": job_id,
+            "status": "queued",
+            "scope": scope,
+            "scope_label": export_scope_label(scope),
+            "destination_path": destination_path,
+            "current": 0,
+            "total": max(1, len(runs)),
+            "message": "Queued PDF export",
+            "error": "",
+            "result": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+    threading.Thread(
+        target=run_export_job,
+        args=(job_id, runs, scope, destination_path, actor),
+        daemon=True,
+    ).start()
+    return job_id
+
+
+def run_group_field_name(action_type: str) -> str:
+    """Return the production_runs column used for the selected split/blend action."""
+    if action_type == "blend":
+        return "blend_number"
+    if action_type == "split":
+        return "split_batch_number"
+    raise ValueError(f"Unsupported run action: {action_type}")
+
+
+def copy_generic_payload_for_run(payload_json: str, target_run: dict) -> str:
+    """Repoint run-identifying fields inside saved generic-sheet payloads to the copied run."""
+    try:
+        payload = json.loads(payload_json or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    updated_payload = dict(payload)
+    run_label = run_display_number(target_run)
+    if "run_number" in updated_payload:
+        updated_payload["run_number"] = run_label
+    if "production_number" in updated_payload:
+        updated_payload["production_number"] = run_label
+    if "run_blend_number" in updated_payload:
+        updated_payload["run_blend_number"] = clean_value(target_run.get("blend_number", "")) or run_label
+    return json.dumps(updated_payload)
+
+
+def copy_latest_run_entries(source_run_id: int, target_run: dict) -> None:
+    """Copy the latest saved run-linked sheets from one run onto a newly created derived run."""
+    target_run_id = target_run["id"]
+
+    extraction_entry = get_latest_extraction_for_run(source_run_id)
+    if extraction_entry:
+        extraction_data = dict(extraction_entry)
+        extraction_data["run_id"] = target_run_id
+        extraction_data["version_no"] = 1
+        extraction_data["previous_entry_id"] = None
+        insert_extraction(extraction_entry.get("employee", ""), extraction_data)
+
+    filtration_entry, filtration_rows = get_latest_filtration_for_run(source_run_id)
+    if filtration_entry:
+        filtration_data = dict(filtration_entry)
+        filtration_data["run_id"] = target_run_id
+        filtration_data["rows"] = [dict(row) for row in filtration_rows]
+        filtration_data["version_no"] = 1
+        filtration_data["previous_entry_id"] = None
+        insert_filtration(filtration_entry.get("employee", ""), filtration_data)
+
+    for stage_key in RUN_STAGE_KEYS:
+        sheet_entry = get_latest_sheet_entry_for_run_stage(source_run_id, stage_key)
+        if not sheet_entry:
+            continue
+        sheet_data = dict(sheet_entry)
+        sheet_data["run_id"] = target_run_id
+        sheet_data["payload_json"] = copy_generic_payload_for_run(sheet_entry.get("payload_json", "{}"), target_run)
+        sheet_data["version_no"] = 1
+        sheet_data["previous_entry_id"] = None
+        insert_sheet_entry(sheet_entry.get("employee", ""), sheet_data)
+
+
+def create_derived_run_copy(source_run: dict, source_run_id: int, action_type: str, derived_number: str, actor: str) -> int:
+    """Create a copied split/blend run header plus its latest saved sheet data."""
+    derived_run_id = create_run(
+        batch_number=derived_number,
+        split_batch_number=derived_number if action_type == "split" else "",
+        blend_number=derived_number if action_type == "blend" else "",
+        run_number=derived_number,
+        batch_type=action_type,
+        reused_batch=1,
+        product_name=clean_value(source_run.get("product_name", "")),
+        shift_name=clean_value(source_run.get("shift_name", "")),
+        operator_id=clean_value(actor) or clean_value(source_run.get("operator_id", "")),
+        notes=clean_value(source_run.get("notes", "")),
+    )
+    target_run = get_run(derived_run_id)
+    if target_run:
+        copy_latest_run_entries(source_run_id, target_run)
+    insert_audit(
+        table_name="production_runs",
+        record_id=derived_run_id,
+        action_type="create",
+        changed_by=actor,
+        old_data="",
+        new_data=f"{action_type} run {derived_number} copied from run {run_display_number(source_run)}",
+    )
+    return derived_run_id
+
+
+def group_action_source_run(request: Request, selected_run_ids: list[int]) -> tuple[int, dict | None]:
+    """Choose the source run whose saved sheets should seed a new split/blend run."""
+    active_id = current_run_id(request)
+    source_run_id = active_id if active_id in selected_run_ids else selected_run_ids[0]
+    return source_run_id, get_run(source_run_id)
+
+
+def create_or_open_group_run(
+    request: Request,
+    action_name: str,
+    selected_run_ids: list[int],
+    action_label: str,
+) -> tuple[int | None, str]:
+    """Keep the selected source runs original while creating or reopening a separate derived run."""
+    source_run_id, source_run = group_action_source_run(request, selected_run_ids)
+    if not source_run:
+        return None, "Choose a source run before creating the new split or blend run."
+
+    field_name = run_group_field_name(action_name)
+    existing_target_run = get_run_by_number(action_label)
+    if existing_target_run:
+        if existing_target_run.get("id") in selected_run_ids:
+            return None, f"Run {action_label} is already one of the selected original runs. Enter a new {action_name} run number instead."
+        if clean_value(existing_target_run.get("batch_type", "")) != action_name or clean_value(existing_target_run.get(field_name, "")) != action_label:
+            return None, f"Run {action_label} already exists. Enter a different {action_name} run number."
+        target_run_id = existing_target_run["id"]
+    else:
+        target_run_id = create_derived_run_copy(
+            source_run=source_run,
+            source_run_id=source_run_id,
+            action_type=action_name,
+            derived_number=action_label,
+            actor=current_user(request),
+        )
+
+    set_run_batch_type(selected_run_ids, "standard")
+    apply_run_group_action(sorted({*selected_run_ids, target_run_id}), action_name, action_label, update_batch_type=False)
+    return target_run_id, ""
+
+
+def run_action_page_context(
+    action_name: str,
+    selected_run_ids: list[int] | None = None,
+    message: str = "",
+    error: str = "",
+    action_label_value: str = "",
+) -> dict:
     """Build shared context for the split/blend selection pages."""
     selected_ids = selected_run_ids or []
     selected_runs = get_runs_by_ids(selected_ids)
     action_title = action_name.title()
+    batch_label_title = f"New {action_title} Run Number"
     return {
         "action_name": action_name,
         "action_title": action_title,
-        "page_title": f"{action_title} Runs",
-        "page_heading": f"{action_title} Runs",
-        "page_copy": f"Choose one or more runs, then confirm {action_name} to apply the shared {action_name} action.",
+        "page_title": f"{action_title} Run Setup",
+        "page_heading": f"{action_title} Run Setup",
+        "page_copy": f"Choose the original runs, enter the new {action_name} run number, and the app will keep those source runs while creating or reopening a separate {action_name} run with copied saved sheets.",
+        "batch_label_title": batch_label_title,
+        "batch_label_value": action_label_value,
+        "batch_label_placeholder": f"Enter {action_name} run number",
+        "recent_labels": list_recent_group_labels(action_name, limit=10),
         "runs": list_runs(limit=120),
         "selected_run_ids": selected_ids,
         "selected_runs": selected_runs,
         "result_message": message,
         "error_message": error,
-        "submit_label": action_title,
+        "submit_label": f"Create {action_title} Run",
     }
 
 
@@ -1189,9 +2011,9 @@ def health():
 
 @app.get("/boot", response_class=HTMLResponse)
 def boot_page(request: Request):
-    """Show the startup animation, clear any stale session, and preload shared app resources."""
-    clear_signature_session(request)
-    request.session.clear()
+    """Show the startup animation and route the user into login, unlock, or the workspace."""
+    if logged_in(request):
+        lock_session(request)
     response = templates.TemplateResponse(
         "boot.html",
         {
@@ -1226,11 +2048,48 @@ def app_status():
             "disk_build_label": current_build["build_label"],
             "disk_changed_file": current_build["changed_file"],
             "restart_required": current_build["version"] != LOADED_APP_BUILD["version"],
-            "requested_backend": db_status["requested_backend"],
-            "active_backend": db_status["active_backend"],
-            "sql_server": db_status["sql_server"],
-            "sql_database": db_status["sql_database"],
+            "database_backend": db_status["backend"],
+            "database_path": db_status["database_path"],
+            "export_mode": db_status["export_mode"],
         }
+    )
+
+
+def render_login_template(request: Request, error: str = "", form_employee: str = ""):
+    """Render the full-login screen with optional validation feedback."""
+    return templates.TemplateResponse(
+        "login.html",
+        {
+            "request": request,
+            "error": error,
+            "form_employee": form_employee,
+            "settings_theme": "light",
+            "settings_font_scale": "1",
+            "settings_persist": False,
+            "asset_version": asset_version(),
+            "local_access_urls": local_access_urls(request),
+            "local_port": request.url.port or configured_port(),
+        },
+        status_code=400 if error else 200,
+    )
+
+
+def render_unlock_template(request: Request, error: str = ""):
+    """Render the lightweight 4-digit unlock screen for a remembered session."""
+    return templates.TemplateResponse(
+        "unlock.html",
+        {
+            "request": request,
+            "error": error,
+            "settings_theme": current_theme(request),
+            "settings_font_scale": current_font_scale(request),
+            "settings_persist": False,
+            "asset_version": asset_version(),
+            "remembered_user": current_user(request),
+            "local_access_urls": local_access_urls(request),
+            "local_port": request.url.port or configured_port(),
+        },
+        status_code=400 if error else 200,
     )
 
 
@@ -1246,21 +2105,9 @@ def login_page(request: Request):
         clear_signature_session(request)
         request.session.clear()
     elif logged_in(request):
-        return RedirectResponse("/home", status_code=303)
+        return RedirectResponse(session_entry_path(request), status_code=303)
 
-    response = templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
-            "error": "",
-            "settings_theme": "light",
-            "settings_font_scale": "1",
-            "settings_persist": False,
-            "asset_version": asset_version(),
-            "local_access_urls": local_access_urls(request),
-            "local_port": request.url.port or configured_port(),
-        },
-    )
+    response = render_login_template(request)
     if fresh_login:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
@@ -1271,36 +2118,56 @@ def login_page(request: Request):
 def login(
     request: Request,
     employee: str = Form(...),
-    password: str = Form(...),
+    passcode: str = Form(...),
 ):
-    """Authenticate an operator and seed the session with their identity data."""
+    """Authenticate an operator using employee number plus a four-digit passcode."""
     employee = employee.strip()
+    passcode = clean_value(passcode)
 
-    if validate_user(employee, password):
+    if len(passcode) != 4 or not passcode.isdigit():
+        return render_login_template(request, error="Enter a 4-digit passcode.", form_employee=employee)
+
+    if validate_user(employee, passcode):
         preferences = get_user_preferences(employee)
-        # Session values power nav badges, default initials, and route guards.
+        role = get_user_role(employee)
         clear_signature_session(request)
         request.session.clear()
         request.session["user"] = employee
+        request.session["role"] = role
         request.session["initials"] = get_user_initials(employee)
         request.session["theme"] = preferences["theme"]
         request.session["font_scale"] = preferences["font_scale"]
-        return RedirectResponse("/home", status_code=303)
+        set_session_quick_code(request, passcode)
+        return RedirectResponse("/admin/dashboard" if role == "admin" else "/home", status_code=303)
 
-    return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
-            "error": "Invalid employee number or password.",
-            "settings_theme": "light",
-            "settings_font_scale": "1",
-            "settings_persist": False,
-            "asset_version": asset_version(),
-            "local_access_urls": local_access_urls(request),
-            "local_port": request.url.port or configured_port(),
-        },
-        status_code=400,
-    )
+    return render_login_template(request, error="Invalid employee number or 4-digit passcode.", form_employee=employee)
+
+
+@app.get("/unlock", response_class=HTMLResponse)
+def unlock_page(request: Request):
+    """Render the quick-unlock screen when a remembered session is waiting for its 4-digit passcode."""
+    if not logged_in(request):
+        return RedirectResponse("/", status_code=303)
+    if not current_session_quick_code(request):
+        return RedirectResponse(user_home_path(request), status_code=303)
+    if not session_locked(request):
+        return RedirectResponse(user_home_path(request), status_code=303)
+    return render_unlock_template(request)
+
+
+@app.post("/unlock")
+def unlock_submit(request: Request, quick_code: str = Form("")):
+    """Unlock the remembered session using its session-only 4-digit passcode."""
+    if not logged_in(request):
+        return RedirectResponse("/", status_code=303)
+    expected_code = current_session_quick_code(request)
+    if not expected_code:
+        return RedirectResponse(user_home_path(request), status_code=303)
+    if clean_value(quick_code) != expected_code:
+        return render_unlock_template(request, error="That 4-digit passcode did not match this active session.")
+
+    unlock_session(request)
+    return RedirectResponse(user_home_path(request), status_code=303)
 
 
 @app.get("/logout")
@@ -1309,6 +2176,556 @@ def logout(request: Request):
     clear_signature_session(request)
     request.session.clear()
     return RedirectResponse("/", status_code=303)
+
+
+# ------------------------
+# REGISTRATION
+# ------------------------
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    if logged_in(request):
+        return RedirectResponse(session_entry_path(request), status_code=303)
+    return templates.TemplateResponse("register.html", {
+        "request": request,
+        "settings_theme": "light",
+        "settings_font_scale": "1",
+        "asset_version": asset_version(),
+        "error": None,
+        "success": False,
+    })
+
+
+@app.post("/register")
+async def register(request: Request):
+    if logged_in(request):
+        return RedirectResponse(session_entry_path(request), status_code=303)
+
+    form = await request.form()
+    employee = (form.get("employee", "") or "").strip()
+    full_name = (form.get("full_name", "") or "").strip()
+    initials = (form.get("initials", "") or "").strip().upper()
+    passcode = (form.get("passcode", "") or "").strip()
+    confirm = (form.get("confirm_passcode", "") or "").strip()
+
+    def render_error(msg: str):
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "settings_theme": "light",
+            "settings_font_scale": "1",
+            "asset_version": asset_version(),
+            "error": msg,
+            "success": False,
+            "form_employee": employee,
+            "form_full_name": full_name,
+            "form_initials": initials,
+        }, status_code=400)
+
+    if not employee or not full_name or not initials or not passcode:
+        return render_error("All fields are required.")
+    if len(passcode) != 4 or not passcode.isdigit():
+        return render_error("Passcode must be exactly 4 digits.")
+    if passcode != confirm:
+        return render_error("Passcodes do not match.")
+    if employee_number_exists(employee):
+        return render_error("That employee number is already registered.")
+
+    create_pending_user(employee, full_name, initials, passcode)
+
+    return templates.TemplateResponse("register.html", {
+        "request": request,
+        "settings_theme": "light",
+        "settings_font_scale": "1",
+        "asset_version": asset_version(),
+        "error": None,
+        "success": True,
+    })
+
+
+# ------------------------
+# TEAM — OPERATOR VIEW
+# --------------------
+
+@app.get("/team", response_class=HTMLResponse)
+def team_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    active = get_active_users()
+    return render_page(request, "team.html", active_users=active)
+
+
+# ADMIN — DASHBOARD & DATA
+# ------------------------
+
+@app.get("/admin")
+def admin_redirect(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    return RedirectResponse("/admin/dashboard", status_code=303)
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+def admin_dashboard(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    stats = get_run_stats()
+    recent = list_runs(limit=15)
+    return render_page(request, "admin_dashboard.html", stats=stats, recent_runs=recent)
+
+
+@app.get("/admin/export", response_class=HTMLResponse)
+def admin_export_page(request: Request):
+    """Render the run-file export builder for admin users."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    return render_page(
+        request,
+        "admin_export.html",
+        export_scopes=EXPORT_SCOPE_LABELS,
+        selected_scope="all",
+        destination_path="",
+        export_result=None,
+        export_job=None,
+        export_error="",
+    )
+
+
+@app.post("/admin/export", response_class=HTMLResponse)
+async def admin_export_submit(request: Request):
+    """Compile run files into a timestamped export package."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    selected_scope = clean_value(form.get("scope", "all"))
+    if selected_scope not in EXPORT_SCOPE_LABELS:
+        selected_scope = "all"
+    destination_path = clean_value(form.get("destination_path", ""))
+    runs = export_runs_for_scope(selected_scope)
+    if not runs:
+        return render_page(
+            request,
+            "admin_export.html",
+            export_scopes=EXPORT_SCOPE_LABELS,
+            selected_scope=selected_scope,
+            destination_path=destination_path,
+            export_result=None,
+            export_job=None,
+            export_error=f"No runs were found for {export_scope_label(selected_scope).lower()}.",
+        )
+
+    job_id = start_export_job(runs, selected_scope, destination_path, current_user(request))
+    return RedirectResponse(f"/admin/export/job/{job_id}", status_code=303)
+
+
+@app.get("/admin/export/job/{job_id}", response_class=HTMLResponse)
+def admin_export_job_page(request: Request, job_id: str):
+    """Show progress for a background PDF export job."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    export_job = export_job_snapshot(job_id)
+    if not export_job:
+        return render_page(
+            request,
+            "admin_export.html",
+            export_scopes=EXPORT_SCOPE_LABELS,
+            selected_scope="all",
+            destination_path="",
+            export_result=None,
+            export_job=None,
+            export_error="That export job is no longer available. Start a new export.",
+        )
+
+    return render_page(
+        request,
+        "admin_export.html",
+        export_scopes=EXPORT_SCOPE_LABELS,
+        selected_scope=export_job.get("scope", "all"),
+        destination_path=export_job.get("destination_path", ""),
+        export_result=export_job.get("result") if export_job.get("status") == "complete" else None,
+        export_job=export_job,
+        export_error="",
+    )
+
+
+@app.get("/admin/export/status/{job_id}")
+def admin_export_status(request: Request, job_id: str):
+    """Return the latest background export progress."""
+    redirect = require_admin(request)
+    if redirect:
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
+
+    export_job = export_job_snapshot(job_id)
+    if not export_job:
+        return JSONResponse({"error": "Export job not found"}, status_code=404)
+    return JSONResponse(export_job)
+
+
+@app.get("/admin/export/download/{file_name}")
+def admin_export_download(request: Request, file_name: str):
+    """Download a previously compiled export ZIP."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    safe_name = Path(file_name).name
+    if safe_name != file_name or not safe_name.endswith(".zip"):
+        return RedirectResponse("/admin/export", status_code=303)
+    zip_path = (EXPORT_DIR / safe_name).resolve()
+    try:
+        zip_path.relative_to(EXPORT_DIR.resolve())
+    except ValueError:
+        return RedirectResponse("/admin/export", status_code=303)
+    if not zip_path.is_file():
+        return RedirectResponse("/admin/export", status_code=303)
+    return FileResponse(zip_path, media_type="application/zip", filename=safe_name)
+
+
+def render_admin_data_page(request: Request, section: str, page: int = 1, search: str = "", status: str = "all"):
+    """Render one admin data section with shared filtering and pagination."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    section_meta = admin_data_section_meta(section)
+    per_page = 25
+    runs, total = list_runs_paginated(
+        page=page,
+        per_page=per_page,
+        search=search,
+        status=status,
+        batch_type=section_meta["batch_type"],
+    )
+    import math
+    total_pages = max(1, math.ceil(total / per_page))
+    return render_page(
+        request,
+        "admin_data.html",
+        runs=runs,
+        total=total,
+        page=page,
+        per_page=per_page,
+        search=search,
+        status_filter=status,
+        total_pages=total_pages,
+        section_key=section_meta["key"],
+        section_title=section_meta["title"],
+        section_copy=section_meta["copy"],
+        section_label_column=section_meta["label_column"],
+        section_path=f"/admin/data/{section_meta['key']}",
+        admin_sections=[admin_data_section_meta("runs"), admin_data_section_meta("blends"), admin_data_section_meta("splits")],
+    )
+
+
+@app.get("/admin/data")
+def admin_data_redirect(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    return RedirectResponse("/admin/data/runs", status_code=303)
+
+
+@app.get("/admin/data/runs", response_class=HTMLResponse)
+def admin_runs_data(request: Request, page: int = 1, search: str = "", status: str = "all"):
+    return render_admin_data_page(request, "runs", page=page, search=search, status=status)
+
+
+@app.get("/admin/data/blends", response_class=HTMLResponse)
+def admin_blends_data(request: Request, page: int = 1, search: str = "", status: str = "all"):
+    return render_admin_data_page(request, "blends", page=page, search=search, status=status)
+
+
+@app.get("/admin/data/splits", response_class=HTMLResponse)
+def admin_splits_data(request: Request, page: int = 1, search: str = "", status: str = "all"):
+    return render_admin_data_page(request, "splits", page=page, search=search, status=status)
+
+
+@app.get("/admin/data/{run_id}", response_class=HTMLResponse)
+def admin_run_detail(request: Request, run_id: int, section: str = ""):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    run = get_run(run_id)
+    if not run:
+        return RedirectResponse("/admin/data/runs", status_code=303)
+    packets = build_print_packets([run])
+    packet = packets[0] if packets else None
+    section_meta = admin_data_section_meta(section or admin_data_section_for_run(run))
+    return render_page(
+        request,
+        "admin_run_detail.html",
+        packet=packet,
+        section_key=section_meta["key"],
+        back_to_list_href=f"/admin/data/{section_meta['key']}",
+        back_to_list_label=f"All {section_meta['title']}",
+    )
+
+
+# ADMIN — ENTRY LISTINGS
+# ------------------------
+
+@app.get("/admin/data/entries/extraction", response_class=HTMLResponse)
+def admin_extraction_list(request: Request, search: str = ""):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entries = list_all_extraction_entries(search=search)
+    return render_page(
+        request,
+        "admin_entries.html",
+        entry_type="extraction",
+        entry_type_label="Extraction",
+        entries=entries,
+        search=search,
+        detail_base="/admin/data/entries/extraction",
+    )
+
+
+@app.get("/admin/data/entries/extraction/{entry_id}", response_class=HTMLResponse)
+def admin_extraction_detail(request: Request, entry_id: int):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entry = get_extraction_entry(entry_id)
+    if not entry:
+        return RedirectResponse("/admin/data/entries/extraction", status_code=303)
+    run = get_run(entry["run_id"]) if entry else None
+    return render_page(
+        request,
+        "admin_entry_extraction.html",
+        entry=entry,
+        run=run,
+        back_href="/admin/data/entries/extraction",
+    )
+
+
+@app.get("/admin/data/entries/filtration", response_class=HTMLResponse)
+def admin_filtration_list(request: Request, search: str = ""):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entries = list_all_filtration_entries(search=search)
+    return render_page(
+        request,
+        "admin_entries.html",
+        entry_type="filtration",
+        entry_type_label="Filtration",
+        entries=entries,
+        search=search,
+        detail_base="/admin/data/entries/filtration",
+    )
+
+
+@app.get("/admin/data/entries/filtration/{entry_id}", response_class=HTMLResponse)
+def admin_filtration_detail(request: Request, entry_id: int):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entry, filt_rows = get_filtration_entry(entry_id)
+    if not entry:
+        return RedirectResponse("/admin/data/entries/filtration", status_code=303)
+    run = get_run(entry["run_id"]) if entry else None
+    return render_page(
+        request,
+        "admin_entry_filtration.html",
+        entry=entry,
+        filt_rows=filt_rows,
+        entry_payload=parse_payload_json(entry),
+        filtration_cycles=filtration_cycle_context(build_filtration_row_map(filt_rows)),
+        run=run,
+        back_href="/admin/data/entries/filtration",
+    )
+
+
+@app.get("/admin/data/entries/clarifier", response_class=HTMLResponse)
+def admin_clarifier_list(request: Request, search: str = ""):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entries = list_all_clarifier_entries(search=search)
+    return render_page(
+        request,
+        "admin_entries.html",
+        entry_type="clarifier",
+        entry_type_label="Clarifier",
+        entries=entries,
+        search=search,
+        detail_base="/admin/data/entries/clarifier",
+    )
+
+
+@app.get("/admin/data/entries/clarifier/{entry_id}", response_class=HTMLResponse)
+def admin_clarifier_detail(request: Request, entry_id: int):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    entry = get_sheet_entry(entry_id)
+    if not entry or entry.get("stage_key") != "clarifier":
+        return RedirectResponse("/admin/data/entries/clarifier", status_code=303)
+    payload = parse_payload_json(entry)
+    clarifier_stage = get_generic_stage("clarifier")
+    headers = [(f[0], f[1], payload.get(f[0], "")) for f in clarifier_stage["headers"]]
+    tables = []
+    for tbl in clarifier_stage["tables"]:
+        prefix = tbl["prefix"]
+        cols = [(c[0], c[1]) for c in tbl["columns"]]
+        rows = []
+        for row_no in range(1, tbl["rows"] + 1):
+            vals = {c[0]: payload.get(f"{prefix}_{row_no}_{c[0]}", "") for c in tbl["columns"]}
+            if any(vals.values()):
+                rows.append(vals)
+        tables.append({"title": tbl["title"], "prefix": prefix, "cols": cols, "rows": rows})
+    return render_page(
+        request,
+        "admin_entry_clarifier.html",
+        entry=entry,
+        payload=payload,
+        clarifier_headers=headers,
+        clarifier_tables=tables,
+        back_href="/admin/data/entries/clarifier",
+    )
+
+
+# ADMIN — USER MANAGEMENT
+# ------------------------
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users_page(request: Request):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    users = get_all_users()
+    pending = [u for u in users if not u["active"]]
+    active = [u for u in users if u["active"]]
+    return render_page(request, "admin_users.html", pending_users=pending, active_users=active)
+
+
+@app.post("/admin/users/{employee}/approve")
+def admin_approve_user(request: Request, employee: str):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    approve_user(employee)
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{employee}/reject")
+def admin_reject_user(request: Request, employee: str):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    reject_user(employee)
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{employee}/deactivate")
+def admin_deactivate_user(request: Request, employee: str):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+    deactivate_user(employee)
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+# ------------------------
+# APP UPDATE
+# ------------------------
+
+GIT_ROOT = BASE_DIR.parent
+
+
+def _run_git(*args: str, timeout: int = 30) -> tuple[bool, str]:
+    """Run a git command in the repo root and return (success, combined_output)."""
+    try:
+        result = subprocess.run(
+            ["git"] + list(args),
+            cwd=str(GIT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        output = (result.stdout + result.stderr).strip()
+        return result.returncode == 0, output
+    except FileNotFoundError:
+        return False, "git not found in PATH"
+    except subprocess.TimeoutExpired:
+        return False, "git command timed out"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _current_branch() -> str:
+    """Return the currently checked-out branch name, falling back to 'main'."""
+    ok, out = _run_git("rev-parse", "--abbrev-ref", "HEAD")
+    branch = out.strip() if ok else ""
+    return branch if branch and branch != "HEAD" else "main"
+
+
+def _spawn_restart() -> None:
+    """Start a fresh server process then hard-exit the current one."""
+    import time
+    time.sleep(3)
+    kwargs: dict = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "cwd": str(BASE_DIR),
+        "env": os.environ.copy(),
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        kwargs["close_fds"] = True
+    subprocess.Popen([sys.executable, str(BASE_DIR / "app.py")], **kwargs)
+    time.sleep(0.5)
+    os._exit(0)
+
+
+@app.get("/check-update")
+def check_update(request: Request):
+    """Fetch from GitHub and report pending commits on the current branch."""
+    redirect = require_login(request)
+    if redirect:
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
+
+    branch = _current_branch()
+    fetch_ok, fetch_out = _run_git("fetch", "origin", branch, timeout=20)
+    if not fetch_ok:
+        return JSONResponse({"error": f"git fetch failed: {fetch_out}"}, status_code=500)
+
+    _, local_hash = _run_git("rev-parse", "HEAD")
+    _, remote_hash = _run_git("rev-parse", f"origin/{branch}")
+    local_hash = local_hash.strip()
+    remote_hash = remote_hash.strip()
+
+    if local_hash == remote_hash:
+        return JSONResponse({"up_to_date": True, "pending_commits": [], "branch": branch})
+
+    _, log_out = _run_git("log", "--oneline", f"HEAD..origin/{branch}")
+    pending = [line.strip() for line in log_out.splitlines() if line.strip()]
+    return JSONResponse({"up_to_date": False, "pending_commits": pending, "branch": branch})
+
+
+@app.post("/admin/update")
+def admin_update(request: Request):
+    """Pull the latest code from GitHub and restart the server."""
+    redirect = require_admin(request)
+    if redirect:
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
+
+    branch = _current_branch()
+    pull_ok, pull_out = _run_git("pull", "origin", branch, timeout=60)
+    if not pull_ok:
+        return JSONResponse({"success": False, "output": pull_out}, status_code=500)
+
+    threading.Thread(target=_spawn_restart, daemon=True).start()
+    return JSONResponse({"success": True, "output": pull_out, "branch": branch, "restarting": True})
 
 
 @app.post("/signature-session")
@@ -1441,6 +2858,9 @@ async def upload_image(request: Request, files: list[UploadFile] = File(...)):
     redirect = require_login(request)
     if redirect:
         return image_upload_response(401, "Not authenticated")
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return image_upload_response(403, "This account is read-only for production data.")
 
     saved_files = []
     allowed_types = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
@@ -1486,15 +2906,22 @@ def home(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    if is_admin(request):
+        return RedirectResponse("/admin/dashboard", status_code=303)
 
     activity_rows = last_12_hour_activity(limit=48)
     current_run = active_run(request)
+    finish_message = ""
+    if request.query_params.get("run_finished") == "1":
+        finish_message = "Run finished. It stays available in Admin > Runs, Blends, or Splits and is now closed out for operators."
     return render_page(
         request,
         "home.html",
         open_runs=list_open_runs(limit=80),
         machine_cards=machine_status_cards(activity_rows, current_run),
         in_use_items=in_use_items(activity_rows),
+        create_product_name="",
+        finish_message=finish_message,
     )
 
 
@@ -1503,18 +2930,26 @@ def home(request: Request):
 # ------------------------
 
 @app.get("/run/select", response_class=HTMLResponse)
-def run_select_page(request: Request):
+def run_select_page(request: Request, next: str = ""):
     """Render the simplified run creation screen with quick access to recent runs."""
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
+    next_path = safe_next_path(next)
     return render_page(
         request,
         "run_select.html",
         runs=list_runs(limit=80),
         open_runs=list_open_runs(limit=80),
         create_error="",
+        create_product_name="",
+        next_path=next_path,
+        next_query=urlencode({"next": next_path}) if next_path else "",
+        next_label=run_select_next_label(next_path),
     )
 
 
@@ -1522,13 +2957,22 @@ def run_select_page(request: Request):
 async def run_select(
     request: Request,
     run_number: str = Form(""),
+    product_name: str = Form(""),
+    next: str = Form(""),
 ):
     """Create or reopen a run using only the run number."""
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     normalized_run_number = clean_value(run_number)
+    normalized_product_name = clean_value(product_name)
+    next_path = safe_next_path(next)
+    redirect_path = next_path or "/home"
+    next_query = urlencode({"next": next_path}) if next_path else ""
     if not normalized_run_number:
         return render_page(
             request,
@@ -1536,12 +2980,17 @@ async def run_select(
             runs=list_runs(limit=80),
             open_runs=list_open_runs(limit=80),
             create_error="Run number is required.",
+            create_product_name=normalized_product_name,
+            create_run_number=normalized_run_number,
+            next_path=next_path,
+            next_query=next_query,
+            next_label=run_select_next_label(next_path),
         )
 
     existing_run = existing_open_run_by_number(normalized_run_number)
     if existing_run:
         request.session["run_id"] = existing_run["id"]
-        return RedirectResponse("/home", status_code=303)
+        return RedirectResponse(redirect_path, status_code=303)
 
     try:
         run_id = create_run(
@@ -1551,7 +3000,7 @@ async def run_select(
             run_number=normalized_run_number,
             batch_type="standard",
             reused_batch=0,
-            product_name="",
+            product_name=normalized_product_name,
             shift_name="",
             operator_id=current_user(request),
             notes="",
@@ -1560,7 +3009,7 @@ async def run_select(
         return PlainTextResponse(f"Run save failed: {type(exc).__name__}: {exc}", status_code=500)
 
     request.session["run_id"] = run_id
-    return RedirectResponse("/home", status_code=303)
+    return RedirectResponse(redirect_path, status_code=303)
 
 
 @app.get("/run/use/{run_id}")
@@ -1572,8 +3021,9 @@ def use_run(request: Request, run_id: int):
 
     request.session["run_id"] = run_id
     next_path = clean_value(request.query_params.get("next", ""))
-    if next_path.startswith("/"):
-        return RedirectResponse(next_path, status_code=303)
+    safe_next = safe_next_path(next_path)
+    if safe_next:
+        return RedirectResponse(safe_next, status_code=303)
     return RedirectResponse("/home", status_code=303)
 
 
@@ -1584,12 +3034,20 @@ def batch_edit_page(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     redirect = require_run(request)
     if redirect:
         return redirect
 
-    return render_page(request, "batch_edit.html")
+    derived_action = clean_value(request.query_params.get("derived_action", ""))
+    derived_number = clean_value(request.query_params.get("derived_number", ""))
+    result_message = ""
+    if derived_action in {"blend", "split"} and derived_number:
+        result_message = f"{derived_action.title()} run {derived_number} is now open. The original source runs stayed in place and remain tied to it."
+    return render_page(request, "batch_edit.html", result_message=result_message, error_message="")
 
 
 @app.post("/run/edit")
@@ -1606,6 +3064,9 @@ async def batch_edit_submit(
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     redirect = require_run(request)
     if redirect:
@@ -1616,31 +3077,33 @@ async def batch_edit_submit(
     final_edit_initials = (final_edit_initials or current_signature_initials(request) or current_initials(request)).strip().upper()
     current_run = active_run(request)
     normalized_run_number = clean_value(run_number) or run_display_number(current_run)
+    normalized_product_name = clean_value(product_name)
+    normalized_notes = clean_value(notes)
+    source_run_id = current_run_id(request)
 
     update_run(
-        run_id=current_run_id(request),
+        run_id=source_run_id,
         batch_number=normalized_run_number,
         split_batch_number=current_run.get("split_batch_number", ""),
         blend_number=current_run.get("blend_number", ""),
         run_number=normalized_run_number,
         batch_type=current_run.get("batch_type", "standard"),
         reused_batch=current_run.get("reused_batch", 0),
-        product_name=product_name,
+        product_name=normalized_product_name,
         shift_name=current_run.get("shift_name", ""),
-        notes=notes,
+        notes=normalized_notes,
         final_edit_initials=final_edit_initials,
         final_edit_notes=final_edit_notes,
     )
 
     insert_audit(
         table_name="production_runs",
-        record_id=current_run_id(request),
+        record_id=source_run_id,
         action_type="update",
         changed_by=current_user(request),
         old_data="",
         new_data="run details updated",
     )
-
     return RedirectResponse("/home", status_code=303)
 
 
@@ -1648,6 +3111,9 @@ async def batch_edit_submit(
 def close_run(request: Request, run_id: int):
     """Close a run directly from a quick action without reopening each machine."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -1671,38 +3137,50 @@ def blend_runs_page(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     return render_page(request, "run_action.html", **run_action_page_context("blend"))
 
 
 @app.post("/runs/blend")
 async def blend_runs_submit(request: Request):
-    """Apply a shared blend label to the selected runs."""
+    """Create or reopen a separate blend run while keeping the selected source runs original."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
     form = await request.form()
     selected_run_ids = selected_run_ids_from_form(form)
+    action_label = clean_value(form.get("action_label", ""))
     if not selected_run_ids:
         return render_page(
             request,
             "run_action.html",
-            **run_action_page_context("blend", error="Select at least one run to blend."),
+            **run_action_page_context("blend", error="Select at least one run to blend.", action_label_value=action_label),
+        )
+    if not action_label:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("blend", selected_run_ids=selected_run_ids, error="Enter the new blend run number.", action_label_value=action_label),
         )
 
-    blend_label = run_action_label("blend")
-    apply_run_group_action(selected_run_ids, "blend", blend_label)
-    request.session["run_id"] = selected_run_ids[0]
-    return render_page(
-        request,
-        "run_action.html",
-        **run_action_page_context(
-            "blend",
-            selected_run_ids=selected_run_ids,
-            message=f"Blend {blend_label} saved for {len(selected_run_ids)} selected run(s).",
-        ),
-    )
+    target_run_id, error_message = create_or_open_group_run(request, "blend", selected_run_ids, action_label)
+    if error_message or not target_run_id:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("blend", selected_run_ids=selected_run_ids, error=error_message, action_label_value=action_label),
+        )
+
+    request.session["run_id"] = target_run_id
+    redirect_query = urlencode({"derived_action": "blend", "derived_number": action_label})
+    return RedirectResponse(f"/run/edit?{redirect_query}", status_code=303)
 
 
 @app.get("/runs/split", response_class=HTMLResponse)
@@ -1711,38 +3189,50 @@ def split_runs_page(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     return render_page(request, "run_action.html", **run_action_page_context("split"))
 
 
 @app.post("/runs/split")
 async def split_runs_submit(request: Request):
-    """Apply a shared split label to the selected runs."""
+    """Create or reopen a separate split run while keeping the selected source runs original."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
     form = await request.form()
     selected_run_ids = selected_run_ids_from_form(form)
+    action_label = clean_value(form.get("action_label", ""))
     if not selected_run_ids:
         return render_page(
             request,
             "run_action.html",
-            **run_action_page_context("split", error="Select at least one run to split."),
+            **run_action_page_context("split", error="Select at least one run to split.", action_label_value=action_label),
+        )
+    if not action_label:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("split", selected_run_ids=selected_run_ids, error="Enter the new split run number.", action_label_value=action_label),
         )
 
-    split_label = run_action_label("split")
-    apply_run_group_action(selected_run_ids, "split", split_label)
-    request.session["run_id"] = selected_run_ids[0]
-    return render_page(
-        request,
-        "run_action.html",
-        **run_action_page_context(
-            "split",
-            selected_run_ids=selected_run_ids,
-            message=f"Split {split_label} saved for {len(selected_run_ids)} selected run(s).",
-        ),
-    )
+    target_run_id, error_message = create_or_open_group_run(request, "split", selected_run_ids, action_label)
+    if error_message or not target_run_id:
+        return render_page(
+            request,
+            "run_action.html",
+            **run_action_page_context("split", selected_run_ids=selected_run_ids, error=error_message, action_label_value=action_label),
+        )
+
+    request.session["run_id"] = target_run_id
+    redirect_query = urlencode({"derived_action": "split", "derived_number": action_label})
+    return RedirectResponse(f"/run/edit?{redirect_query}", status_code=303)
 
 
 @app.get("/runs/print", response_class=HTMLResponse)
@@ -1820,12 +3310,52 @@ def stages(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     redirect = require_run(request)
     if redirect:
         return redirect
 
-    return render_page(request, "stages.html", stage_links=STAGE_LINKS)
+    run_id = current_run_id(request)
+    completed = get_completed_stage_keys_for_run(run_id)
+    voided = get_voided_stage_keys_for_run(run_id)
+
+    enriched_links = []
+    for stage in STAGE_LINKS:
+        href = stage["href"]
+        stage_key = href.rsplit("/", 1)[-1]
+        enriched_links.append({
+            **stage,
+            "stage_key": stage_key,
+            "done": stage_key in completed,
+            "voided": stage_key in voided and stage_key not in completed,
+        })
+
+    return render_page(
+        request,
+        "stages.html",
+        stage_links=enriched_links,
+        can_finish_batch=bool(completed),
+    )
+
+
+@app.post("/stage/{stage_key}/void")
+def void_stage(request: Request, stage_key: str, next: str = "/stages"):
+    redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
+    redirect = require_run(request)
+    if redirect:
+        return redirect
+    run_id = current_run_id(request)
+    toggle_stage_void(run_id, stage_key, current_user(request))
+    safe_next = next if next.startswith("/") and not next.startswith("//") else "/stages"
+    return RedirectResponse(safe_next, status_code=303)
 
 
 @app.get("/run/review", response_class=HTMLResponse)
@@ -1833,6 +3363,9 @@ def stages(request: Request):
 def batch_review_page(request: Request):
     """Render the run review page for the active run."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -1851,6 +3384,9 @@ async def finalize_batch_review(request: Request):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
     redirect = require_run(request)
     if redirect:
@@ -1860,19 +3396,25 @@ async def finalize_batch_review(request: Request):
     save_signature_session(request, form)
 
     review = build_batch_review(current_run_id(request))
-    if not review["has_entries"]:
-        return PlainTextResponse("Add at least one run record before closing the run.", status_code=400)
+    if not review.get("has_complete_entries"):
+        return PlainTextResponse("Save at least one run record as complete before closing the run.", status_code=400)
 
-    mark_run_complete(current_run_id(request), current_user(request))
+    active_run_id = current_run_id(request)
+    product_name = clean_value(form.get("product_name", ""))
+    if product_name:
+        set_run_product_name(active_run_id, product_name)
+    mark_run_complete(active_run_id, current_user(request))
     insert_audit(
         table_name="production_runs",
-        record_id=current_run_id(request),
+        record_id=active_run_id,
         action_type="finalize",
         changed_by=current_user(request),
         old_data="",
         new_data="run review completed and run closed",
     )
-    return RedirectResponse("/dashboard", status_code=303)
+    if current_run_id(request) == active_run_id:
+        request.session.pop("run_id", None)
+    return RedirectResponse("/home?run_finished=1", status_code=303)
 
 
 # ------------------------
@@ -1880,19 +3422,25 @@ async def finalize_batch_review(request: Request):
 # ------------------------
 
 @app.get("/stage/extraction", response_class=HTMLResponse)
-def extraction_page(request: Request):
+def extraction_page(request: Request, saved: bool = False):
     """Render the standalone extraction entry form."""
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
-    return render_page(request, "extraction.html", run=None)
+    return render_page(request, "extraction.html", run=None, saved=saved)
 
 
 @app.post("/submit/extraction")
 async def submit_extraction(request: Request):
     """Save a new extraction entry and audit the create action."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -1903,7 +3451,10 @@ async def submit_extraction(request: Request):
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
 
     try:
-        entry_id = insert_extraction(current_user(request), build_extraction_payload(form, operator_initials))
+        entry_id = insert_extraction(
+            current_user(request),
+            attach_current_signature(request, build_extraction_payload(form, operator_initials)),
+        )
 
         insert_audit(
             table_name="extraction_entries",
@@ -1916,7 +3467,7 @@ async def submit_extraction(request: Request):
     except Exception as exc:
         return PlainTextResponse(f"Extraction save failed: {type(exc).__name__}: {exc}", status_code=500)
 
-    return RedirectResponse("/process-dashboard", status_code=303)
+    return RedirectResponse("/stage/extraction?saved=1", status_code=303)
 
 
 # ------------------------
@@ -1924,19 +3475,38 @@ async def submit_extraction(request: Request):
 # ------------------------
 
 @app.get("/stage/filtration", response_class=HTMLResponse)
-def filtration_page(request: Request):
+def filtration_page(request: Request, saved: str = ""):
     """Render the standalone filtration entry form."""
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
 
-    return render_page(request, "filtration.html", run=None, entry_payload={}, filtration_cycles=filtration_cycle_context())
+    entry, rows = get_latest_filtration_draft()
+    row_map = build_filtration_row_map(rows) if rows else {}
+    return render_page(
+        request,
+        "filtration.html",
+        run=None,
+        entry=entry,
+        row_map=row_map,
+        entry_payload=parse_payload_json(entry),
+        filtration_cycles=filtration_cycle_context(row_map),
+        cleaning_methods=CYCLE_CLEANING_OPTIONS,
+        draft_mode=bool(entry),
+        saved=saved,
+    )
 
 
 @app.post("/submit/filtration")
 async def submit_filtration(request: Request):
     """Save a new filtration entry and audit the create action."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -1947,20 +3517,34 @@ async def submit_filtration(request: Request):
 
     try:
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-        entry_id = insert_filtration(current_user(request), build_filtration_payload(form, operator_initials))
+        save_mode = COMPLETE_STATUS if form.get("save_mode") == COMPLETE_STATUS else DRAFT_STATUS
+        payload = attach_current_signature(request, build_filtration_payload(form, operator_initials))
+        payload["completion_status"] = save_mode
+        draft_entry, _ = get_latest_filtration_draft()
+        if draft_entry:
+            entry_id = draft_entry["id"]
+            update_filtration(entry_id, current_user(request), payload)
+            audit_action = "update"
+            audit_text = f"filtration entry saved as {save_mode.lower()}"
+        else:
+            entry_id = insert_filtration(current_user(request), payload)
+            audit_action = "create"
+            audit_text = f"filtration entry created as {save_mode.lower()}"
 
         insert_audit(
             table_name="filtration_entries",
             record_id=entry_id,
-            action_type="create",
+            action_type=audit_action,
             changed_by=current_user(request),
             old_data="",
-            new_data="filtration entry created",
+            new_data=audit_text,
         )
     except Exception as exc:
         return PlainTextResponse(f"Filtration save failed: {type(exc).__name__}: {exc}", status_code=500)
 
-    return RedirectResponse("/process-dashboard", status_code=303)
+    if form.get("save_mode") == COMPLETE_STATUS:
+        return RedirectResponse("/process-dashboard", status_code=303)
+    return RedirectResponse("/stage/filtration?saved=draft", status_code=303)
 
 
 # ------------------------
@@ -1968,9 +3552,12 @@ async def submit_filtration(request: Request):
 # ------------------------
 
 @app.get("/stage/evaporation", response_class=HTMLResponse)
-def evaporation_page(request: Request):
+def evaporation_page(request: Request, saved: bool = False):
     """Render the evaporation sheet or its saved read-only view for the active run."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -1987,6 +3574,7 @@ def evaporation_page(request: Request):
         row_map=row_map,
         view_only=entry is not None,
         edit_href=f"/edit/evaporation/{entry['id']}" if entry else "",
+        saved=saved,
     )
 
 
@@ -1994,6 +3582,9 @@ def evaporation_page(request: Request):
 async def submit_evaporation(request: Request):
     """Save a new evaporation entry for the active run and audit the create action."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -2009,7 +3600,10 @@ async def submit_evaporation(request: Request):
         operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
         entry_id = insert_evaporation(
             current_user(request),
-            build_evaporation_payload(form, current_run_id(request), operator_initials),
+            attach_current_signature(
+                request,
+                build_evaporation_payload(form, current_run_id(request), operator_initials),
+            ),
         )
 
         insert_audit(
@@ -2023,7 +3617,7 @@ async def submit_evaporation(request: Request):
     except Exception as exc:
         return PlainTextResponse(f"Evaporation save failed: {type(exc).__name__}: {exc}", status_code=500)
 
-    return RedirectResponse("/stages", status_code=303)
+    return RedirectResponse("/stage/evaporation?saved=1", status_code=303)
 
 
 # ------------------------
@@ -2031,13 +3625,12 @@ async def submit_evaporation(request: Request):
 # ------------------------
 
 @app.get("/stage/generic/{stage_key}", response_class=HTMLResponse)
-def generic_stage_page(request: Request, stage_key: str):
+def generic_stage_page(request: Request, stage_key: str, saved: str = ""):
     """Render a generic run sheet driven entirely by `stage_defs.py`."""
     redirect = require_login(request)
     if redirect:
         return redirect
-
-    redirect = require_run(request)
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -2045,9 +3638,18 @@ def generic_stage_page(request: Request, stage_key: str):
     if not stage:
         return RedirectResponse("/stages", status_code=303)
 
-    entry = get_latest_sheet_entry_for_run_stage(current_run_id(request), stage_key)
+    is_standalone = stage_key in STANDALONE_GENERIC_STAGE_KEYS
+    if not is_standalone:
+        redirect = require_run(request)
+        if redirect:
+            return redirect
+
+    entry = get_latest_standalone_sheet_draft(stage_key) if is_standalone else get_latest_sheet_entry_for_run_stage(current_run_id(request), stage_key)
     payload = json.loads(entry["payload_json"] or "{}") if entry else {}
     prepared_stage = generic_stage_for_render(stage, payload)
+    entry_status = completion_status(entry)
+    view_only = bool(entry and entry_status == COMPLETE_STATUS and not is_standalone)
+    stage_voided = (not is_standalone) and stage_key in get_voided_stage_keys_for_run(current_run_id(request))
     return render_page(
         request,
         "generic_sheet.html",
@@ -2055,8 +3657,16 @@ def generic_stage_page(request: Request, stage_key: str):
         stage=prepared_stage,
         entry=entry,
         entry_values=payload,
-        view_only=entry is not None,
-        edit_href=f"/edit/generic/{entry['id']}" if entry else "",
+        run=None if is_standalone else active_run(request),
+        is_standalone_stage=is_standalone,
+        view_only=view_only,
+        draft_mode=entry is not None and entry_status == DRAFT_STATUS,
+        entry_status=entry_status,
+        stage_voided=stage_voided,
+        edit_href=f"/edit/generic/{entry['id']}" if entry and not is_standalone else "",
+        back_href="/process-dashboard" if is_standalone else "/stages",
+        back_label="Back to Machines" if is_standalone else "Back",
+        saved=saved,
     )
 
 
@@ -2066,8 +3676,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
     redirect = require_login(request)
     if redirect:
         return redirect
-
-    redirect = require_run(request)
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -2075,36 +3684,63 @@ async def submit_generic_stage(request: Request, stage_key: str):
     if not stage:
         return RedirectResponse("/stages", status_code=303)
 
+    is_standalone = stage_key in STANDALONE_GENERIC_STAGE_KEYS
+    if not is_standalone:
+        redirect = require_run(request)
+        if redirect:
+            return redirect
+
     form = await request.form()
     signature_error = require_handwritten_signature(request, form)
     if signature_error:
         return signature_error
+    save_mode = COMPLETE_STATUS if form.get("save_mode") == COMPLETE_STATUS else DRAFT_STATUS
     # Generic sheets store their dynamic cells as JSON because each stage has different fields.
-    payload = {key: value for key, value in form.multi_items() if not key.startswith("__session_signature_")}
+    payload = {
+        key: value
+        for key, value in form.multi_items()
+        if not key.startswith("__session_signature_") and key != "save_mode"
+    }
 
-    entry_id = insert_sheet_entry(
-        current_user(request),
-        {
-            "run_id": current_run_id(request),
-            "stage_key": stage_key,
-            "stage_title": stage["title"],
-            "operator_initials": (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper(),
-            "entry_date": form.get("entry_date", ""),
-            "comments": form.get("comments", ""),
-            "payload_json": json.dumps(payload),
-        },
-    )
+    sheet_payload = {
+        "run_id": None if is_standalone else current_run_id(request),
+        "stage_key": stage_key,
+        "stage_title": stage["title"],
+        "operator_initials": (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper(),
+        "entry_date": form.get("entry_date", ""),
+        "comments": form.get("comments", ""),
+        "payload_json": json.dumps(payload),
+        "completion_status": save_mode,
+        **current_signature_record(request),
+    }
+
+    existing_entry = get_latest_standalone_sheet_draft(stage_key) if is_standalone else get_latest_sheet_entry_for_run_stage(current_run_id(request), stage_key)
+    if existing_entry and completion_status(existing_entry) == DRAFT_STATUS:
+        entry_id = existing_entry["id"]
+        update_sheet_entry(entry_id, current_user(request), sheet_payload)
+        audit_action = "update"
+        audit_text = f"{stage['title']} entry saved as {save_mode.lower()}"
+    else:
+        entry_id = insert_sheet_entry(current_user(request), sheet_payload)
+        audit_action = "create"
+        audit_text = f"{stage['title']} entry created as {save_mode.lower()}"
 
     insert_audit(
         table_name="sheet_entries",
         record_id=entry_id,
-        action_type="create",
+        action_type=audit_action,
         changed_by=current_user(request),
         old_data="",
-        new_data=f"{stage['title']} entry created",
+        new_data=audit_text,
     )
+    if not is_standalone and save_mode == COMPLETE_STATUS and stage_key in get_voided_stage_keys_for_run(current_run_id(request)):
+        toggle_stage_void(current_run_id(request), stage_key, current_user(request))
 
-    return RedirectResponse("/stages", status_code=303)
+    if is_standalone and save_mode == COMPLETE_STATUS:
+        return RedirectResponse("/process-dashboard", status_code=303)
+    if save_mode == COMPLETE_STATUS:
+        return RedirectResponse(f"/stage/generic/{stage_key}?saved=complete", status_code=303)
+    return RedirectResponse(f"/stage/generic/{stage_key}?saved=draft", status_code=303)
 
 
 # ------------------------
@@ -2115,6 +3751,9 @@ async def submit_generic_stage(request: Request, stage_key: str):
 def edit_extraction_page(request: Request, entry_id: int):
     """Render the extraction correction form for a saved entry."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
 
@@ -2134,6 +3773,9 @@ def edit_extraction_page(request: Request, entry_id: int):
 async def edit_extraction_submit(request: Request, entry_id: int):
     """Validate and save extraction corrections while logging field-level changes."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
     entry = get_extraction_entry(entry_id)
@@ -2175,7 +3817,11 @@ async def edit_extraction_submit(request: Request, entry_id: int):
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-    update_extraction(entry_id, current_user(request), build_extraction_payload(form, operator_initials))
+    update_extraction(
+        entry_id,
+        current_user(request),
+        attach_current_signature(request, build_extraction_payload(form, operator_initials)),
+    )
     insert_field_change_log(entry["run_id"], "extraction_entries", entry_id, changes)
     insert_audit(
         table_name="extraction_entries",
@@ -2194,6 +3840,9 @@ def edit_filtration_page(request: Request, entry_id: int):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
     entry, rows = get_filtration_entry(entry_id)
     return render_page(
         request,
@@ -2203,6 +3852,7 @@ def edit_filtration_page(request: Request, entry_id: int):
         row_map=build_filtration_row_map(rows),
         entry_payload=parse_payload_json(entry),
         filtration_cycles=filtration_cycle_context(build_filtration_row_map(rows)),
+        cleaning_methods=CYCLE_CLEANING_OPTIONS,
         is_edit=True,
         form_action=f"/edit/filtration/{entry_id}",
         submit_label="Save Filtration Changes",
@@ -2213,6 +3863,9 @@ def edit_filtration_page(request: Request, entry_id: int):
 async def edit_filtration_submit(request: Request, entry_id: int):
     """Validate and save filtration corrections while logging field-level changes."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
     entry, existing_rows = get_filtration_entry(entry_id)
@@ -2230,7 +3883,7 @@ async def edit_filtration_submit(request: Request, entry_id: int):
         "notes": entry["comments"],
         "photo_path": entry["photo_path"],
     }
-    for cycle_no in range(1, 5):
+    for cycle_no in range(1, FILTRATION_CYCLE_COUNT + 1):
         for field_name in ("cycle_number", "ri_to_sewer", "total_filtrate_volume", "cleaning_method"):
             key = f"cycle{cycle_no}_{field_name}"
             old_values[key] = entry_payload.get(key, "")
@@ -2258,7 +3911,11 @@ async def edit_filtration_submit(request: Request, entry_id: int):
     if mismatched_values:
         return correction_error_response("Original saved values do not match these fields", mismatched_values)
     operator_initials = (form.get("operator_initials") or current_signature_initials(request) or current_initials(request)).strip().upper()
-    update_filtration(entry_id, current_user(request), build_filtration_payload(form, operator_initials))
+    update_filtration(
+        entry_id,
+        current_user(request),
+        attach_current_signature(request, build_filtration_payload(form, operator_initials)),
+    )
     insert_field_change_log(entry["run_id"], "filtration_entries", entry_id, changes)
     insert_audit(
         table_name="filtration_entries",
@@ -2277,6 +3934,9 @@ def edit_evaporation_page(request: Request, entry_id: int):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
     entry, rows = get_evaporation_entry(entry_id)
     return render_page(
         request,
@@ -2293,6 +3953,9 @@ def edit_evaporation_page(request: Request, entry_id: int):
 async def edit_evaporation_submit(request: Request, entry_id: int):
     """Validate and save evaporation corrections while logging field-level changes."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
     entry, existing_rows = get_evaporation_entry(entry_id)
@@ -2332,7 +3995,10 @@ async def edit_evaporation_submit(request: Request, entry_id: int):
     update_evaporation(
         entry_id,
         current_user(request),
-        build_evaporation_payload(form, entry["run_id"], operator_initials),
+        attach_current_signature(
+            request,
+            build_evaporation_payload(form, entry["run_id"], operator_initials),
+        ),
     )
     insert_field_change_log(entry["run_id"], "evaporation_entries", entry_id, changes)
     insert_audit(
@@ -2352,9 +4018,13 @@ def edit_generic_page(request: Request, entry_id: int):
     redirect = require_login(request)
     if redirect:
         return redirect
+    redirect = require_data_entry_access(request)
+    if redirect:
+        return redirect
     entry = get_sheet_entry(entry_id)
     stage_key = entry["stage_key"]
     stage = get_generic_stage(stage_key)
+    is_standalone = stage_key in STANDALONE_GENERIC_STAGE_KEYS
     payload = json.loads(entry["payload_json"] or "{}")
     prepared_stage = generic_stage_for_render(stage, payload)
     return render_page(
@@ -2364,6 +4034,10 @@ def edit_generic_page(request: Request, entry_id: int):
         stage=prepared_stage,
         entry_values=payload,
         entry=entry,
+        run=None if is_standalone else get_run(entry["run_id"]),
+        is_standalone_stage=is_standalone,
+        back_href="/process-dashboard" if is_standalone else "/stages",
+        back_label="Back to Machines" if is_standalone else "Back",
         is_edit=True,
         form_action=f"/edit/generic/{entry_id}",
         submit_label=f"Save {stage['title']} Changes",
@@ -2374,6 +4048,9 @@ def edit_generic_page(request: Request, entry_id: int):
 async def edit_generic_submit(request: Request, entry_id: int):
     """Validate and save generic sheet corrections while logging field-level changes."""
     redirect = require_login(request)
+    if redirect:
+        return redirect
+    redirect = require_data_entry_access(request)
     if redirect:
         return redirect
     entry = get_sheet_entry(entry_id)
@@ -2409,6 +4086,8 @@ async def edit_generic_submit(request: Request, entry_id: int):
             "entry_date": form.get("entry_date", ""),
             "comments": form.get("comments", ""),
             "payload_json": json.dumps(payload),
+            "completion_status": completion_status(entry),
+            **current_signature_record(request),
         },
     )
     insert_field_change_log(entry["run_id"], "sheet_entries", entry_id, changes)
@@ -2420,6 +4099,8 @@ async def edit_generic_submit(request: Request, entry_id: int):
         old_data="",
         new_data=f"{entry['stage_title']} entry updated",
     )
+    if entry["stage_key"] in STANDALONE_GENERIC_STAGE_KEYS:
+        return RedirectResponse("/process-dashboard", status_code=303)
     return RedirectResponse("/stages", status_code=303)
 
 
@@ -2445,14 +4126,12 @@ def change_history(request: Request):
     if redirect:
         return redirect
 
-    # `changes` holds the full plant-wide correction history.
     changes = []
     for row in get_field_change_history():
         item = dict(row)
         item["display_sheet"] = display_sheet_name(item["entry_table"])
         changes.append(item)
 
-    # `active_changes` narrows the same history to the run currently selected in session.
     active_changes = []
     if current_run_id(request):
         for row in get_field_change_history(current_run_id(request)):

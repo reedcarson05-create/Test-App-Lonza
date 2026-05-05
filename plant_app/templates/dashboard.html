@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label, activity_href %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
   <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -35,10 +35,33 @@
   <div class="nav">
     <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Run Records</div>
     <div class="navlinks">
-      <a class="pill" href="/home">Home</a>
-      <a class="pill" href="/runs/print">Print</a>
-      <a class="pill" href="/logout">Logout</a>
-      <span class="pill">User: {{ user }}</span>
+      <a class="pill" href="{{ user_home_path }}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </a>
+      <a class="pill hide-mobile" href="/change-history">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        Change Log
+      </a>
+      <a class="pill hide-mobile" href="/runs/print">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+        Print
+      </a>
+      <a class="pill hide-mobile" href="/team">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </a>
+      {% if user_is_admin %}
+      <a class="pill hide-mobile" href="/admin/dashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Admin
+      </a>
+      {% endif %}
+      <a class="pill hide-mobile" href="/logout">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
+      <span class="pill">{{ user }}</span>
     </div>
   </div>
 
@@ -47,7 +70,13 @@
       <h2>Run Records Dashboard</h2>
       <span class="info-chip">{{ run_groups|length }} Run Groups</span>
     </div>
-    <p class="muted">Use this dashboard to reopen run-linked records and review recent activity across the plant.</p>
+    <p class="muted">
+      {% if user_can_edit_data %}
+      Use this dashboard to reopen run-linked records and review recent activity across the plant.
+      {% else %}
+      Use this dashboard to review recent run-linked activity across the plant. This account stays read-only.
+      {% endif %}
+    </p>
   </div>
 
   <div class="card">
@@ -73,14 +102,17 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <tr><th>Saved</th><th>Record</th><th>Operator</th><th>Comments</th><th>Open</th></tr>
+            <tr>
+              <th>Saved</th><th>Record</th><th>Operator</th><th>Comments</th>
+              {% if user_can_edit_data %}<th>Open</th>{% endif %}
+            </tr>
             {% for row in group['entries'] %}
             <tr>
               <td>{{ row['activity_time'] }}</td>
               <td>{{ row['display_section'] }}</td>
               <td>{{ row['employee'] }}{% if row['operator_initials'] %} ({{ row['operator_initials'] }}){% endif %}</td>
               <td>{{ row['comments'] or '' }}</td>
-              <td><a class="table-action" href="{{ row['edit_href'] }}">Open</a></td>
+              {% if user_can_edit_data %}<td><a class="table-action" href="{{ row['edit_href'] }}">Open</a></td>{% endif %}
             </tr>
             {% endfor %}
           </table>
@@ -103,7 +135,10 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Saved</th><th>Record</th><th>Run</th><th>Status</th><th>Comments</th><th>Open</th></tr>
+        <tr>
+          <th>Saved</th><th>Record</th><th>Run</th><th>Status</th><th>Comments</th>
+          {% if user_can_edit_data %}<th>Open</th>{% endif %}
+        </tr>
         {% for row in rows %}
         <tr>
           <td>{{ row['activity_time'] }}</td>
@@ -111,11 +146,11 @@
           <td>{{ run_label(row) or 'Standalone' }}</td>
           <td>{{ row['status'] or '' }}</td>
           <td>{{ row['comments'] or '' }}</td>
-          <td><a class="table-action" href="{{ activity_href(row) }}">Open</a></td>
+          {% if user_can_edit_data %}<td><a class="table-action" href="{{ activity_href(row) }}">Open</a></td>{% endif %}
         </tr>
         {% endfor %}
         {% if not rows %}
-        <tr><td colspan="6" class="muted center">No activity has been saved yet.</td></tr>
+        <tr><td colspan="{{ 6 if user_can_edit_data else 5 }}" class="muted center">No activity has been saved yet.</td></tr>
         {% endif %}
       </table>
     </div>

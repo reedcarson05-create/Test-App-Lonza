@@ -1,5 +1,24 @@
 .vs/
 Lonza Test App Server/
+<<<<<<< HEAD
 plant_app/dist/
 plant_app/wheelhouse/
 plant_app/.venv/
+=======
+
+# Python/local environment noise
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local app state and generated output
+runtime/
+plant_app/runtime/
+static/uploads/
+plant_app/static/uploads/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+>>>>>>> 82b3757622561672db656621693c973de7bc3def

@@ -1,0 +1,169 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if is_edit %}Edit Filtration{% else %}Filtration{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}" data-session-signature-data="{{ session_signature_data }}">
+  <div class="settings-root">
+    <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+    <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+      <p class="settings-title">Display Settings</p>
+      <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+      <div class="settings-group">
+        <span class="settings-label">Theme</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+          <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
+        <span class="settings-label">Text Size</span>
+        <div class="settings-options">
+          <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+          <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+          <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if is_edit %}Edit Filtration Entry{% else %}Microflow Filtration Data Entry{% endif %}</div>
+      <div class="navlinks">
+        <a class="pill" href="/home">Home</a>
+        <a class="pill" href="/process-dashboard">Current Work</a>
+        <a class="pill" href="/logout">Logout</a>
+        <span class="pill">Standalone Machine</span>
+      </div>
+    </div>
+
+  <form method="post" action="{{ form_action or '/submit/filtration' }}" class="stack-gap">
+    <div class="card page-intro">
+      <h2>{% if is_edit %}Correct Saved Filtration Data{% else %}Enter Microflow Filtration Data{% endif %}</h2>
+      <p class="muted">{% if is_edit %}Enter the corrected value in the main box, keep the original saved value visible below it, and add initials next to the field you changed.{% else %}Fill in the highlighted Microflow Filtration fields and add reading rows only as needed.{% endif %}</p>
+    </div>
+    <div class="banner signature-session-banner{% if signature_session_ready %} is-saved{% endif %}" data-signature-session-banner>
+      {% if signature_session_ready %}
+      Handwritten signature saved for this login: {{ session_signature_initials }} at {{ session_signature_signed_at }}. It will be reused until you log out.
+      {% else %}
+      Before your first save on this login, sign once by hand and confirm your initials, date, and time. The saved signature will be reused until you log out.
+      {% endif %}
+    </div>
+    <div class="card">
+      <h2>Header Information</h2>
+      <div class="grid three-up">
+        <div><label>Process Area</label><input value="Microflow Filtration" disabled></div>
+        <div><label>Date</label><input type="date" name="entry_date" value="{{ entry['entry_date'] if entry else today }}"></div>
+        <div><label>Cycle Volume Set Point (gal)</label><input name="cycle_volume_set_point" value="{{ entry['cycle_volume_set_point'] if entry else '' }}"></div>
+        <div>
+          <label>Zero Refract</label>
+          <select name="zero_refract">
+            <option value=""></option>
+            <option value="Y" {% if entry and entry['zero_refract'] == 'Y' %}selected{% endif %}>Y</option>
+            <option value="N" {% if entry and entry['zero_refract'] == 'N' %}selected{% endif %}>N</option>
+          </select>
+        </div>
+        <div><label>Handwritten Initials</label><input name="operator_initials" value="{{ entry['operator_initials'] if entry and entry['operator_initials'] else initials }}"></div>
+      </div>
+    </div>
+
+    {% for cycle in filtration_cycles %}
+    {% set prefix = cycle['prefix'] %}
+    <div class="card">
+      <h2>Cycle {{ cycle['number'] }}</h2>
+      <div class="grid four-up">
+        <div><label>Cycle #</label><input name="{{ prefix }}_cycle_number" value="{{ entry_payload.get(prefix ~ '_cycle_number', cycle['number']) }}"></div>
+        <div><label>RI to Sewer</label><input name="{{ prefix }}_ri_to_sewer" value="{{ entry_payload.get(prefix ~ '_ri_to_sewer', '') }}"></div>
+        <div><label>Total Filtrate Volume</label><input name="{{ prefix }}_total_filtrate_volume" value="{{ entry_payload.get(prefix ~ '_total_filtrate_volume', '') }}"></div>
+        <div><label>Cleaning Method</label><input name="{{ prefix }}_cleaning_method" value="{{ entry_payload.get(prefix ~ '_cleaning_method', '') }}"></div>
+      </div>
+      <div class="table-wrap">
+        <table class="table entry-table" data-repeat-table data-repeat-prefix="{{ prefix }}" data-repeat-max-rows="{{ cycle['max_rows'] }}">
+          <tr>
+            <th>Time</th>
+            <th>Operator Initials</th>
+            <th>FIC1 (gpm)</th>
+            <th>TIT1 (&lt;140F)</th>
+            <th>TIT2 (&lt;140F)</th>
+            <th>DPT</th>
+            <th>DPM</th>
+            <th>Perm Total</th>
+            <th>F12 (gpm)</th>
+            <th>Permeate RI</th>
+            <th>Retentate RI</th>
+            <th>QIC1 NTU Turbidity</th>
+            <th>Pressure pt1</th>
+            <th>Pressure pt2</th>
+            <th>Pressure pt3</th>
+          </tr>
+          <tbody data-repeat-body>
+          {% for row_no in range(1, cycle['render_rows'] + 1) %}
+          {% set row = row_map.get(prefix ~ '_' ~ row_no) if row_map else none %}
+          <tr>
+            <td><input name="{{ prefix }}_{{ row_no }}_time" data-repeat-field="time" value="{{ row['row_time'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_operator_initials" data-repeat-field="operator_initials" value="{{ row['operator_initials'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_fic1_gpm" data-repeat-field="fic1_gpm" value="{{ row['fic1_gpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit1" data-repeat-field="tit1" value="{{ row['tit1'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit2" data-repeat-field="tit2" value="{{ row['tit2'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpt" data-repeat-field="dpt" value="{{ row['dpt'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpm" data-repeat-field="dpm" value="{{ row['dpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_perm_total" data-repeat-field="perm_total" value="{{ row['perm_total'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_f12_gpm" data-repeat-field="f12_gpm" value="{{ row['f12_gpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_permeate_ri" data-repeat-field="permeate_ri" value="{{ row['permeate_ri'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_retentate_ri" data-repeat-field="retentate_ri" value="{{ row['retentate_ri'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_qic1_ntu_turbidity" data-repeat-field="qic1_ntu_turbidity" value="{{ row['qic1_ntu_turbidity'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt1" data-repeat-field="pressure_pt1" value="{{ row['pressure_pt1'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt2" data-repeat-field="pressure_pt2" value="{{ row['pressure_pt2'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_pressure_pt3" data-repeat-field="pressure_pt3" value="{{ row['pressure_pt3'] if row else '' }}"></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if not is_edit %}
+      <div class="table-actions">
+        <button class="btn ghost" type="button" data-add-row>Add Row</button>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <div class="grid two-up">
+        <div>
+          <label>Notes</label>
+          <textarea name="notes" rows="4">{{ entry['comments'] if entry else '' }}</textarea>
+        </div>
+        <div>
+          <label>Pictures / Image Paths</label>
+          <div data-image-field-container data-upload-endpoint="/upload-image">
+            <textarea name="photo_path" rows="4" placeholder="Saved image links will appear here after capture or upload." data-image-field>{{ entry['photo_path'] if entry else '' }}</textarea>
+            <div class="image-tools">
+              <button class="btn ghost" type="button" data-image-camera-button>Take Photo</button>
+              <button class="btn ghost" type="button" data-image-upload-button>Upload Images</button>
+              <input type="file" accept="image/*" capture="environment" data-image-camera-input>
+              <input type="file" accept="image/*" multiple data-image-upload-input>
+            </div>
+            <p class="muted small image-status" data-image-status>No image selected yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">{{ submit_label or ('Save Corrected Entry' if is_edit else 'Save Filtration') }}</button>
+      <a class="btn ghost" href="/process-dashboard">Back</a>
+    </div>
+  </form>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+<script src="/static/dynamic_rows.js?v={{ asset_version }}"></script>
+<script src="/static/image_upload.js?v={{ asset_version }}"></script>
+<script src="/static/signature_session.js?v={{ asset_version }}"></script>
+{% if is_edit %}<script src="/static/form_corrections.js?v={{ asset_version }}"></script>{% endif %}
+</body>
+</html>

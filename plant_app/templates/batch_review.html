@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label, display_or_blank %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}" data-default-initials="{{ default_initials }}" data-session-signature-initials="{{ session_signature_initials }}" data-session-signature-signed-at="{{ session_signature_signed_at }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -37,7 +37,10 @@
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/stages">Run Sheets</a>
+        <a class="pill" href="/change-history">Change Log</a>
+        <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -53,13 +56,20 @@
       <h2>Run Details</h2>
       <div class="banner">
         Run: <strong>{{ run_label(run) }}</strong>
-        {% if run['product_name'] %}| Product {{ run['product_name'] }}{% endif %}
         {% if run['blend_number'] %}| Blend {{ run['blend_number'] }}{% endif %}
         {% if run['split_batch_number'] %}| Split {{ run['split_batch_number'] }}{% endif %}
         {% if run['status'] %}| Status: {{ run['status'] }}{% endif %}
       </div>
       {% if run['notes'] %}
       <p><strong>Notes:</strong> {{ run['notes'] }}</p>
+      {% endif %}
+      {% if run['status'] != 'Complete' %}
+      <div>
+        <label>Product Type</label>
+        <input name="product_name" form="finalize-form" value="{{ run['product_name'] or '' }}" placeholder="ex. Resin A" autocomplete="off">
+      </div>
+      {% elif run['product_name'] %}
+      <p><strong>Product Type:</strong> {{ run['product_name'] }}</p>
       {% endif %}
     </div>
 
@@ -84,7 +94,7 @@
     <div class="card">
       <div class="section-title">
         <h2>{{ item['title'] }}</h2>
-        <span class="info-chip">Saved</span>
+        <span class="info-chip">{{ item['completion_status'] or 'Complete' }}</span>
       </div>
       <div class="grid three-up">
         {% for field in item['stage']['headers'] %}
@@ -100,6 +110,16 @@
     </div>
     {% endfor %}
 
+    {% for item in voided_entries %}
+    <div class="card">
+      <div class="section-title">
+        <h2>{{ item['title'] }}</h2>
+        <span class="info-chip">Void / N/A</span>
+      </div>
+      <p class="muted">{{ item['sheet_name'] }} was marked Void / N/A{% if item['voided_by'] %} by {{ item['voided_by'] }}{% endif %}{% if item['voided_at'] %} at {{ item['voided_at'] }}{% endif %}.</p>
+    </div>
+    {% endfor %}
+
     {% if not has_entries %}
     <div class="card">
       <p class="muted center">No run-linked records have been saved yet. Add at least one run sheet before closing the run.</p>
@@ -108,12 +128,14 @@
 
     <div class="actions">
       <a class="btn ghost" href="/stages">Back To Run Sheets</a>
-      {% if has_entries and run['status'] != 'Complete' %}
-      <form method="post" action="/run/review/finalize">
-        <button class="btn" type="submit">Close Run</button>
+      {% if has_complete_entries and run['status'] != 'Complete' %}
+      <form id="finalize-form" method="post" action="/run/review/finalize">
+        <button class="btn" type="submit">Finish Run</button>
       </form>
+      {% elif has_entries and run['status'] != 'Complete' %}
+      <span class="pill">Save at least one sheet complete before finishing</span>
       {% elif run['status'] == 'Complete' %}
-      <span class="pill">Run Closed</span>
+      <span class="pill">Run Finished</span>
       {% endif %}
     </div>
   </div>

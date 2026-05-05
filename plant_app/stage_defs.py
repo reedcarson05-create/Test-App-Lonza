@@ -6,6 +6,7 @@ YES_NO_OPTIONS = ["Yes", "No"]
 Y_N_OPTIONS = ["Y", "N"]
 A_B_OPTIONS = ["A", "B"]
 AUTO_OFF_OPTIONS = ["AUTO", "OFF"]
+CYCLE_CLEANING_OPTIONS = ["Standard Rinse", "Regular Chemical Clean", "Intensive Chemical Clean"]
 
 def header(field_name: str, label: str, field_type: str, options: list[str] | None = None, default: str = ""):
     """Build a header tuple for a top-of-form field in a generic stage sheet."""
@@ -22,6 +23,23 @@ def table(title: str, prefix: str, rows: int, columns: list[tuple], initial_rows
     return {"title": title, "prefix": prefix, "rows": rows, "initial_rows": initial_rows, "columns": columns}
 
 
+def filtration_cycle_table(cycle_no: int):
+    """Build one Microflow filtration cycle table."""
+    return table(f"Cycle {cycle_no}", f"cycle{cycle_no}", 12, [
+        column("time", "Time"),
+        column("operator_initials", "Initials"),
+        column("fic1_gpm", "FIC1 (gpm)"),
+        column("tit1", f"TIT1 ({DEG_F})"),
+        column("tit2", f"TIT2 ({DEG_F})"),
+        column("dpt", "DPT (psi)"),
+        column("dpm", "DPM (psi)"),
+        column("perm_total", "Perm Total (gal)"),
+        column("f12_gpm", "F12 (gpm)"),
+        column("permeate_ri", "Perm RI (%)"),
+        column("retentate_ri", "Retentate RI (%)"),
+    ])
+
+
 # Full configuration for every run-linked stage rendered through `generic_sheet.html`.
 GENERIC_STAGE_DEFS = {
     # Three repeated filtration cycle tables kept available for standalone use later.
@@ -34,47 +52,7 @@ GENERIC_STAGE_DEFS = {
             header("zero_refract", "Zero Refract", "select", Y_N_OPTIONS),
             header("operator_initials", "Operator Initials", "text"),
         ],
-        "tables": [
-            table("Cycle 1", "cycle1", 4, [
-                column("time", "Time"),
-                column("operator_initials", "Initials"),
-                column("fic1_gpm", "FIC1 (gpm)"),
-                column("tit1", f"TIT1 ({DEG_F})"),
-                column("tit2", f"TIT2 ({DEG_F})"),
-                column("dpt", "DPT (psi)"),
-                column("dpm", "DPM (psi)"),
-                column("perm_total", "Perm Total (gal)"),
-                column("f12_gpm", "F12 (gpm)"),
-                column("permeate_ri", "Perm RI (%)"),
-                column("retentate_ri", "Retentate RI (%)"),
-            ]),
-            table("Cycle 2", "cycle2", 4, [
-                column("time", "Time"),
-                column("operator_initials", "Initials"),
-                column("fic1_gpm", "FIC1 (gpm)"),
-                column("tit1", f"TIT1 ({DEG_F})"),
-                column("tit2", f"TIT2 ({DEG_F})"),
-                column("dpt", "DPT (psi)"),
-                column("dpm", "DPM (psi)"),
-                column("perm_total", "Perm Total (gal)"),
-                column("f12_gpm", "F12 (gpm)"),
-                column("permeate_ri", "Perm RI (%)"),
-                column("retentate_ri", "Retentate RI (%)"),
-            ]),
-            table("Cycle 3", "cycle3", 4, [
-                column("time", "Time"),
-                column("operator_initials", "Initials"),
-                column("fic1_gpm", "FIC1 (gpm)"),
-                column("tit1", f"TIT1 ({DEG_F})"),
-                column("tit2", f"TIT2 ({DEG_F})"),
-                column("dpt", "DPT (psi)"),
-                column("dpm", "DPM (psi)"),
-                column("perm_total", "Perm Total (gal)"),
-                column("f12_gpm", "F12 (gpm)"),
-                column("permeate_ri", "Perm RI (%)"),
-                column("retentate_ri", "Retentate RI (%)"),
-            ]),
-        ],
+        "tables": [filtration_cycle_table(cycle_no) for cycle_no in range(1, 7)],
     },
     # Clarifier combines a filtration section and a diafiltration section in one stage.
     "clarifier": {
@@ -90,7 +68,7 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Filtration", "clarifier_filtration", 8, [
+            table("Filtration", "clarifier_filtration", 50, [
                 column("time", "Time"),
                 column("operator_initials", "Initials"),
                 column("feed_tank_level", "Feed Tank Level (%)"),
@@ -101,7 +79,7 @@ GENERIC_STAGE_DEFS = {
                 column("retentate_ri", "Retentate RI (%)"),
                 column("permeate_ri", "Permeate RI (%)"),
             ]),
-            table("Diafiltration", "clarifier_dia", 6, [
+            table("Diafiltration", "clarifier_dia", 50, [
                 column("time", "Time"),
                 column("operator_initials", "Initials"),
                 column("feed_tank_level", "Feed Tank Level (%)"),
@@ -127,13 +105,17 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Initials", "text"),
         ],
         "tables": [
-            table("Timed Readings", "concentration", 8, [
+            table("Timed Readings", "concentration", 72, [
                 column("time", "Time"),
                 column("product_ri", "Product RI (%)"),
                 column("first_effect_temp", f"1st Effect Temp ({DEG_F})"),
                 column("second_effect_temp", f"2nd Effect Temp ({DEG_F})"),
                 column("third_effect_temp", f"3rd Effect Temp ({DEG_F})"),
                 column("condenser_temp", f"Condenser Temp ({DEG_F})"),
+                column("first_effect_vac_pi_4400", "1st Effect Vac PI 4400"),
+                column("second_effect_vac_pi_4405", "2nd Effect Vac PI 4405"),
+                column("third_effect_vac_pi_4401", "3rd Effect Vac PI 4401"),
+                column("condenser_vac_pi_4402", "Condenser Vac PI 4402"),
                 column("system_pressure", "System Pressure (in Hg)"),
                 column("gcv", "GCV"),
             ]),
@@ -153,7 +135,7 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Timed Readings", "reconcentration", 8, [
+            table("Timed Readings", "reconcentration", 72, [
                 column("time", "Time"),
                 column("product_ri", "Product RI (%)"),
                 column("product_color", "Product Color"),
@@ -161,6 +143,10 @@ GENERIC_STAGE_DEFS = {
                 column("second_effect_temp", f"2nd Effect Temp ({DEG_F})"),
                 column("third_effect_temp", f"3rd Effect Temp ({DEG_F})"),
                 column("condenser_temp", f"Condenser Temp ({DEG_F})"),
+                column("first_effect_vac_pi_4400", "1st Effect Vac PI 4400"),
+                column("second_effect_vac_pi_4405", "2nd Effect Vac PI 4405"),
+                column("third_effect_vac_pi_4401", "3rd Effect Vac PI 4401"),
+                column("condenser_vac_pi_4402", "Condenser Vac PI 4402"),
                 column("system_pressure", "System Pressure (in Hg)"),
                 column("h2o2_ppm", "H2O2 (ppm)"),
                 column("gcv", "GCV"),
@@ -190,14 +176,14 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Bulk H2O2 Additions", "koh_h2o2", 10, [
+            table("Bulk H2O2 Additions", "koh_h2o2", 20, [
                 column("time", "Time"),
                 column("initials", "Initials"),
                 column("totalizer", "Totalizer (gal)"),
                 column("net_add", "Net Add (gal)"),
                 column("pump_status", "Pump Status", "select", AUTO_OFF_OPTIONS, "AUTO"),
             ]),
-            table("Potassium Hydroxide Additions", "koh_additions", 10, [
+            table("Potassium Hydroxide Additions", "koh_additions", 50, [
                 column("time", "Time"),
                 column("initials", "Initials"),
                 column("pump_status", "Pump Status", "select", AUTO_OFF_OPTIONS, "AUTO"),
@@ -224,13 +210,13 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Bulk H2O2 Additions", "calcium_h2o2", 8, [
+            table("Bulk H2O2 Additions", "calcium_h2o2", 20, [
                 column("time", "Time"),
                 column("initials", "Initials"),
                 column("totalizer", "Totalizer (gal)"),
                 column("net_add", "Net Add (gal)"),
             ]),
-            table("Calcium Hydroxide Additions", "calcium_additions", 12, [
+            table("Calcium Hydroxide Additions", "calcium_additions", 50, [
                 column("time", "Time"),
                 column("operator_initials", "Initials"),
                 column("scale_before", "Scale Before (lb)"),
@@ -254,7 +240,7 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Operating Log", "centrifuge", 10, [
+            table("Operating Log", "centrifuge", 50, [
                 column("initials", "Initials"),
                 column("time", "Time"),
                 column("h2o2_added", "H2O2 Added (ppm)"),
@@ -284,7 +270,7 @@ GENERIC_STAGE_DEFS = {
             header("completion_initials", "Completion Initials", "text"),
         ],
         "tables": [
-            table("Exchange Log", "anion_exchange", 10, [
+            table("Exchange Log", "anion_exchange", 50, [
                 column("time", "Time"),
                 column("initials", "Initials"),
                 column("product_ri", "Product RI (%)"),
@@ -306,7 +292,7 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Operator Initials", "text"),
         ],
         "tables": [
-            table("Transfer Log", "resistaid", 16, [
+            table("Transfer Log", "resistaid", 50, [
                 column("date", "Date"),
                 column("time", "Time"),
                 column("initials", "Initials"),
@@ -330,7 +316,7 @@ GENERIC_STAGE_DEFS = {
             header("operator_initials", "Initials", "text"),
         ],
         "tables": [
-            table("Carbon Usage", "carbon_usage", 5, [
+            table("Carbon Usage", "carbon_usage", 20, [
                 column("vessel", "Vessel"),
                 column("date", "Date"),
                 column("time", "Time"),
@@ -339,7 +325,7 @@ GENERIC_STAGE_DEFS = {
                 column("lot_number", "Lot Number"),
                 column("flushed", "Flushed?", "select", Y_N_OPTIONS),
             ]),
-            table("Vessel Monitoring", "carbon_monitoring", 10, [
+            table("Vessel Monitoring", "carbon_monitoring", 50, [
                 column("date", "Date"),
                 column("time", "Time"),
                 column("initials", "Initials"),
@@ -360,9 +346,6 @@ GENERIC_STAGE_DEFS = {
 
 # Navigation used on the run sheet selection screen.
 STAGE_LINKS = [
-    # Evaporation uses its own dedicated template instead of the generic sheet renderer.
-    {"title": "Evaporation", "href": "/stage/evaporation"},
-    {"title": "Clarifier", "href": "/stage/generic/clarifier"},
     {"title": "Concentration", "href": "/stage/generic/concentration"},
     {"title": "Reconcentration", "href": "/stage/generic/reconcentration"},
     {"title": "H2O2 - KOH Decolorizing", "href": "/stage/generic/h2o2_koh_decolorizing"},
@@ -375,7 +358,7 @@ STAGE_LINKS = [
 
 # Navigation used on the standalone process dashboard.
 PROCESS_STAGE_LINKS = [
-    # Extraction and filtration are the only standalone process sheets in the current UI.
     {"title": "Extraction", "href": "/stage/extraction"},
     {"title": "Filtration", "href": "/stage/filtration"},
+    {"title": "Clarifier", "href": "/stage/generic/clarifier"},
 ]

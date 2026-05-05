@@ -12,25 +12,25 @@
     <div class="card login-card">
       <div class="login-logo"><img src="/static/logo.png?v={{ asset_version }}" alt="LAG"></div>
       <p class="eyebrow center">Plant Operations</p>
-      <h1>Operator Login</h1>
-      <p class="muted center">Secure sign-in for run setup, machine entries, and audit history.</p>
-      <div class="login-meta">
-        <span class="info-chip">Run Setup</span>
-        <span class="info-chip">Machine Entries</span>
-        <span class="info-chip">Change History</span>
-      </div>
+      <h1>Start Session</h1>
+      <p class="muted center">Use your employee number and 4-digit passcode to sign in.</p>
+
       {% if error %}<div class="alert">{{ error }}</div>{% endif %}
       <form method="post" action="/login" class="stack">
         <div>
           <label>Employee Number</label>
-          <input name="employee" required autocomplete="username">
+          <input name="employee" value="{{ form_employee or '' }}" required autocomplete="username">
         </div>
         <div>
-          <label>Password</label>
-          <input type="password" name="password" required autocomplete="current-password">
+          <label>4-Digit Passcode</label>
+          <input type="password" name="passcode" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" required autocomplete="current-password" placeholder="0000">
         </div>
-        <button class="btn" type="submit" data-loading-label="Signing in...">Login</button>
+        <button class="btn" type="submit" data-loading-label="Signing in...">
+          <svg style="width:18px;height:18px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+          Login
+        </button>
       </form>
+      <p class="muted center" style="margin-top: 1rem;">No account? <a href="/register">Request access</a></p>
     </div>
   </div>
   <script src="/static/settings.js?v={{ asset_version }}"></script>

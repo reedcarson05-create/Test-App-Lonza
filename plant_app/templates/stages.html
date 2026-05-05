@@ -3,12 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Run Sheets</title>
+  <title>Run Sheets — Run {{ run['run_number'] if run else '' }}</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+{% set stage_descriptions = {
+  "Concentration":               "Concentration process data and hourly readings",
+  "Reconcentration":             "Reconcentration runs and final product readings",
+  "H2O2-KOH Decolorizing":      "Hydrogen peroxide / KOH decolorizing treatment",
+  "H2O2-Calcium Decolorizing":  "Hydrogen peroxide / calcium decolorizing treatment",
+  "Centrifuge":                  "Centrifuge speed, solids, and cycle data",
+  "Anion Exchange":              "Anion exchange resin bed treatment readings",
+  "ResistAid Anion Exchange":   "ResistAid-specific anion exchange data",
+  "Carbon Treatment":            "Activated carbon treatment and filtrate data"
+} %}
+{% set done_count = stage_links | selectattr('done') | list | length %}
+{% set total_count = stage_links | length %}
+{% set pct = ((done_count / total_count * 100) | round(0) | int) if total_count > 0 else 0 %}
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -31,50 +44,157 @@
       </div>
     </div>
   </div>
+
   <div class="wrap">
     <div class="nav">
       <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Run Sheets</div>
       <div class="navlinks">
-        <a class="pill" href="/home">Home</a>
-        <a class="pill" href="/run/select">Runs</a>
-        <a class="pill" href="/run/review">Review</a>
-        <a class="pill" href="/logout">Logout</a>
+        <a class="pill" href="/home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Home
+        </a>
+        <a class="pill" href="/run/select">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Runs
+        </a>
+        <a class="pill hide-mobile" href="/run/review">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Review
+        </a>
+        <a class="pill hide-mobile" href="/runs/print">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+          Print
+        </a>
+        <a class="pill hide-mobile" href="/change-history">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+          Change Log
+        </a>
+        <a class="pill hide-mobile" href="/logout">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          Logout
+        </a>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
+    <div class="breadcrumb">
+      <a href="/home">Home</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>Run {{ run_label(run) }}</span>
+    </div>
+
+    <!-- Process entry shortcuts at top of every page -->
+    <div class="process-bar">
+      <a class="process-tile process-tile--extraction" href="/stage/extraction">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <div class="process-tile-foot">
+          <div class="process-tile-text">
+            <span class="process-tile-label">Extraction</span>
+            <span class="process-tile-sub">Enter data entry</span>
+          </div>
+          <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </a>
+      <a class="process-tile process-tile--filtration" href="/stage/filtration">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        <div class="process-tile-foot">
+          <div class="process-tile-text">
+            <span class="process-tile-label">Filtration</span>
+            <span class="process-tile-sub">Enter data entry</span>
+          </div>
+          <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </a>
+      <a class="process-tile process-tile--clarifier" href="/stage/generic/clarifier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+        <div class="process-tile-foot">
+          <div class="process-tile-text">
+            <span class="process-tile-label">Clarifier</span>
+            <span class="process-tile-sub">Enter data entry</span>
+          </div>
+          <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </a>
+    </div>
+
+    <!-- Run info — compact, two actions only -->
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Run Work Area</h2>
-        <span class="info-chip">Run {{ run_label(run) }}</span>
+        <h2>Run {{ run_label(run) }}</h2>
+        {% if run['status'] %}<span class="info-chip">{{ run['status'] }}</span>{% endif %}
       </div>
-      <div class="banner">
-        {% if run['product_name'] %}Product: <strong>{{ run['product_name'] }}</strong>{% else %}No product assigned{% endif %}
-        {% if run['blend_number'] %} | Blend {{ run['blend_number'] }}{% endif %}
-        {% if run['split_batch_number'] %} | Split {{ run['split_batch_number'] }}{% endif %}
-        {% if run['status'] %} | Status: {{ run['status'] }}{% endif %}
+      {% if run['product_name'] %}<p class="muted">{{ run['product_name'] }}{% if run['blend_number'] %} &nbsp;&middot;&nbsp; Blend {{ run['blend_number'] }}{% endif %}{% if run['split_batch_number'] %} &nbsp;&middot;&nbsp; Split {{ run['split_batch_number'] }}{% endif %}</p>{% endif %}
+      <div class="actions">
+        <a class="btn" href="/run/review">
+          <svg style="width:17px;height:17px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Review Run
+        </a>
+        <a class="btn ghost" href="/run/select">Change Run</a>
+        <a class="btn ghost" href="/run/edit">Edit Run</a>
       </div>
-      <p class="muted">Use these run-linked sheets for the active run. Filtration stays standalone and is available from the home page.</p>
-      {% set action_links = [
-        {"label": "Change Run", "href": "/run/select", "ghost": True},
-        {"label": "Edit Run", "href": "/run/edit", "ghost": True},
-        {"label": "Print", "href": "/runs/print", "ghost": True},
-        {"label": "Review", "href": "/run/review"}
-      ] %}
-      {% include "partials/action_link_grid.html" %}
     </div>
 
+    <!-- Sheet selection with progress -->
     <div class="card">
       <div class="section-title">
-        <h2>Select A Run Sheet</h2>
-        <span class="info-chip">{{ stage_links|length }} Sheets</span>
+        <h2>Select a Sheet</h2>
+        <span class="info-chip">{{ total_count }} Sheets</span>
       </div>
-      <div class="action-grid stage-buttons">
+
+      {% if total_count > 0 %}
+      <div class="stage-progress">
+        <div class="stage-progress-header">
+          <span class="stage-progress-label">Completion</span>
+          <span class="stage-progress-value">{{ done_count }} of {{ total_count }} saved</span>
+        </div>
+        <div class="stage-progress-track">
+          <div class="stage-progress-fill{% if done_count == total_count %} all-done{% endif %}" style="width: {{ pct }}%"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="section-grid stage-buttons">
         {% for stage in stage_links %}
-        <a class="btn" href="{{ stage['href'] }}">{{ stage['title'] }}</a>
+        <div class="summary-card stage-sheet-link{% if stage['done'] %} stage-done{% elif stage['voided'] %} stage-voided{% endif %}">
+          <a class="stage-card-body" href="{{ stage['href'] }}">
+            <div class="stage-sheet-top">
+              <h3>{{ stage['title'] }}</h3>
+              {% if stage['done'] %}
+                <span class="stage-check" aria-label="Saved">&#10003;</span>
+              {% elif stage['voided'] %}
+                <span class="stage-void-badge">N/A</span>
+              {% endif %}
+            </div>
+            <p>{{ stage_descriptions.get(stage['title'], 'Enter and review run data for this stage.') }}</p>
+          </a>
+          {% if not stage['done'] %}
+          <form method="post" action="/stage/{{ stage['stage_key'] }}/void" class="stage-void-form">
+            <button type="submit" class="stage-void-btn">{% if stage['voided'] %}Restore{% else %}Mark N/A{% endif %}</button>
+          </form>
+          {% endif %}
+        </div>
         {% endfor %}
       </div>
+
+      {% if run['status'] != 'Complete' %}
+      <div style="margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+          <p style="font-weight:800; margin-bottom:4px;">Finish Run</p>
+          <p class="muted" style="font-size:14px;">{% if can_finish_batch %}Review your saved records then close the run.{% else %}Save at least one sheet before finishing.{% endif %}</p>
+        </div>
+        <a class="btn{% if not can_finish_batch %} disabled{% endif %}" href="/run/review">
+          <svg style="width:17px;height:17px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Review &amp; Finish
+        </a>
+      </div>
+      {% else %}
+      <div style="margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line);">
+        <p class="muted" style="font-size:14px;">This run is closed. Records remain available from the admin data view.</p>
+      </div>
+      {% endif %}
     </div>
   </div>
+
   <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>
 </html>

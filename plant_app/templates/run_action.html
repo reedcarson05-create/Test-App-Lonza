@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -33,13 +33,15 @@
   </div>
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{{ action_title }} Runs</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{{ page_heading }}</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
         <a class="pill" href="/run/select">Runs</a>
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/runs/print">Print</a>
+        <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
-        <span class="pill">User: {{ user }}</span>
+        <span class="pill">{{ user }}</span>
       </div>
     </div>
 
@@ -60,28 +62,58 @@
     <form method="post" action="/runs/{{ action_name }}" class="stack-gap">
       <div class="card">
         <div class="section-title">
-          <h2>Select Runs</h2>
+          <h2>{{ batch_label_title }}</h2>
+          <span class="info-chip">Creates separate run</span>
+        </div>
+        <p class="muted">Type the new {{ action_name }} run number here. The selected runs stay as their original runs, and the app creates or reopens a separate {{ action_name }} run with copied saved sheets.</p>
+        <div class="grid two-up">
+          <div>
+            <label>{{ batch_label_title }}</label>
+            <input name="action_label" list="{{ action_name }}-recent-labels" value="{{ batch_label_value or '' }}" placeholder="{{ batch_label_placeholder }}" autocomplete="off">
+            <datalist id="{{ action_name }}-recent-labels">
+              {% for item in recent_labels %}
+              <option value="{{ item['label'] }}">{{ item['label'] }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div>
+            <label>Recent Run Numbers</label>
+            <div class="summary-line">
+              {% for item in recent_labels %}
+              <span class="pill">{{ item['label'] }}</span>
+              {% endfor %}
+              {% if not recent_labels %}
+              <span class="pill">No previous labels yet</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>Select Original Runs</h2>
           <span class="info-chip">Multi-select enabled</span>
         </div>
         {% include "partials/run_selection_table.html" %}
         <div class="actions">
           <button class="btn" type="submit">{{ submit_label }}</button>
-          <a class="btn ghost" href="/home">Back Home</a>
+          <a class="btn ghost" href="/run/select">Back To Runs</a>
         </div>
       </div>
     </form>
 
     {% if selected_runs %}
-    <div class="card">
-      <div class="section-title">
-        <h2>Selected Runs</h2>
-        <span class="info-chip">{{ selected_runs|length }} Chosen</span>
-      </div>
+      <div class="card">
+        <div class="section-title">
+          <h2>Selected Original Runs</h2>
+          <span class="info-chip">{{ selected_runs|length }} Chosen</span>
+        </div>
       <div class="section-grid">
         {% for run_item in selected_runs %}
         <div class="summary-card">
           <h3>Run {{ run_label(run_item) }}</h3>
-          <p>{{ run_item['product_name'] or 'No product assigned yet.' }}</p>
+          <p>{{ run_item['product_name'] or 'No product type assigned yet.' }}</p>
           <div class="summary-line">
             <span class="pill">{{ run_item['status'] or 'Open' }}</span>
             {% if run_item['blend_number'] %}<span class="pill">Blend {{ run_item['blend_number'] }}</span>{% endif %}

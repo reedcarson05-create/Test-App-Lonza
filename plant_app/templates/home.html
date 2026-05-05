@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
   <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -31,46 +31,121 @@
     </div>
   </div>
 </div>
+
 <div class="wrap">
   <div class="nav">
     <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Plant App</div>
     <div class="navlinks">
-      <a class="pill" href="/run/select">Runs</a>
-      <a class="pill" href="/runs/print">Print</a>
-      <a class="pill" href="/logout">Logout</a>
-      <span class="pill">User: {{ user }}</span>
+      {% if run %}
+      <span class="pill pill-active">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Run {{ run_label(run) }}
+      </span>
+      {% endif %}
+      <a class="pill" href="/run/select">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Runs
+      </a>
+      <a class="pill hide-mobile" href="/change-history">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        Change Log
+      </a>
+      <a class="pill hide-mobile" href="/runs/print">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+        Print
+      </a>
+      <a class="pill hide-mobile" href="/team">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </a>
+      {% if user_is_admin %}
+      <a class="pill hide-mobile" href="/admin/dashboard">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Admin
+      </a>
+      {% endif %}
+      <a class="pill hide-mobile" href="/logout">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
+      <span class="pill">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+        {{ user }}
+      </span>
     </div>
   </div>
 
+  {% if finish_message %}
+  <div class="banner success-banner">{{ finish_message }}</div>
+  {% endif %}
+
+  <!-- Process entry — always at the top for quick access -->
+  <div class="process-bar">
+    <a class="process-tile process-tile--extraction" href="/stage/extraction">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <div class="process-tile-foot">
+        <div class="process-tile-text">
+          <span class="process-tile-label">Extraction</span>
+          <span class="process-tile-sub">Enter data entry</span>
+        </div>
+        <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </a>
+    <a class="process-tile process-tile--filtration" href="/stage/filtration">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      <div class="process-tile-foot">
+        <div class="process-tile-text">
+          <span class="process-tile-label">Filtration</span>
+          <span class="process-tile-sub">Enter data entry</span>
+        </div>
+        <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </a>
+    <a class="process-tile process-tile--clarifier" href="/stage/generic/clarifier">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      <div class="process-tile-foot">
+        <div class="process-tile-text">
+          <span class="process-tile-label">Clarifier</span>
+          <span class="process-tile-sub">Enter data entry</span>
+        </div>
+        <svg class="process-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </a>
+  </div>
+
+  <!-- Current run context or get-started prompt -->
+  {% if run %}
+  <div class="run-context">
+    <div class="run-context-info">
+      <p class="eyebrow">Currently Working On</p>
+      <h2 class="run-context-title">Run {{ run_label(run) }}</h2>
+      <div class="run-context-meta">
+        {% if run['product_name'] %}<span class="muted" style="font-size:14px">{{ run['product_name'] }}</span>{% endif %}
+        {% if run['status'] %}<span class="status-badge">{{ run['status'] }}</span>{% endif %}
+        {% if run['blend_number'] %}<span class="status-badge">Blend {{ run['blend_number'] }}</span>{% endif %}
+        {% if run['split_batch_number'] %}<span class="status-badge">Split {{ run['split_batch_number'] }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="run-context-actions">
+      <a class="btn" href="/stages">
+        <svg style="width:17px;height:17px;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+        Open Run Sheets
+      </a>
+      <a class="btn ghost" href="/run/select">Change Run</a>
+    </div>
+  </div>
+  {% else %}
   <div class="card page-intro">
     <div class="section-title">
-      <h2>Run Control</h2>
-      {% if run %}
-      <span class="info-chip">Current Run {{ run_label(run) }}</span>
-      {% else %}
+      <h2>Get Started</h2>
       <span class="info-chip">No run selected</span>
-      {% endif %}
     </div>
-    <p class="muted">Create runs, jump into open machines, blend or split selected runs, and print audit-ready summaries from this page.</p>
+    <p class="muted">Select an open run below, or create a new one to start recording batch data.</p>
     {% include "partials/create_run_form.html" %}
   </div>
+  {% endif %}
 
-  {% set action_links = [
-    {"label": "Open Run Sheets", "href": "/stages" if run else "/run/select"},
-    {"label": "Extraction", "href": "/stage/extraction", "ghost": True},
-    {"label": "Filtration", "href": "/stage/filtration", "ghost": True},
-    {"label": "Blend", "href": "/runs/blend"},
-    {"label": "Split", "href": "/runs/split"},
-    {"label": "Print", "href": "/runs/print", "ghost": True}
-  ] %}
-  <div class="card">
-    <div class="section-title">
-      <h2>Quick Actions</h2>
-      <span class="info-chip">Minimized clicks</span>
-    </div>
-    {% include "partials/action_link_grid.html" %}
-  </div>
-
+  <!-- Open runs -->
   <div class="card">
     <div class="section-title">
       <h2>Open Runs</h2>
@@ -78,88 +153,33 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <tr><th>Run</th><th>Product</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Actions</th></tr>
+        <tr><th>Run</th><th>Product Type</th><th>Updated</th><th>Actions</th></tr>
         {% for run_item in open_runs %}
         <tr>
           <td>
             <strong>{{ run_label(run_item) }}</strong>
-            {% if run and run_item['id'] == run['id'] %}<span class="info-chip">Current</span>{% endif %}
+            {% if run and run_item['id'] == run['id'] %}<span class="status-badge current">Active</span>{% endif %}
           </td>
           <td>{{ run_item['product_name'] or '' }}</td>
-          <td>{{ run_item['status'] or '' }}</td>
-          <td>{{ run_item['blend_number'] or '' }}</td>
-          <td>{{ run_item['split_batch_number'] or '' }}</td>
           <td>{{ run_item['updated_at'] or '' }}</td>
           <td class="table-actions">
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}">Use</a>
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/run/edit">Edit</a>
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/run/review">Review</a>
-            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/runs/print">Print</a>
-            <form method="post" action="/run/close/{{ run_item['id'] }}" class="inline-form">
-              <button class="table-action table-action-button" type="submit">Close</button>
+            <a class="table-action" href="/run/use/{{ run_item['id'] }}?next=/stages">Work</a>
+            <a class="table-action secondary" href="/run/use/{{ run_item['id'] }}?next=/run/review">Review</a>
+            <form method="post" action="/run/close/{{ run_item['id'] }}" class="inline-form" onsubmit="return confirm('Are you sure you want to close this open run?');">
+              <button class="table-action secondary table-action-button" type="submit">Close</button>
             </form>
           </td>
         </tr>
         {% endfor %}
         {% if not open_runs %}
-        <tr><td colspan="7" class="muted center">No runs are open right now.</td></tr>
+        <tr><td colspan="4" class="muted center">No runs are open right now.</td></tr>
         {% endif %}
       </table>
     </div>
   </div>
 
-  <div class="card">
-    <div class="section-title">
-      <h2>Machines</h2>
-      <span class="info-chip">Auto-populated usage state</span>
-    </div>
-    <div class="section-grid machine-grid">
-      {% for machine in machine_cards %}
-      <div class="summary-card">
-        <h3>{{ machine['title'] }}</h3>
-        <p>{{ machine['detail'] }}</p>
-        <div class="summary-line">
-          <span class="pill">{{ machine['status_label'] }}</span>
-        </div>
-        <div class="actions">
-          <a class="btn ghost" href="{{ machine['href'] }}">{{ machine['button_label'] }}</a>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="section-title">
-      <h2>Currently In Use</h2>
-      <span class="info-chip">{{ in_use_items|length }} Active Items</span>
-    </div>
-    <div class="section-grid">
-      {% for item in in_use_items %}
-      <div class="summary-card">
-        <h3>{{ item['title'] }}</h3>
-        <p>{% if item['run_label'] %}Run {{ item['run_label'] }}{% else %}Standalone machine{% endif %}</p>
-        <div class="summary-line">
-          <span class="pill">{{ item['status_label'] }}</span>
-          <span class="pill">{{ item['activity_time'] }}</span>
-        </div>
-        {% if item['comments'] %}
-        <p class="muted">{{ item['comments'] }}</p>
-        {% endif %}
-        <div class="actions">
-          <a class="btn ghost" href="{{ item['href'] }}">Open</a>
-        </div>
-      </div>
-      {% endfor %}
-      {% if not in_use_items %}
-      <div class="summary-card">
-        <h3>No Active Items</h3>
-        <p>Open runs and machines will appear here as soon as they are in use.</p>
-      </div>
-      {% endif %}
-    </div>
-  </div>
 </div>
+
 <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>
 </html>

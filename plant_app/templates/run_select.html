@@ -1,14 +1,14 @@
-<!doctype html>
+﻿<!doctype html>
 <html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Runs</title>
+  <title>{% if next_label %}Choose Run for {{ next_label }}{% else %}Runs{% endif %}</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
 {% from "partials/template_helpers.html" import run_label %}
-<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}">
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
   <div class="settings-root">
     <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
     <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
@@ -33,37 +33,50 @@
   </div>
   <div class="wrap">
     <div class="nav">
-      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">Runs</div>
+      <div class="brand"><img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">{% if next_label %}Choose Run{% else %}Runs{% endif %}</div>
       <div class="navlinks">
         <a class="pill" href="/home">Home</a>
+        {% if not next_path %}
         <a class="pill" href="/runs/blend">Blend</a>
         <a class="pill" href="/runs/split">Split</a>
+        {% endif %}
+        <a class="pill" href="/change-history">Change Log</a>
         <a class="pill" href="/runs/print">Print</a>
+        <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
       </div>
     </div>
 
     <div class="card page-intro">
       <div class="section-title">
-        <h2>Create Or Reopen Runs</h2>
+        <h2>{% if next_label %}Choose Run for {{ next_label }}{% else %}New Standard Run{% endif %}</h2>
         <span class="info-chip">{{ open_runs|length }} Open Runs</span>
       </div>
-      <p class="muted">Run number is the main identifier. Creating a run only needs that one value, and open runs are listed below for quick reuse.</p>
+      <p class="muted">
+        {% if next_label %}
+        Select an existing run below or create a new standard run, then {{ next_label }} will open automatically.
+        {% else %}
+        Create standard runs here with a run number and product type, or reopen an existing run below.
+        {% endif %}
+      </p>
       {% include "partials/create_run_form.html" %}
     </div>
 
+    {% if not next_path %}
     {% set action_links = [
-      {"label": "Blend Runs", "href": "/runs/blend"},
-      {"label": "Split Runs", "href": "/runs/split"},
+      {"label": "Open Blend Run Setup", "href": "/runs/blend"},
+      {"label": "Open Split Run Setup", "href": "/runs/split"},
       {"label": "Print Runs", "href": "/runs/print", "ghost": True}
     ] %}
     <div class="card">
       <div class="section-title">
-        <h2>Run Actions</h2>
-        <span class="info-chip">Shared selection workflows</span>
+        <h2>Blend &amp; Split Run Setup</h2>
+        <span class="info-chip">Separate from standard runs</span>
       </div>
+      <p class="muted">Use these separate pages when original runs need to stay in place and the app should create a new blend or split run number tied back to them.</p>
       {% include "partials/action_link_grid.html" %}
     </div>
+    {% endif %}
 
     <div class="card">
       <div class="section-title">
@@ -72,7 +85,7 @@
       </div>
       <div class="table-wrap">
         <table class="table">
-          <tr><th>Run</th><th>Product</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Open</th></tr>
+          <tr><th>Run</th><th>Product Type</th><th>Status</th><th>Blend</th><th>Split</th><th>Updated</th><th>Open</th></tr>
           {% for run_item in runs %}
           <tr>
             <td><strong>{{ run_label(run_item) }}</strong></td>
@@ -81,7 +94,7 @@
             <td>{{ run_item['blend_number'] or '' }}</td>
             <td>{{ run_item['split_batch_number'] or '' }}</td>
             <td>{{ run_item['updated_at'] or '' }}</td>
-            <td><a class="table-action" href="/run/use/{{ run_item['id'] }}">Use Run</a></td>
+            <td><a class="table-action" href="/run/use/{{ run_item['id'] }}{% if next_query %}?{{ next_query }}{% endif %}">{% if next_label %}Open {{ next_label }}{% else %}Use Run{% endif %}</a></td>
           </tr>
           {% endfor %}
           {% if not runs %}

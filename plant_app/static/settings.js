@@ -14,8 +14,8 @@ const DEMO_CORE_ROUTES = [
   "/process-dashboard",
   "/stage/extraction",
   "/stage/filtration",
+  "/stage/generic/clarifier",
   "/stages",
-  "/stage/evaporation",
   "/run/edit",
   "/run/review",
   "/dashboard",
@@ -23,7 +23,7 @@ const DEMO_CORE_ROUTES = [
 ];
 const DEMO_RUN_REQUIRED_ROUTES = [
   "/stages",
-  "/stage/evaporation",
+  "/stage/generic/clarifier",
   "/run/edit",
   "/run/review",
 ];
@@ -152,8 +152,8 @@ function describeDemoRoute(route) {
     "/process-dashboard": "Process Dashboard",
     "/stage/extraction": "Extraction",
     "/stage/filtration": "Filtration",
+    "/stage/generic/clarifier": "Clarifier",
     "/stages": "Run Sheets",
-    "/stage/evaporation": "Evaporation",
     "/run/edit": "Run Edit",
     "/batch/edit": "Run Edit",
     "/run/review": "Run Review",
@@ -404,6 +404,10 @@ function initSettingsPanel() {
   const initAppUpdateSection = () => {
     if (!appStatusEndpoint || panel.querySelector("[data-app-update-group]")) return;
 
+    const checkUpdateEndpoint = page.dataset.checkUpdateEndpoint || "";
+    const updateEndpoint = page.dataset.updateEndpoint || "";
+    const userIsAdmin = page.dataset.userIsAdmin === "true";
+
     const group = document.createElement("div");
     group.className = "settings-group settings-update-group";
     group.dataset.appUpdateGroup = "true";
@@ -413,6 +417,7 @@ function initSettingsPanel() {
       <div class="settings-update-actions">
         <button class="btn ghost settings-update-button" type="button" data-app-update-button>Check for Updates</button>
         <button class="btn settings-update-button" type="button" data-app-reload-button hidden>Reload Page</button>
+        <button class="btn settings-update-button" type="button" data-app-pull-button hidden>Pull &amp; Restart</button>
       </div>
       <p class="settings-status muted small" data-app-update-status aria-live="polite"></p>
     `;
@@ -422,6 +427,7 @@ function initSettingsPanel() {
     const statusNode = group.querySelector("[data-app-update-status]");
     const checkButton = group.querySelector("[data-app-update-button]");
     const reloadButton = group.querySelector("[data-app-reload-button]");
+    const pullButton = group.querySelector("[data-app-pull-button]");
 
     const setStatus = (message, state = "") => {
       statusNode.textContent = message;
@@ -432,6 +438,10 @@ function initSettingsPanel() {
       reloadButton.hidden = !visible;
     };
 
+    const setPullVisible = (visible) => {
+      pullButton.hidden = !visible;
+    };
+
     if (buildMeta) {
       buildMeta.textContent = pageBuildLabel
         ? `This page loaded build ${describeBuild(pageBuildLabel, pageChangedFile)}.`
@@ -439,23 +449,63 @@ function initSettingsPanel() {
     }
     setStatus("Use Check for Updates to see whether newer code has been picked up.", "idle");
     setReloadVisible(false);
+    setPullVisible(false);
 
     reloadButton.addEventListener("click", () => {
       reloadPageWithFreshQuery();
+    });
+
+    const pollUntilReady = (onReady, onTimeout) => {
+      const deadline = Date.now() + 30000;
+      const tick = () => {
+        if (Date.now() > deadline) { onTimeout(); return; }
+        fetch("/health", { cache: "no-store" })
+          .then((r) => { if (r.ok) { onReady(); } else { setTimeout(tick, 800); } })
+          .catch(() => { setTimeout(tick, 800); });
+      };
+      setTimeout(tick, 2000);
+    };
+
+    pullButton.addEventListener("click", async () => {
+      if (!confirm("Pull the latest code from GitHub and restart the server?")) return;
+      setStatus("Pulling updates from GitHub...", "checking");
+      pullButton.disabled = true;
+      checkButton.disabled = true;
+      try {
+        const response = await fetch(updateEndpoint, { method: "POST", credentials: "same-origin", cache: "no-store" });
+        const data = await response.json();
+        if (data.success) {
+          const branch = data.branch ? ` (${data.branch})` : "";
+          setStatus(`Update applied${branch}. Waiting for server to restart...`, "update");
+          setPullVisible(false);
+          pollUntilReady(
+            () => { reloadPageWithFreshQuery(); },
+            () => { setStatus("Server is taking longer than expected. Reload the page manually when ready.", "warning"); }
+          );
+        } else {
+          setStatus(`Update failed: ${data.output || "unknown error"}`, "error");
+          pullButton.disabled = false;
+          checkButton.disabled = false;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(`Update failed: ${message}`, "error");
+        pullButton.disabled = false;
+        checkButton.disabled = false;
+      }
     });
 
     checkButton.addEventListener("click", async () => {
       checkButton.disabled = true;
       checkButton.textContent = "Checking...";
       setReloadVisible(false);
+      setPullVisible(false);
       setStatus("Checking the newest code visible to the app...", "checking");
 
       try {
         const response = await fetch(appStatusEndpoint, {
           method: "GET",
-          headers: {
-            "Accept": "application/json",
-          },
+          headers: { "Accept": "application/json" },
           credentials: "same-origin",
           cache: "no-store",
         });
@@ -496,8 +546,38 @@ function initSettingsPanel() {
           return;
         }
 
+        // Local build is current — check GitHub for new commits.
+        if (checkUpdateEndpoint) {
+          setStatus("Local build is current. Checking GitHub for new commits...", "checking");
+          try {
+            const ghResponse = await fetch(checkUpdateEndpoint, {
+              method: "GET",
+              headers: { "Accept": "application/json" },
+              credentials: "same-origin",
+              cache: "no-store",
+            });
+            if (ghResponse.ok) {
+              const ghData = await ghResponse.json();
+              if (!ghData.up_to_date && Array.isArray(ghData.pending_commits) && ghData.pending_commits.length) {
+                const count = ghData.pending_commits.length;
+                const branch = ghData.branch ? ` on ${ghData.branch}` : "";
+                setStatus(
+                  `${count} update${count !== 1 ? "s" : ""}${branch} available. ${userIsAdmin ? "Click Pull & Restart to apply." : "Ask an admin to apply the update."}`,
+                  "update"
+                );
+                if (userIsAdmin && updateEndpoint) {
+                  setPullVisible(true);
+                }
+                return;
+              }
+            }
+          } catch (_) {
+            // GitHub check failed — fall through to "up to date" message.
+          }
+        }
+
         setStatus(
-          `No newer update found. Running build ${describeBuild(loadedBuildLabel || pageBuildLabel, loadedChangedFile || pageChangedFile)}.`,
+          `App is up to date. Running build ${describeBuild(loadedBuildLabel || pageBuildLabel, loadedChangedFile || pageChangedFile)}.`,
           "ok"
         );
       } catch (error) {
