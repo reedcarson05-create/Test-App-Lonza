@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin Dashboard</title>
+  <title>Comments &amp; Pictures</title>
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
 </head>
-{% from "partials/template_helpers.html" import run_label %}
 <body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
 <div class="settings-root">
   <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
@@ -42,7 +41,7 @@
     </div>
     <nav>
       <div class="admin-nav-section">Overview</div>
-      <a class="admin-nav-link is-active" href="/admin/dashboard">
+      <a class="admin-nav-link" href="/admin/dashboard">
         <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
         Dashboard
       </a>
@@ -71,7 +70,7 @@
         <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
         Clarifier Entries
       </a>
-      <a class="admin-nav-link" href="/admin/data/media">
+      <a class="admin-nav-link is-active" href="/admin/data/media">
         <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
         Comments &amp; Pictures
       </a>
@@ -98,160 +97,95 @@
   </aside>
   <div class="admin-main">
     <div class="admin-topbar">
-      <span class="admin-topbar-title">Dashboard</span>
+      <span class="admin-topbar-title">Comments &amp; Pictures</span>
       <div class="admin-topbar-right">
-        <span class="muted" style="font-size:13px;">Build: {{ app_loaded_build_label }}</span>
+        <span class="info-chip">{{ total }} record{{ 's' if total != 1 else '' }}</span>
       </div>
     </div>
     <div class="admin-page">
 
       <div class="admin-stats">
         <div class="admin-stat admin-stat--blue">
-          <div class="admin-stat-value">{{ stats.total_runs }}</div>
-          <div class="admin-stat-label">Total Runs</div>
+          <div class="admin-stat-value">{{ all_count }}</div>
+          <div class="admin-stat-label">Total Records</div>
         </div>
         <div class="admin-stat admin-stat--green">
-          <div class="admin-stat-value">{{ stats.open_runs }}</div>
-          <div class="admin-stat-label">Open Runs</div>
+          <div class="admin-stat-value">{{ comment_count }}</div>
+          <div class="admin-stat-label">With Comments</div>
         </div>
         <div class="admin-stat admin-stat--amber">
-          <div class="admin-stat-value">{{ stats.active_users }}</div>
-          <div class="admin-stat-label">Active Users</div>
+          <div class="admin-stat-value">{{ picture_count }}</div>
+          <div class="admin-stat-label">With Pictures</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="section-title">
-          <h2>App Update</h2>
-          <span class="info-chip">{{ app_loaded_build_label }}</span>
-        </div>
-        <p class="muted">Check GitHub for new commits and apply updates without leaving the browser.</p>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1rem;">
-          <button class="btn ghost" type="button" id="check-update-btn">Check for Updates</button>
-          <button class="btn" type="button" id="apply-update-btn" hidden>Pull &amp; Restart</button>
-        </div>
-        <div id="update-status" style="margin-top:1rem;"></div>
-        <div id="update-commits" style="margin-top:0.5rem;"></div>
+        <form method="get" action="/admin/data/media">
+          <div class="actions">
+            <input type="text" name="search" value="{{ search }}" placeholder="Run, machine, user, date, or comment" style="flex:1; padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+            <select name="show" style="padding:.4rem .6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:.95rem;">
+              <option value="all" {% if show == 'all' %}selected{% endif %}>All</option>
+              <option value="comments" {% if show == 'comments' %}selected{% endif %}>Comments</option>
+              <option value="pictures" {% if show == 'pictures' %}selected{% endif %}>Pictures</option>
+            </select>
+            <button class="btn" type="submit">Search</button>
+            <a class="btn ghost" href="/admin/data/media">Clear</a>
+          </div>
+        </form>
       </div>
 
-      <div class="card">
-        <div class="section-title">
-          <h2>Run File Export</h2>
-          <span class="info-chip">PDF data sheets</span>
-        </div>
-        <p class="muted">Compile run data-sheet PDFs into a timestamped folder and ZIP for download or flash drive copy.</p>
-        <div class="actions" style="margin-top:1rem;">
-          <a class="btn" href="/admin/export">Export Run Files</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="section-title">
-          <h2>Recent Runs</h2>
-        </div>
-        <div class="table-wrap">
-          <table class="table">
-            <tr><th>Run</th><th>Product Type</th><th>Status</th><th>Updated</th><th>Actions</th></tr>
-            {% for run in recent_runs %}
-            <tr>
-              <td><strong>{{ run_label(run) }}</strong></td>
-              <td>{{ run.product_name or '-' }}</td>
-              <td><span class="status-badge">{{ run.status or 'Open' }}</span></td>
-              <td>{{ run.updated_at or run.created_at or '' }}</td>
-              <td class="table-actions">
-                <a class="table-action" href="/admin/data/{{ run.id }}?section={{ admin_data_section_for_run(run) }}">View</a>
-              </td>
-            </tr>
-            {% endfor %}
-            {% if not recent_runs %}
-            <tr><td colspan="5" class="muted center">No runs recorded yet.</td></tr>
+      <div class="admin-media-list">
+        {% for item in media_entries %}
+        <article class="admin-media-card">
+          <div class="admin-media-header">
+            <div>
+              <h2>{{ item.machine_label }}</h2>
+              <p class="muted">
+                {{ item.display_section }}
+                {% if item.run_label %} | Run {{ item.run_label }}{% endif %}
+                {% if item.record_id %} | Entry #{{ item.record_id }}{% endif %}
+              </p>
+            </div>
+            {% if item.detail_href %}
+            <a class="table-action" href="{{ item.detail_href }}">Open Sheet</a>
             {% endif %}
-          </table>
+          </div>
+
+          <div class="admin-media-meta">
+            <span><strong>User</strong>{{ item.user_label }}</span>
+            <span><strong>Data Time</strong>{{ item.captured_at or item.saved_at or '-' }}</span>
+            <span><strong>Saved</strong>{{ item.saved_at or '-' }}</span>
+            <span><strong>Machine</strong>{{ item.machine_label }}</span>
+          </div>
+
+          {% if item.comment_text %}
+          <div class="admin-media-comment">{{ item.comment_text }}</div>
+          {% endif %}
+
+          {% if item.photo_urls %}
+          <div class="admin-media-gallery">
+            {% for photo in item.photo_urls %}
+            <a href="{{ photo }}" target="_blank" rel="noopener">
+              <img src="{{ photo }}" alt="Data collection picture from {{ item.user_label }}">
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </article>
+        {% else %}
+        <div class="card">
+          <div class="section-title">
+            <h2>No Comments Or Pictures</h2>
+            <span class="info-chip">0 records</span>
+          </div>
+          <p class="muted">No matching data collection records were found.</p>
         </div>
+        {% endfor %}
       </div>
 
     </div>
   </div>
 </div>
 <script src="/static/settings.js?v={{ asset_version }}"></script>
-<script>
-(function () {
-  var checkBtn = document.getElementById('check-update-btn');
-  var applyBtn = document.getElementById('apply-update-btn');
-  var statusEl = document.getElementById('update-status');
-  var commitsEl = document.getElementById('update-commits');
-
-  function setStatus(text) { statusEl.textContent = text; }
-  function setCommits(html) { commitsEl.innerHTML = html; }
-
-  function pollUntilReady(onReady, onTimeout) {
-    var deadline = Date.now() + 30000;
-    function tick() {
-      if (Date.now() > deadline) { onTimeout(); return; }
-      fetch('/health', { cache: 'no-store' })
-        .then(function (r) { if (r.ok) { onReady(); } else { setTimeout(tick, 800); } })
-        .catch(function () { setTimeout(tick, 800); });
-    }
-    setTimeout(tick, 2000);
-  }
-
-  checkBtn.addEventListener('click', function () {
-    setStatus('Checking GitHub...');
-    setCommits('');
-    applyBtn.hidden = true;
-    checkBtn.disabled = true;
-    fetch('/check-update', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.error) {
-          setStatus('Error: ' + data.error);
-        } else if (data.up_to_date) {
-          setStatus('Already up to date' + (data.branch ? ' on ' + data.branch : '') + '.');
-        } else {
-          var count = data.pending_commits.length;
-          var branch = data.branch ? ' on ' + data.branch : '';
-          setStatus(count + ' update' + (count !== 1 ? 's' : '') + branch + ' available.');
-          var lines = data.pending_commits.map(function (c) { return c; }).join('\n');
-          setCommits('<pre style="white-space:pre-wrap;font-size:0.85em;margin:0;">' + lines + '</pre>');
-          applyBtn.hidden = false;
-        }
-      })
-      .catch(function (e) { setStatus('Error: ' + e.message); })
-      .finally(function () { checkBtn.disabled = false; });
-  });
-
-  applyBtn.addEventListener('click', function () {
-    if (!confirm('Pull the latest code from GitHub and restart the server?')) return;
-    setStatus('Pulling updates...');
-    setCommits('');
-    applyBtn.hidden = true;
-    applyBtn.disabled = true;
-    checkBtn.disabled = true;
-    fetch('/admin/update', { method: 'POST', cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.success) {
-          var branch = data.branch ? ' (' + data.branch + ')' : '';
-          setStatus('Update applied' + branch + '. Waiting for server to restart...');
-          setCommits('<pre style="white-space:pre-wrap;font-size:0.85em;margin:0;">' + data.output + '</pre>');
-          pollUntilReady(
-            function () { window.location.reload(); },
-            function () { setStatus('Server is taking longer than expected. Reload the page manually when ready.'); }
-          );
-        } else {
-          setStatus('Update failed.');
-          setCommits('<pre style="white-space:pre-wrap;font-size:0.85em;margin:0;">' + (data.output || '') + '</pre>');
-          applyBtn.disabled = false;
-          checkBtn.disabled = false;
-        }
-      })
-      .catch(function (e) {
-        setStatus('Error: ' + e.message);
-        applyBtn.disabled = false;
-        checkBtn.disabled = false;
-      });
-  });
-}());
-</script>
 </body>
 </html>

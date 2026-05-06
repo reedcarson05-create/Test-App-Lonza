@@ -44,6 +44,7 @@ from db import (
     approve_user,
     reject_user,
     deactivate_user,
+    update_user_passcode,
     create_run,
     get_run,
     get_run_by_number,
@@ -84,6 +85,7 @@ from db import (
     list_all_extraction_entries,
     list_all_filtration_entries,
     list_all_clarifier_entries,
+    list_admin_media_entries,
 )
 
 from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS, CYCLE_CLEANING_OPTIONS
@@ -1065,6 +1067,96 @@ def parse_payload_json(entry) -> dict:
         return json.loads(entry.get("payload_json") or "{}")
     except (TypeError, ValueError):
         return {}
+
+
+def admin_media_photo_urls(photo_text: str) -> list[str]:
+    """Return local upload URLs from a saved image textarea value."""
+    urls = []
+    for raw_reference in re.split(r"[\r\n,]+", clean_value(photo_text)):
+        reference = clean_value(raw_reference)
+        if not reference:
+            continue
+        if reference.startswith("static/uploads/"):
+            reference = f"/{reference}"
+        if reference.startswith("/static/uploads/") and reference not in urls:
+            urls.append(reference)
+    return urls
+
+
+def admin_media_comment_label(field_name: str) -> str:
+    """Turn a payload comment field name into a compact readable label."""
+    cleaned = re.sub(r"_?comments?$", "", clean_value(field_name).lower()).strip("_")
+    if not cleaned:
+        return "Comments"
+    return re.sub(r"_+", " ", cleaned).title()
+
+
+def admin_media_detail_href(row: dict) -> str:
+    """Return the best read-only admin destination for a media entry."""
+    entry_table = clean_value(row.get("entry_table", ""))
+    record_id = row.get("record_id")
+    if entry_table == "extraction_entries" and record_id:
+        return f"/admin/data/entries/extraction/{record_id}"
+    if entry_table == "filtration_entries" and record_id:
+        return f"/admin/data/entries/filtration/{record_id}"
+    if entry_table == "sheet_entries" and row.get("stage_key") == "clarifier" and record_id:
+        return f"/admin/data/entries/clarifier/{record_id}"
+    if row.get("run_id"):
+        return f"/admin/data/{row['run_id']}"
+    return ""
+
+
+def prepare_admin_media_entries(rows: list[dict]) -> list[dict]:
+    """Add display labels, extracted row comments, and image URLs to media rows."""
+    entries = []
+    for row in rows:
+        payload = parse_payload_json(row)
+        comment_parts = []
+        base_comment = clean_value(row.get("comments", ""))
+        if base_comment:
+            comment_parts.append(base_comment)
+
+        for key, value in sorted(payload.items()):
+            if "comment" not in clean_value(key).lower():
+                continue
+            text = clean_value(value)
+            if not text or text in comment_parts:
+                continue
+            label = admin_media_comment_label(key)
+            comment_parts.append(text if label == "Comments" else f"{label}: {text}")
+
+        photo_text = row.get("photo_path", "")
+        if payload:
+            photo_text = "\n".join([clean_value(photo_text), clean_value(payload.get("photo_path", ""))])
+        photo_urls = admin_media_photo_urls(photo_text)
+        comment_text = "\n".join(comment_parts)
+        if not comment_text and not photo_urls:
+            continue
+
+        employee = clean_value(row.get("employee", ""))
+        operator_initials = clean_value(row.get("operator_initials", "") or row.get("user_initials", "")).upper()
+        employee_name = clean_value(row.get("employee_name", ""))
+        user_label = employee_name or employee or operator_initials or "Unknown user"
+        if employee and employee != user_label:
+            user_label = f"{user_label} ({employee})"
+        if operator_initials:
+            user_label = f"{user_label} - {operator_initials}"
+
+        entries.append(
+            {
+                **dict(row),
+                "display_section": display_sheet_name(row.get("entry_table", ""), row.get("section", "")),
+                "run_label": run_display_number(row),
+                "machine_label": clean_value(row.get("machine_label", "")) or display_sheet_name(row.get("entry_table", ""), row.get("section", "")),
+                "captured_at": clean_value(" ".join(part for part in (row.get("entry_date", ""), row.get("entry_time", "")) if clean_value(part))),
+                "saved_at": clean_value(row.get("created_at", "")),
+                "user_label": user_label,
+                "comment_text": comment_text,
+                "photo_urls": photo_urls,
+                "detail_href": admin_media_detail_href(row),
+            }
+        )
+    return entries
 
 
 def filtration_cycle_render_rows(row_map: dict, prefix: str) -> int:
@@ -2450,6 +2542,38 @@ def admin_splits_data(request: Request, page: int = 1, search: str = "", status:
     return render_admin_data_page(request, "splits", page=page, search=search, status=status)
 
 
+@app.get("/admin/data/media", response_class=HTMLResponse)
+def admin_media_page(request: Request, search: str = "", show: str = "all"):
+    """Render a read-only admin feed of saved comments and images."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    selected_show = clean_value(show).lower() or "all"
+    if selected_show not in {"all", "comments", "pictures"}:
+        selected_show = "all"
+    all_entries = prepare_admin_media_entries(list_admin_media_entries(search=search))
+    comment_count = sum(1 for entry in all_entries if entry["comment_text"])
+    picture_count = sum(1 for entry in all_entries if entry["photo_urls"])
+    entries = all_entries
+    if selected_show == "comments":
+        entries = [entry for entry in all_entries if entry["comment_text"]]
+    elif selected_show == "pictures":
+        entries = [entry for entry in all_entries if entry["photo_urls"]]
+
+    return render_page(
+        request,
+        "admin_media.html",
+        media_entries=entries,
+        search=search,
+        show=selected_show,
+        total=len(entries),
+        all_count=len(all_entries),
+        comment_count=comment_count,
+        picture_count=picture_count,
+    )
+
+
 @app.get("/admin/data/{run_id}", response_class=HTMLResponse)
 def admin_run_detail(request: Request, run_id: int, section: str = ""):
     redirect = require_admin(request)
@@ -2599,15 +2723,33 @@ def admin_clarifier_detail(request: Request, entry_id: int):
 # ADMIN — USER MANAGEMENT
 # ------------------------
 
+def _admin_users_redirect(**params):
+    cleaned_params = {}
+    for key, value in params.items():
+        cleaned = clean_value(value)
+        if cleaned:
+            cleaned_params[key] = cleaned
+    query = urlencode(cleaned_params)
+    target = f"/admin/users?{query}" if query else "/admin/users"
+    return RedirectResponse(target, status_code=303)
+
+
 @app.get("/admin/users", response_class=HTMLResponse)
-def admin_users_page(request: Request):
+def admin_users_page(request: Request, passcode_changed: str = "", passcode_error: str = ""):
     redirect = require_admin(request)
     if redirect:
         return redirect
     users = get_all_users()
     pending = [u for u in users if not u["active"]]
     active = [u for u in users if u["active"]]
-    return render_page(request, "admin_users.html", pending_users=pending, active_users=active)
+    return render_page(
+        request,
+        "admin_users.html",
+        pending_users=pending,
+        active_users=active,
+        passcode_changed=clean_value(passcode_changed),
+        passcode_error=clean_value(passcode_error),
+    )
 
 
 @app.post("/admin/users/{employee}/approve")
@@ -2635,6 +2777,36 @@ def admin_deactivate_user(request: Request, employee: str):
         return redirect
     deactivate_user(employee)
     return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{employee}/passcode")
+def admin_change_user_passcode(
+    request: Request,
+    employee: str,
+    new_passcode: str = Form(""),
+    confirm_passcode: str = Form(""),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    employee = clean_value(employee)
+    passcode = clean_value(new_passcode)
+    confirm = clean_value(confirm_passcode)
+
+    if not employee:
+        return _admin_users_redirect(passcode_error="Choose a user before changing a passcode.")
+    if len(passcode) != 4 or not passcode.isdigit():
+        return _admin_users_redirect(passcode_error="Enter a 4-digit passcode.")
+    if passcode != confirm:
+        return _admin_users_redirect(passcode_error="The passcodes did not match.")
+    if not update_user_passcode(employee, passcode):
+        return _admin_users_redirect(passcode_error="That user could not be found.")
+
+    if clean_value(request.session.get("user", "")) == employee:
+        set_session_quick_code(request, passcode)
+
+    return _admin_users_redirect(passcode_changed=employee)
 
 
 # ------------------------
