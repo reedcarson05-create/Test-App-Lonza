@@ -5,7 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$launcherRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = $launcherRoot
+$latestCommitAppRoot = Join-Path $launcherRoot "plant_app"
+if (Test-Path -LiteralPath (Join-Path $latestCommitAppRoot "app.py")) {
+  $projectRoot = $latestCommitAppRoot
+}
 Set-Location -LiteralPath $projectRoot
 
 $runtimeDir = Join-Path $projectRoot "runtime"
@@ -165,11 +170,14 @@ function Stop-StaleProjectServer {
   $commandLine = [string]$owner.CommandLine
   $executablePath = [string]$owner.ExecutablePath
   $normalizedRoot = $ExpectedRoot.ToLowerInvariant()
+  $normalizedLauncherRoot = $launcherRoot.ToLowerInvariant()
   $normalizedExecutablePath = $executablePath.ToLowerInvariant()
   $looksLikeProjectServer = (
     $commandLine.ToLowerInvariant().Contains("app.py") -and
     (
       $commandLine.ToLowerInvariant().Contains($normalizedRoot) -or
+      $commandLine.ToLowerInvariant().Contains($normalizedLauncherRoot) -or
+      $normalizedExecutablePath.StartsWith($normalizedLauncherRoot) -or
       $normalizedExecutablePath.StartsWith($normalizedRoot)
     )
   )
@@ -272,6 +280,8 @@ function Test-PythonRuntime {
 
 function Resolve-PythonExe {
   $localCandidates = @(
+    (Join-Path $launcherRoot ".venv\Scripts\python.exe"),
+    (Join-Path $launcherRoot "venv\Scripts\python.exe"),
     (Join-Path $projectRoot ".venv\Scripts\python.exe"),
     (Join-Path $projectRoot "venv\Scripts\python.exe"),
     (Join-Path $env:LOCALAPPDATA "Python\bin\python.exe")

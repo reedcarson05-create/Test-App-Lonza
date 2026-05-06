@@ -750,7 +750,7 @@ def render_page(request: Request, template_name: str, **context):
         "admin_data_section_for_run": admin_data_section_for_run,
     }
     page_context.update(context)
-    return templates.TemplateResponse(template_name, page_context)
+    return templates.TemplateResponse(request=request, name=template_name, context=page_context)
 
 
 def clean_value(value) -> str:
@@ -1480,8 +1480,9 @@ def boot_page(request: Request):
     if logged_in(request):
         lock_session(request)
     response = templates.TemplateResponse(
-        "boot.html",
-        {
+        request=request,
+        name="boot.html",
+        context={
             "request": request,
             "boot_manifest": build_boot_manifest(request),
             "asset_version": asset_version(),
@@ -1524,8 +1525,9 @@ def app_status():
 def render_login_template(request: Request, error: str = "", form_employee: str = ""):
     """Render the full-login screen with optional validation feedback."""
     return templates.TemplateResponse(
-        "login.html",
-        {
+        request=request,
+        name="login.html",
+        context={
             "request": request,
             "error": error,
             "form_employee": form_employee,
@@ -1543,8 +1545,9 @@ def render_login_template(request: Request, error: str = "", form_employee: str 
 def render_unlock_template(request: Request, error: str = ""):
     """Render the lightweight 4-digit unlock screen for a remembered session."""
     return templates.TemplateResponse(
-        "unlock.html",
-        {
+        request=request,
+        name="unlock.html",
+        context={
             "request": request,
             "error": error,
             "settings_theme": current_theme(request),
@@ -1652,7 +1655,7 @@ def logout(request: Request):
 def register_page(request: Request):
     if logged_in(request):
         return RedirectResponse(session_entry_path(request), status_code=303)
-    return templates.TemplateResponse("register.html", {
+    return templates.TemplateResponse(request=request, name="register.html", context={
         "request": request,
         "settings_theme": "light",
         "settings_font_scale": "1",
@@ -1675,7 +1678,7 @@ async def register(request: Request):
     confirm = (form.get("confirm_passcode", "") or "").strip()
 
     def render_error(msg: str):
-        return templates.TemplateResponse("register.html", {
+        return templates.TemplateResponse(request=request, name="register.html", context={
             "request": request,
             "settings_theme": "light",
             "settings_font_scale": "1",
@@ -1698,7 +1701,7 @@ async def register(request: Request):
 
     create_pending_user(employee, full_name, initials, passcode)
 
-    return templates.TemplateResponse("register.html", {
+    return templates.TemplateResponse(request=request, name="register.html", context={
         "request": request,
         "settings_theme": "light",
         "settings_font_scale": "1",
