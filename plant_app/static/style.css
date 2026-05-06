@@ -1327,11 +1327,17 @@ td.blank-display {
 }
 
 .settings-root {
-  position: fixed;
-  top: 14px;
-  right: 14px;
+  position: relative;
   z-index: 80;
-  max-height: calc(100vh - 28px);
+  flex: 0 0 auto;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.settings-root[data-settings-docked="true"] {
+  order: -1;
 }
 
 .settings-toggle {
@@ -1350,8 +1356,11 @@ td.blank-display {
 }
 
 .settings-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
   width: min(300px, calc(100vw - 28px));
-  margin-top: 10px;
+  margin-top: 0;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -1361,6 +1370,7 @@ td.blank-display {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  text-align: left;
 }
 
 .settings-panel[hidden] {
@@ -2233,8 +2243,15 @@ html[data-theme="dark"] .loading-screen-track {
   }
 
   .settings-root {
-    top: 10px;
-    right: 10px;
+    width: 100%;
+  }
+
+  .settings-toggle {
+    width: 100%;
+  }
+
+  .settings-panel {
+    width: 100%;
   }
 
   .brand {
