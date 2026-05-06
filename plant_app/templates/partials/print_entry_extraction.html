@@ -1,0 +1,88 @@
+{% from "partials/template_helpers.html" import display_or_blank %}
+{% macro signature_block(signature_data, signature_signed_at='', initials='') -%}
+{% if signature_data %}
+<div class="ps-signature">
+  <span class="ps-label">Signature</span>
+  <img class="ps-signature-img" src="{{ signature_data }}" alt="Saved handwritten signature">
+  <span class="ps-signature-meta">{{ initials }}{% if signature_signed_at %} | {{ signature_signed_at }}{% endif %}</span>
+</div>
+{% endif %}
+{%- endmacro %}
+{% set entry_date = entry.entry_date or '' %}
+{% set entry_initials = entry.operator_initials or '' %}
+<section class="card print-packet">
+  <div class="ps-run-header">
+    <div class="ps-run-title">
+      <h2>{% if run %}Batch Record &mdash; Run {{ run.run_number }}{% else %}Extraction Entry #{{ entry.id }}{% endif %}</h2>
+      <span class="info-chip">Extraction</span>
+    </div>
+    <div class="ps-run-meta">
+      Entry ID: <strong>{{ entry.id }}</strong>
+      {% if run and run.product_name %} &nbsp;|&nbsp; Product Type: <strong>{{ run.product_name }}</strong>{% endif %}
+      {% if entry.created_at %} &nbsp;|&nbsp; Created: {{ entry.created_at }}{% endif %}
+      {% if entry.version_no %} &nbsp;|&nbsp; Version: {{ entry.version_no }}{% endif %}
+    </div>
+  </div>
+
+  <div class="ps-sheet">
+    <div class="ps-sheet-heading">
+      <h3>Extraction</h3>
+      <span class="ps-sheet-name">Extraction Data Sheet</span>
+    </div>
+    {{ signature_block(entry.signature_data or '', entry.signature_signed_at or '', entry_initials) }}
+
+    <div class="ps-fields">
+      <div class="ps-field"><span class="ps-label">Run</span><span class="ps-value">{{ display_or_blank(run.run_number if run else entry.run_id, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Date</span><span class="ps-value">{{ display_or_blank(entry.entry_date, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Time</span><span class="ps-value">{{ display_or_blank(entry.entry_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Operator Initials</span><span class="ps-value">{{ display_or_blank(entry.operator_initials or entry.employee, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">North / South / Pile</span><span class="ps-value">{{ display_or_blank(entry.location, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Time on Pipe or Pile</span><span class="ps-value">{{ display_or_blank(entry.time_on_pile, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Start Time</span><span class="ps-value">{{ display_or_blank(entry.start_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Stop Time</span><span class="ps-value">{{ display_or_blank(entry.stop_time, entry_date, entry_initials) }}</span></div>
+    </div>
+
+    <p class="ps-table-title">Machine Readings</p>
+    <div class="ps-table-wrap">
+      <table class="ps-table">
+        <tr>
+          <th>Equipment</th>
+          <th>Speed (rpm)</th>
+          <th>Load (%)</th>
+          <th>Blowback Pressure (psi)</th>
+        </tr>
+        <tr>
+          <td>PSF 1</td>
+          <td>{{ display_or_blank(entry.psf1_speed, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.psf1_load, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.psf1_blowback, entry_date, entry_initials) }}</td>
+        </tr>
+        <tr>
+          <td>PSF 2</td>
+          <td>{{ display_or_blank(entry.psf2_speed, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.psf2_load, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.psf2_blowback, entry_date, entry_initials) }}</td>
+        </tr>
+        <tr>
+          <td>Press</td>
+          <td>{{ display_or_blank(entry.press_speed, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.press_load, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(entry.press_blowback, entry_date, entry_initials) }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="ps-fields">
+      <div class="ps-field"><span class="ps-label">Pressate RI @ P303 (%)</span><span class="ps-value">{{ display_or_blank(entry.pressate_ri, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Chip Bin Steam FT201 (lb/hr)</span><span class="ps-value">{{ display_or_blank(entry.chip_bin_steam, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Chip Chute Temp (&deg;F)</span><span class="ps-value">{{ display_or_blank(entry.chip_chute_temp, entry_date, entry_initials) }}</span></div>
+    </div>
+
+    {% if entry.comments %}
+    <div class="ps-notes">Notes: {{ entry.comments }}</div>
+    {% endif %}
+    {% if entry.photo_path %}
+    <div class="ps-notes">Image Paths: {{ entry.photo_path }}</div>
+    {% endif %}
+  </div>
+</section>

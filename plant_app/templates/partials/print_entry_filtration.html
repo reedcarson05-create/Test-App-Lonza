@@ -1,0 +1,120 @@
+{% from "partials/template_helpers.html" import display_or_blank %}
+{% macro signature_block(signature_data, signature_signed_at='', initials='') -%}
+{% if signature_data %}
+<div class="ps-signature">
+  <span class="ps-label">Signature</span>
+  <img class="ps-signature-img" src="{{ signature_data }}" alt="Saved handwritten signature">
+  <span class="ps-signature-meta">{{ initials }}{% if signature_signed_at %} | {{ signature_signed_at }}{% endif %}</span>
+</div>
+{% endif %}
+{%- endmacro %}
+{% set entry_date = entry.entry_date or '' %}
+{% set entry_initials = entry.operator_initials or '' %}
+<section class="card print-packet">
+  <div class="ps-run-header">
+    <div class="ps-run-title">
+      <h2>{% if run %}Batch Record &mdash; Run {{ run.run_number }}{% else %}Filtration Entry #{{ entry.id }}{% endif %}</h2>
+      <span class="info-chip">Filtration</span>
+      <span class="info-chip">{{ entry.completion_status or 'Complete' }}</span>
+    </div>
+    <div class="ps-run-meta">
+      Entry ID: <strong>{{ entry.id }}</strong>
+      {% if run and run.product_name %} &nbsp;|&nbsp; Product Type: <strong>{{ run.product_name }}</strong>{% endif %}
+      {% if entry.created_at %} &nbsp;|&nbsp; Created: {{ entry.created_at }}{% endif %}
+      {% if entry.version_no %} &nbsp;|&nbsp; Version: {{ entry.version_no }}{% endif %}
+    </div>
+  </div>
+
+  <div class="ps-sheet">
+    <div class="ps-sheet-heading">
+      <h3>Microflow Filtration</h3>
+      <span class="ps-sheet-name">Filtration Data Sheet</span>
+    </div>
+    {{ signature_block(entry.signature_data or '', entry.signature_signed_at or '', entry_initials) }}
+
+    <div class="ps-fields">
+      <div class="ps-field"><span class="ps-label">Run</span><span class="ps-value">{{ display_or_blank(run.run_number if run else entry.run_id, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Date</span><span class="ps-value">{{ display_or_blank(entry.entry_date, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Operator Initials</span><span class="ps-value">{{ display_or_blank(entry.operator_initials or entry.employee, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Cycle Volume Set Point (gal)</span><span class="ps-value">{{ display_or_blank(entry.cycle_volume_set_point, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Clarification Sequential No.</span><span class="ps-value">{{ display_or_blank(entry.clarification_sequential_no, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Retentate Flow Set Point (gpm)</span><span class="ps-value">{{ display_or_blank(entry.retentate_flow_set_point, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Zero Refract</span><span class="ps-value">{{ display_or_blank(entry.zero_refract, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Start-up Time</span><span class="ps-value">{{ display_or_blank(entry.startup_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Shut-down Time</span><span class="ps-value">{{ display_or_blank(entry.shutdown_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Start Time</span><span class="ps-value">{{ display_or_blank(entry.start_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Stop Time</span><span class="ps-value">{{ display_or_blank(entry.stop_time, entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Status</span><span class="ps-value">{{ display_or_blank(entry.completion_status or 'Complete', entry_date, entry_initials) }}</span></div>
+    </div>
+
+    {% for cycle in filtration_cycles %}
+    {% set prefix = cycle.prefix %}
+    {% set cycle_rows = filt_rows|selectattr('row_group', 'equalto', prefix)|list %}
+    {% set summary_values = [
+      entry_payload.get(prefix ~ '_cycle_number', ''),
+      entry_payload.get(prefix ~ '_ri_to_sewer', ''),
+      entry_payload.get(prefix ~ '_total_filtrate_volume', ''),
+      entry_payload.get(prefix ~ '_cleaning_method', '')
+    ] %}
+    {% if cycle_rows or summary_values|select|list %}
+    <p class="ps-table-title">Cycle {{ cycle.number }}</p>
+    <div class="ps-fields">
+      <div class="ps-field"><span class="ps-label">Cycle #</span><span class="ps-value">{{ display_or_blank(entry_payload.get(prefix ~ '_cycle_number', cycle.number), entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">RI to Sewer</span><span class="ps-value">{{ display_or_blank(entry_payload.get(prefix ~ '_ri_to_sewer', ''), entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Total Filtrate Volume</span><span class="ps-value">{{ display_or_blank(entry_payload.get(prefix ~ '_total_filtrate_volume', ''), entry_date, entry_initials) }}</span></div>
+      <div class="ps-field"><span class="ps-label">Cleaning Method</span><span class="ps-value">{{ display_or_blank(entry_payload.get(prefix ~ '_cleaning_method', ''), entry_date, entry_initials) }}</span></div>
+    </div>
+    <div class="ps-table-wrap">
+      <table class="ps-table">
+        <tr>
+          <th>Time</th>
+          <th>Initials</th>
+          <th>FIC1 (gpm)</th>
+          <th>TIT1 (&deg;F)</th>
+          <th>TIT2 (&deg;F)</th>
+          <th>DPT</th>
+          <th>DPM</th>
+          <th>Perm Total</th>
+          <th>F12 (gpm)</th>
+          <th>Permeate RI</th>
+          <th>Retentate RI</th>
+          <th>QIC1 NTU</th>
+          <th>PT1</th>
+          <th>PT2</th>
+          <th>PT3</th>
+        </tr>
+        {% for row in cycle_rows %}
+        <tr>
+          <td>{{ display_or_blank(row.row_time, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.operator_initials, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.fic1_gpm, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.tit1, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.tit2, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.dpt, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.dpm, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.perm_total, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.f12_gpm, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.permeate_ri, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.retentate_ri, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.qic1_ntu_turbidity, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.pressure_pt1, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.pressure_pt2, entry_date, entry_initials) }}</td>
+          <td>{{ display_or_blank(row.pressure_pt3, entry_date, entry_initials) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if not filt_rows %}
+    <p class="ps-no-entries">No cycle readings were saved for this filtration entry.</p>
+    {% endif %}
+    {% if entry.comments %}
+    <div class="ps-notes">Notes: {{ entry.comments }}</div>
+    {% endif %}
+    {% if entry.photo_path %}
+    <div class="ps-notes">Image Paths: {{ entry.photo_path }}</div>
+    {% endif %}
+  </div>
+</section>
