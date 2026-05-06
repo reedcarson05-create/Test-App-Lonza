@@ -25,26 +25,26 @@ document.addEventListener("DOMContentLoaded", () => {
     {
       threshold: 0,
       stage: "modern",
-      status: "Preparing Plant App",
-      detail: "Loading shared controls and session services.",
+      status: "Initializing",
+      detail: "Starting session services and authentication.",
     },
     {
       threshold: 0.4,
       stage: "modern",
-      status: "Loading Shared Resources",
-      detail: "Caching styles, scripts, and the next screen.",
+      status: "Loading Resources",
+      detail: "Preparing interface components and assets.",
     },
     {
       threshold: 0.68,
       stage: "modern",
-      status: "Checking Current Data",
-      detail: "Refreshing the latest workspace records.",
+      status: "Syncing Data",
+      detail: "Retrieving the latest production records.",
     },
     {
       threshold: 0.87,
       stage: "modern",
-      status: "Launching Workspace",
-      detail: "Finalizing the secure handoff to the app.",
+      status: "Ready",
+      detail: "Handing off to the workspace.",
     },
   ];
 

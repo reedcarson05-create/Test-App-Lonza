@@ -21,6 +21,8 @@
   .ps-table-title { font-size: .85rem; font-weight: 600; margin: .5rem 0 .2rem; }
   .ps-notes { font-size: .82rem; color: #333; border-left: 3px solid #ccc; padding-left: .5rem; margin-top: .5rem; }
   .ps-no-entries { color: #777; font-style: italic; font-size: .85rem; padding: .5rem 0; }
+  .ps-sheet-voided { border: 1px solid #888; padding: .5rem; }
+  .ps-void-box { border: 1px solid #888; background: #f6f6f6; padding: .5rem; font-weight: 700; }
 
   @media print {
     @page { margin: 0.5in 0.4in; size: letter portrait; }
@@ -80,5 +82,8 @@
     .ps-notes { font-size: 7.5pt; border-left: 2pt solid #000 !important;
       padding-left: 4pt; margin-top: 4pt; color: #000; }
     .ps-no-entries { font-size: 8pt; color: #000; }
+    .ps-sheet-voided { border: 0.75pt solid #000 !important; padding: 5pt !important; }
+    .ps-void-box { border: 0.75pt solid #000 !important; background: #eee !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 4pt !important; font-size: 8pt !important; }
   }
 </style>

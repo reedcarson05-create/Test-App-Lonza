@@ -31,7 +31,7 @@ This guide explains what each active file does, what to change when requirements
 - Insert/update helpers: one helper per saved entry type.
 - Read helpers: fetch single entries, latest run-linked entries, and dashboard history.
 - Safe edit notes:
-- Add new columns in table creation SQL and with `ensure_column(...)` for existing databases.
+- Add new columns in the `CREATE TABLE` block and with `add_column_if_missing(...)` for existing databases.
 - Keep insert and update helpers aligned with the payloads built in `app.py`.
 - If a table has repeating rows, update both the parent-table helper and the child-row helper/query.
 - Avoid hand-editing `plant.db`; let schema changes happen through `init_db()`.
@@ -213,6 +213,21 @@ This guide explains what each active file does, what to change when requirements
 - Purpose: Creates desktop, Start Menu, and Startup shortcuts for the standalone Windows app and attempts to place a taskbar launcher for it.
 - Change this file when:
 - You want different shortcut names, icons, startup behavior, or taskbar-pinning logic.
+
+### `Install-LAGPlantApp.ps1`
+- Purpose: Installs the app from a copied package folder onto another Windows device by copying files to `%LOCALAPPDATA%\LAG Plant App`, creating a local `.venv`, installing dependencies, checking imports, and then running the shortcut installer.
+- Change this file when:
+- You need different install paths, dependency setup, startup shortcut defaults, or LAN-access install behavior.
+
+### `build_install_package.ps1`
+- Purpose: Builds `dist\LAG-Plant-App-Installer` and optionally a zip that can be moved to another Windows device.
+- Change this file when:
+- You want to include or exclude files from the copyable installer package, or add offline dependency wheel packaging.
+
+### `build_one_file_installer.ps1`
+- Purpose: Builds `dist\Install-LAG-Plant-App.cmd`, a single self-extracting Windows installer that embeds the package and runs `Install-LAGPlantApp.ps1` from a temporary folder.
+- Change this file when:
+- You want to change the one-file installer name, wrapper behavior, embedded package options, or double-click install flow.
 
 ## Fastest Way To Make Common Changes
 
