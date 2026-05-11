@@ -104,6 +104,42 @@
         {% include "partials/action_link_grid.html" %}
       </div>
 
+      {% if group_action and (source_runs or derived_run) %}
+      <div class="card">
+        <div class="section-title">
+          <h2>{{ group_action | title }} Composition</h2>
+          <span class="info-chip">Run Relationships</span>
+        </div>
+        {% if batch_type == group_action %}
+          <p class="muted">This is the <strong>{{ group_action }}</strong> run. It was created from the source runs listed below.</p>
+          {% if source_runs %}
+          <div class="summary-line" style="flex-wrap:wrap;gap:8px;margin-top:10px;">
+            {% for r in source_runs %}
+            <span class="pill">Source: {{ r['run_number'] or r['batch_number'] or ('Run ' ~ r['id']) }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% else %}
+          <p class="muted">This run was merged into a <strong>{{ group_action }}</strong>.</p>
+          {% if derived_run %}
+          <div class="summary-line" style="margin-top:10px;">
+            <span class="pill">{{ group_action | title }}: {{ derived_run['run_number'] or derived_run['batch_number'] or ('Run ' ~ derived_run['id']) }}</span>
+          </div>
+          {% endif %}
+          {% if source_runs %}
+          <p class="muted" style="margin-top:10px;">Other source runs in this {{ group_action }}:</p>
+          <div class="summary-line" style="flex-wrap:wrap;gap:8px;">
+            {% for r in source_runs %}
+            {% if r['id'] != run['id'] %}
+            <span class="pill">{{ r['run_number'] or r['batch_number'] or ('Run ' ~ r['id']) }}</span>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+
       <div class="card">
         <h2>Final Run Update</h2>
         <p class="muted">Use one final run note here instead of opening each machine individually just to close the run.</p>

@@ -41,6 +41,8 @@ from db import (
     get_all_users,
     get_active_users,
     list_recent_group_labels,
+    list_runs_by_group_label,
+    list_open_draft_sheets,
     approve_user,
     reject_user,
     deactivate_user,
@@ -3095,6 +3097,7 @@ def home(request: Request):
         open_runs=list_open_runs(limit=80),
         machine_cards=machine_status_cards(activity_rows, current_run),
         in_use_items=in_use_items(activity_rows),
+        draft_sheets=list_open_draft_sheets(limit=20),
         create_product_name="",
         finish_message=finish_message,
     )
@@ -3222,7 +3225,30 @@ def batch_edit_page(request: Request):
     result_message = ""
     if derived_action in {"blend", "split"} and derived_number:
         result_message = f"{derived_action.title()} run {derived_number} is now open. The original source runs stayed in place and remain tied to it."
-    return render_page(request, "batch_edit.html", result_message=result_message, error_message="")
+    current_run_data = active_run(request)
+    blend_num = clean_value((current_run_data or {}).get("blend_number", ""))
+    split_num = clean_value((current_run_data or {}).get("split_batch_number", ""))
+    batch_type = clean_value((current_run_data or {}).get("batch_type", "standard"))
+    group_runs: list[dict] = []
+    group_action = ""
+    if blend_num:
+        group_runs = list_runs_by_group_label("blend", blend_num)
+        group_action = "blend"
+    elif split_num:
+        group_runs = list_runs_by_group_label("split", split_num)
+        group_action = "split"
+    source_runs = [r for r in group_runs if r.get("batch_type") != group_action]
+    derived_run = next((r for r in group_runs if r.get("batch_type") == group_action), None)
+    return render_page(
+        request,
+        "batch_edit.html",
+        result_message=result_message,
+        error_message="",
+        group_action=group_action,
+        source_runs=source_runs,
+        derived_run=derived_run,
+        batch_type=batch_type,
+    )
 
 
 @app.post("/run/edit")
@@ -3719,7 +3745,7 @@ async def submit_filtration(request: Request):
 
     if form.get("save_mode") == COMPLETE_STATUS:
         return RedirectResponse("/process-dashboard", status_code=303)
-    return RedirectResponse("/stage/filtration?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------
@@ -3915,7 +3941,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/process-dashboard", status_code=303)
     if save_mode == COMPLETE_STATUS:
         return RedirectResponse(f"/stage/generic/{stage_key}?saved=complete", status_code=303)
-    return RedirectResponse(f"/stage/generic/{stage_key}?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------

@@ -113,6 +113,27 @@
     </a>
   </div>
 
+  {% if draft_sheets %}
+  <!-- Active draft sheet quick links — small tiles below the process bar -->
+  <div class="draft-sheet-section">
+    <div class="draft-sheet-heading">
+      <span class="draft-sheet-heading-dot"></span>
+      Open Drafts — tap to continue
+    </div>
+    <div class="draft-sheet-bar">
+      {% for sheet in draft_sheets %}
+      <a class="draft-sheet-tile" href="/run/use/{{ sheet['run_id'] }}?next=/stage/generic/{{ sheet['stage_key'] }}">
+        <span class="draft-sheet-body">
+          <span class="draft-sheet-label">{{ sheet['stage_title'] }}</span>
+          <span class="draft-sheet-run">Run {{ sheet['run_number'] or sheet['batch_number'] or sheet['run_id'] }}</span>
+        </span>
+        <svg class="draft-sheet-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Current run context or get-started prompt -->
   {% if run %}
   <div class="run-context">

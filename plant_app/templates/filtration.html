@@ -67,8 +67,8 @@
         <h2>{% if is_edit %}Correct Filtration Entry{% elif draft_mode %}Continue Filtration Draft{% else %}Microflow Filtration Entry{% endif %}</h2>
         {% if not is_edit %}
         <div style="display:flex;gap:8px;flex-shrink:0;">
-          <button class="btn ghost" type="submit" name="save_mode" value="Draft">Save Draft</button>
-          <button class="btn" type="submit" name="save_mode" value="Complete">Save Complete</button>
+          <button class="btn draft-primary" type="submit" name="save_mode" value="Draft">Save Draft</button>
+          <button class="btn ghost" type="submit" name="save_mode" value="Complete">Save Complete</button>
         </div>
         {% endif %}
       </div>
@@ -142,12 +142,12 @@
           {% set row = row_map.get(prefix ~ '_' ~ row_no) if row_map else none %}
           <tr>
             <td><input name="{{ prefix }}_{{ row_no }}_time" data-repeat-field="time" value="{{ row['row_time'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_operator_initials" data-repeat-field="operator_initials" value="{{ row['operator_initials'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_fic1_gpm" data-repeat-field="fic1_gpm" value="{{ row['fic1_gpm'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_tit1" data-repeat-field="tit1" value="{{ row['tit1'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_tit2" data-repeat-field="tit2" value="{{ row['tit2'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_dpt" data-repeat-field="dpt" value="{{ row['dpt'] if row else '' }}"></td>
-            <td><input name="{{ prefix }}_{{ row_no }}_dpm" data-repeat-field="dpm" value="{{ row['dpm'] if row else '' }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_operator_initials" data-repeat-field="operator_initials" data-default-value="{{ initials }}" value="{{ row['operator_initials'] if row else initials }}"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_fic1_gpm" data-repeat-field="fic1_gpm" value="{{ row['fic1_gpm'] if row else '' }}" inputmode="decimal"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit1" data-repeat-field="tit1" value="{{ row['tit1'] if row else '' }}" inputmode="decimal"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_tit2" data-repeat-field="tit2" value="{{ row['tit2'] if row else '' }}" inputmode="decimal"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpt" data-repeat-field="dpt" value="{{ row['dpt'] if row else '' }}" inputmode="decimal"></td>
+            <td><input name="{{ prefix }}_{{ row_no }}_dpm" data-repeat-field="dpm" value="{{ row['dpm'] if row else '' }}" inputmode="decimal"></td>
             <td><input name="{{ prefix }}_{{ row_no }}_perm_total" data-repeat-field="perm_total" value="{{ row['perm_total'] if row else '' }}"></td>
             <td><input name="{{ prefix }}_{{ row_no }}_f12_gpm" data-repeat-field="f12_gpm" value="{{ row['f12_gpm'] if row else '' }}"></td>
             <td><input name="{{ prefix }}_{{ row_no }}_permeate_ri" data-repeat-field="permeate_ri" value="{{ row['permeate_ri'] if row else '' }}"></td>
@@ -196,8 +196,8 @@
       {% if is_edit %}
       <button class="btn" type="submit">{{ submit_label or 'Save Corrected Entry' }}</button>
       {% else %}
-      <button class="btn ghost" type="submit" name="save_mode" value="Draft">Save Draft</button>
-      <button class="btn" type="submit" name="save_mode" value="Complete">Save Complete</button>
+      <button class="btn draft-primary" type="submit" name="save_mode" value="Draft">Save Draft</button>
+      <button class="btn ghost" type="submit" name="save_mode" value="Complete">Save Complete</button>
       {% endif %}
       <a class="btn ghost" href="/process-dashboard">Back</a>
     </div>

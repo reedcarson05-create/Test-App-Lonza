@@ -1046,6 +1046,34 @@ def touch_run(run_id: int):
     conn.close()
 
 
+def list_open_draft_sheets(limit: int = 20) -> list[dict]:
+    """Return draft-status run-linked sheets for open runs — used as home-screen quick links."""
+    conn = get_conn()
+    cur = conn.cursor()
+    safe_limit = max(1, int(limit))
+    cur.execute(f"""
+        SELECT
+            s.id AS entry_id,
+            s.stage_key,
+            s.stage_title,
+            s.run_id,
+            r.run_number,
+            r.batch_number,
+            r.blend_number,
+            r.split_batch_number
+        FROM sheet_entries s
+        JOIN production_runs r ON r.id = s.run_id
+        WHERE s.completion_status = 'Draft'
+          AND r.status = 'Open'
+        ORDER BY s.id DESC
+        LIMIT {safe_limit}
+    """)
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
 def insert_extraction(employee: str, data: dict) -> int:
     """Insert a new extraction entry and return its id."""
     conn = get_conn()

@@ -87,7 +87,7 @@
         {% set field_options = field[3] if field|length > 3 else [] %}
         {% set field_default = field_default_value(field, run) %}
         {% set field_value = entry_values.get(field_name) if entry_values and entry_values.get(field_name) is not none else field_default %}
-        {% set field_locked = draft_mode and not is_edit and field_value %}
+        {% set field_locked = draft_mode and not is_edit and field_value and field_name not in ['completion_date', 'completion_time', 'completion_initials'] %}
         <div>
           <label>{{ field_label }}</label>
           {% if field_type == 'select' %}
@@ -112,7 +112,8 @@
           {% else %}
           <input
             name="{{ field_name }}"
-            type="{{ 'text' if view_only and not is_edit else field_type }}"
+            type="{{ 'text' if view_only and not is_edit else ('text' if field_type == 'numeric' else field_type) }}"
+            {% if field_type == 'numeric' and not (view_only and not is_edit) %}inputmode="decimal"{% endif %}
             value="{% if view_only and not is_edit and entry_values and entry_values.get(field_name) is not none %}{{ display_or_blank(entry_values.get(field_name), entry_values.get('entry_date', today), entry_values.get('operator_initials', initials)) }}{% elif entry_values and entry_values.get(field_name) is not none %}{{ entry_values.get(field_name) }}{% elif field_name == 'entry_date' or field_name == 'startup_date' %}{{ today }}{% elif field_name == 'operator_initials' %}{{ initials }}{% else %}{{ field_default }}{% endif %}"
             autocomplete="off"
             {% if field_locked %}readonly{% endif %}
@@ -157,7 +158,7 @@
                 {% endfor %}
               </select>
               {% else %}
-              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ cell_value }}" autocomplete="off" {% if cell_locked %}readonly class="saved-locked"{% endif %}>
+              <input name="{{ cell_name }}" data-repeat-field="{{ column_name }}" data-default-value="{{ column_default }}" value="{{ cell_value }}" autocomplete="off" {% if cell_locked %}readonly class="saved-locked"{% endif %}{% if column_type == 'numeric' %}inputmode="decimal"{% endif %}>
               {% endif %}
             </td>
             {% endfor %}
@@ -203,8 +204,8 @@
         {% if is_edit %}
         <button class="btn" type="submit">{{ submit_label or 'Save Corrected Entry' }}</button>
         {% else %}
-        <button class="btn ghost" type="submit" name="save_mode" value="Draft">Save Draft</button>
-        <button class="btn" type="submit" name="save_mode" value="Complete">Save Complete</button>
+        <button class="btn draft-primary" type="submit" name="save_mode" value="Draft">Save Draft</button>
+        <button class="btn ghost" type="submit" name="save_mode" value="Complete">Save Complete</button>
         {% endif %}
       {% endif %}
       {% if view_only and not is_edit and edit_href %}
