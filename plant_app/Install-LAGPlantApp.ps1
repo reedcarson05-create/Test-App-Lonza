@@ -243,7 +243,7 @@ if (-not $SkipDependencyInstall) {
 }
 
 Write-Step "Checking app imports"
-Invoke-Checked -FilePath $venvPython -Arguments @("-c", "import fastapi, uvicorn, jinja2, multipart, itsdangerous, pyodbc; print('Import check OK')") -FailureMessage "The app dependencies are not ready."
+Invoke-Checked -FilePath $venvPython -Arguments @("-c", "import fastapi, uvicorn, jinja2, multipart, itsdangerous; print('Import check OK')") -FailureMessage "The app dependencies are not ready."
 
 Write-Step "Creating Windows shortcuts"
 $shortcutInstaller = Join-Path $installRoot "install_windows_app.ps1"

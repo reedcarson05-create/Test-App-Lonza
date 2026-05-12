@@ -315,6 +315,12 @@ function initSettingsPanel() {
   const panel = document.querySelector("[data-settings-panel]");
   const toggle = document.querySelector("[data-settings-toggle]");
   if (!page || !panel || !toggle) return;
+  const settingsRoot = toggle.closest(".settings-root");
+  const settingsDock = document.querySelector(".admin-topbar-right") || document.querySelector(".nav .navlinks");
+  if (settingsRoot && settingsDock && settingsRoot.parentElement !== settingsDock) {
+    settingsDock.prepend(settingsRoot);
+    settingsRoot.dataset.settingsDocked = "true";
+  }
 
   const settingsEndpoint = page.dataset.settingsEndpoint || "";
   const shouldPersist = page.dataset.settingsPersist === "true";

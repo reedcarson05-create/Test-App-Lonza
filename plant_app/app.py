@@ -41,9 +41,12 @@ from db import (
     get_all_users,
     get_active_users,
     list_recent_group_labels,
+    list_runs_by_group_label,
+    list_open_draft_sheets,
     approve_user,
     reject_user,
     deactivate_user,
+    update_user_passcode,
     create_run,
     get_run,
     get_run_by_number,
@@ -84,6 +87,7 @@ from db import (
     list_all_extraction_entries,
     list_all_filtration_entries,
     list_all_clarifier_entries,
+    list_admin_media_entries,
 )
 
 from stage_defs import GENERIC_STAGE_DEFS, STAGE_LINKS, PROCESS_STAGE_LINKS, CYCLE_CLEANING_OPTIONS
@@ -815,7 +819,7 @@ def render_page(request: Request, template_name: str, **context):
         "admin_data_section_for_run": admin_data_section_for_run,
     }
     page_context.update(context)
-    return templates.TemplateResponse(template_name, page_context)
+    return templates.TemplateResponse(request=request, name=template_name, context=page_context)
 
 
 def clean_value(value) -> str:
@@ -1065,6 +1069,96 @@ def parse_payload_json(entry) -> dict:
         return json.loads(entry.get("payload_json") or "{}")
     except (TypeError, ValueError):
         return {}
+
+
+def admin_media_photo_urls(photo_text: str) -> list[str]:
+    """Return local upload URLs from a saved image textarea value."""
+    urls = []
+    for raw_reference in re.split(r"[\r\n,]+", clean_value(photo_text)):
+        reference = clean_value(raw_reference)
+        if not reference:
+            continue
+        if reference.startswith("static/uploads/"):
+            reference = f"/{reference}"
+        if reference.startswith("/static/uploads/") and reference not in urls:
+            urls.append(reference)
+    return urls
+
+
+def admin_media_comment_label(field_name: str) -> str:
+    """Turn a payload comment field name into a compact readable label."""
+    cleaned = re.sub(r"_?comments?$", "", clean_value(field_name).lower()).strip("_")
+    if not cleaned:
+        return "Comments"
+    return re.sub(r"_+", " ", cleaned).title()
+
+
+def admin_media_detail_href(row: dict) -> str:
+    """Return the best read-only admin destination for a media entry."""
+    entry_table = clean_value(row.get("entry_table", ""))
+    record_id = row.get("record_id")
+    if entry_table == "extraction_entries" and record_id:
+        return f"/admin/data/entries/extraction/{record_id}"
+    if entry_table == "filtration_entries" and record_id:
+        return f"/admin/data/entries/filtration/{record_id}"
+    if entry_table == "sheet_entries" and row.get("stage_key") == "clarifier" and record_id:
+        return f"/admin/data/entries/clarifier/{record_id}"
+    if row.get("run_id"):
+        return f"/admin/data/{row['run_id']}"
+    return ""
+
+
+def prepare_admin_media_entries(rows: list[dict]) -> list[dict]:
+    """Add display labels, extracted row comments, and image URLs to media rows."""
+    entries = []
+    for row in rows:
+        payload = parse_payload_json(row)
+        comment_parts = []
+        base_comment = clean_value(row.get("comments", ""))
+        if base_comment:
+            comment_parts.append(base_comment)
+
+        for key, value in sorted(payload.items()):
+            if "comment" not in clean_value(key).lower():
+                continue
+            text = clean_value(value)
+            if not text or text in comment_parts:
+                continue
+            label = admin_media_comment_label(key)
+            comment_parts.append(text if label == "Comments" else f"{label}: {text}")
+
+        photo_text = row.get("photo_path", "")
+        if payload:
+            photo_text = "\n".join([clean_value(photo_text), clean_value(payload.get("photo_path", ""))])
+        photo_urls = admin_media_photo_urls(photo_text)
+        comment_text = "\n".join(comment_parts)
+        if not comment_text and not photo_urls:
+            continue
+
+        employee = clean_value(row.get("employee", ""))
+        operator_initials = clean_value(row.get("operator_initials", "") or row.get("user_initials", "")).upper()
+        employee_name = clean_value(row.get("employee_name", ""))
+        user_label = employee_name or employee or operator_initials or "Unknown user"
+        if employee and employee != user_label:
+            user_label = f"{user_label} ({employee})"
+        if operator_initials:
+            user_label = f"{user_label} - {operator_initials}"
+
+        entries.append(
+            {
+                **dict(row),
+                "display_section": display_sheet_name(row.get("entry_table", ""), row.get("section", "")),
+                "run_label": run_display_number(row),
+                "machine_label": clean_value(row.get("machine_label", "")) or display_sheet_name(row.get("entry_table", ""), row.get("section", "")),
+                "captured_at": clean_value(" ".join(part for part in (row.get("entry_date", ""), row.get("entry_time", "")) if clean_value(part))),
+                "saved_at": clean_value(row.get("created_at", "")),
+                "user_label": user_label,
+                "comment_text": comment_text,
+                "photo_urls": photo_urls,
+                "detail_href": admin_media_detail_href(row),
+            }
+        )
+    return entries
 
 
 def filtration_cycle_render_rows(row_map: dict, prefix: str) -> int:
@@ -2015,8 +2109,9 @@ def boot_page(request: Request):
     if logged_in(request):
         lock_session(request)
     response = templates.TemplateResponse(
-        "boot.html",
-        {
+        request=request,
+        name="boot.html",
+        context={
             "request": request,
             "boot_manifest": build_boot_manifest(request),
             "asset_version": asset_version(),
@@ -2058,8 +2153,9 @@ def app_status():
 def render_login_template(request: Request, error: str = "", form_employee: str = ""):
     """Render the full-login screen with optional validation feedback."""
     return templates.TemplateResponse(
-        "login.html",
-        {
+        request=request,
+        name="login.html",
+        context={
             "request": request,
             "error": error,
             "form_employee": form_employee,
@@ -2077,8 +2173,9 @@ def render_login_template(request: Request, error: str = "", form_employee: str 
 def render_unlock_template(request: Request, error: str = ""):
     """Render the lightweight 4-digit unlock screen for a remembered session."""
     return templates.TemplateResponse(
-        "unlock.html",
-        {
+        request=request,
+        name="unlock.html",
+        context={
             "request": request,
             "error": error,
             "settings_theme": current_theme(request),
@@ -2186,7 +2283,7 @@ def logout(request: Request):
 def register_page(request: Request):
     if logged_in(request):
         return RedirectResponse(session_entry_path(request), status_code=303)
-    return templates.TemplateResponse("register.html", {
+    return templates.TemplateResponse(request=request, name="register.html", context={
         "request": request,
         "settings_theme": "light",
         "settings_font_scale": "1",
@@ -2209,7 +2306,7 @@ async def register(request: Request):
     confirm = (form.get("confirm_passcode", "") or "").strip()
 
     def render_error(msg: str):
-        return templates.TemplateResponse("register.html", {
+        return templates.TemplateResponse(request=request, name="register.html", context={
             "request": request,
             "settings_theme": "light",
             "settings_font_scale": "1",
@@ -2232,7 +2329,7 @@ async def register(request: Request):
 
     create_pending_user(employee, full_name, initials, passcode)
 
-    return templates.TemplateResponse("register.html", {
+    return templates.TemplateResponse(request=request, name="register.html", context={
         "request": request,
         "settings_theme": "light",
         "settings_font_scale": "1",
@@ -2447,6 +2544,38 @@ def admin_splits_data(request: Request, page: int = 1, search: str = "", status:
     return render_admin_data_page(request, "splits", page=page, search=search, status=status)
 
 
+@app.get("/admin/data/media", response_class=HTMLResponse)
+def admin_media_page(request: Request, search: str = "", show: str = "all"):
+    """Render a read-only admin feed of saved comments and images."""
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    selected_show = clean_value(show).lower() or "all"
+    if selected_show not in {"all", "comments", "pictures"}:
+        selected_show = "all"
+    all_entries = prepare_admin_media_entries(list_admin_media_entries(search=search))
+    comment_count = sum(1 for entry in all_entries if entry["comment_text"])
+    picture_count = sum(1 for entry in all_entries if entry["photo_urls"])
+    entries = all_entries
+    if selected_show == "comments":
+        entries = [entry for entry in all_entries if entry["comment_text"]]
+    elif selected_show == "pictures":
+        entries = [entry for entry in all_entries if entry["photo_urls"]]
+
+    return render_page(
+        request,
+        "admin_media.html",
+        media_entries=entries,
+        search=search,
+        show=selected_show,
+        total=len(entries),
+        all_count=len(all_entries),
+        comment_count=comment_count,
+        picture_count=picture_count,
+    )
+
+
 @app.get("/admin/data/{run_id}", response_class=HTMLResponse)
 def admin_run_detail(request: Request, run_id: int, section: str = ""):
     redirect = require_admin(request)
@@ -2596,15 +2725,33 @@ def admin_clarifier_detail(request: Request, entry_id: int):
 # ADMIN — USER MANAGEMENT
 # ------------------------
 
+def _admin_users_redirect(**params):
+    cleaned_params = {}
+    for key, value in params.items():
+        cleaned = clean_value(value)
+        if cleaned:
+            cleaned_params[key] = cleaned
+    query = urlencode(cleaned_params)
+    target = f"/admin/users?{query}" if query else "/admin/users"
+    return RedirectResponse(target, status_code=303)
+
+
 @app.get("/admin/users", response_class=HTMLResponse)
-def admin_users_page(request: Request):
+def admin_users_page(request: Request, passcode_changed: str = "", passcode_error: str = ""):
     redirect = require_admin(request)
     if redirect:
         return redirect
     users = get_all_users()
     pending = [u for u in users if not u["active"]]
     active = [u for u in users if u["active"]]
-    return render_page(request, "admin_users.html", pending_users=pending, active_users=active)
+    return render_page(
+        request,
+        "admin_users.html",
+        pending_users=pending,
+        active_users=active,
+        passcode_changed=clean_value(passcode_changed),
+        passcode_error=clean_value(passcode_error),
+    )
 
 
 @app.post("/admin/users/{employee}/approve")
@@ -2632,6 +2779,36 @@ def admin_deactivate_user(request: Request, employee: str):
         return redirect
     deactivate_user(employee)
     return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{employee}/passcode")
+def admin_change_user_passcode(
+    request: Request,
+    employee: str,
+    new_passcode: str = Form(""),
+    confirm_passcode: str = Form(""),
+):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    employee = clean_value(employee)
+    passcode = clean_value(new_passcode)
+    confirm = clean_value(confirm_passcode)
+
+    if not employee:
+        return _admin_users_redirect(passcode_error="Choose a user before changing a passcode.")
+    if len(passcode) != 4 or not passcode.isdigit():
+        return _admin_users_redirect(passcode_error="Enter a 4-digit passcode.")
+    if passcode != confirm:
+        return _admin_users_redirect(passcode_error="The passcodes did not match.")
+    if not update_user_passcode(employee, passcode):
+        return _admin_users_redirect(passcode_error="That user could not be found.")
+
+    if clean_value(request.session.get("user", "")) == employee:
+        set_session_quick_code(request, passcode)
+
+    return _admin_users_redirect(passcode_changed=employee)
 
 
 # ------------------------
@@ -2920,6 +3097,7 @@ def home(request: Request):
         open_runs=list_open_runs(limit=80),
         machine_cards=machine_status_cards(activity_rows, current_run),
         in_use_items=in_use_items(activity_rows),
+        draft_sheets=list_open_draft_sheets(limit=20),
         create_product_name="",
         finish_message=finish_message,
     )
@@ -3047,7 +3225,30 @@ def batch_edit_page(request: Request):
     result_message = ""
     if derived_action in {"blend", "split"} and derived_number:
         result_message = f"{derived_action.title()} run {derived_number} is now open. The original source runs stayed in place and remain tied to it."
-    return render_page(request, "batch_edit.html", result_message=result_message, error_message="")
+    current_run_data = active_run(request)
+    blend_num = clean_value((current_run_data or {}).get("blend_number", ""))
+    split_num = clean_value((current_run_data or {}).get("split_batch_number", ""))
+    batch_type = clean_value((current_run_data or {}).get("batch_type", "standard"))
+    group_runs: list[dict] = []
+    group_action = ""
+    if blend_num:
+        group_runs = list_runs_by_group_label("blend", blend_num)
+        group_action = "blend"
+    elif split_num:
+        group_runs = list_runs_by_group_label("split", split_num)
+        group_action = "split"
+    source_runs = [r for r in group_runs if r.get("batch_type") != group_action]
+    derived_run = next((r for r in group_runs if r.get("batch_type") == group_action), None)
+    return render_page(
+        request,
+        "batch_edit.html",
+        result_message=result_message,
+        error_message="",
+        group_action=group_action,
+        source_runs=source_runs,
+        derived_run=derived_run,
+        batch_type=batch_type,
+    )
 
 
 @app.post("/run/edit")
@@ -3544,7 +3745,7 @@ async def submit_filtration(request: Request):
 
     if form.get("save_mode") == COMPLETE_STATUS:
         return RedirectResponse("/process-dashboard", status_code=303)
-    return RedirectResponse("/stage/filtration?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------
@@ -3740,7 +3941,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/process-dashboard", status_code=303)
     if save_mode == COMPLETE_STATUS:
         return RedirectResponse(f"/stage/generic/{stage_key}?saved=complete", status_code=303)
-    return RedirectResponse(f"/stage/generic/{stage_key}?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------

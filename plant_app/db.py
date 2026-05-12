@@ -658,6 +658,17 @@ def deactivate_user(employee: str) -> None:
     conn.close()
 
 
+def update_user_passcode(employee: str, passcode: str) -> bool:
+    """Replace a user's four-digit login passcode. Returns True when a user was updated."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password = ? WHERE employee_number = ?", (passcode.strip(), employee.strip()))
+    updated = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
 def create_run(
     batch_number: str,
     split_batch_number: str,
@@ -1033,6 +1044,34 @@ def touch_run(run_id: int):
     cur.execute("UPDATE production_runs SET updated_at = ? WHERE id = ?", (now_stamp(), run_id))
     conn.commit()
     conn.close()
+
+
+def list_open_draft_sheets(limit: int = 20) -> list[dict]:
+    """Return draft-status run-linked sheets for open runs — used as home-screen quick links."""
+    conn = get_conn()
+    cur = conn.cursor()
+    safe_limit = max(1, int(limit))
+    cur.execute(f"""
+        SELECT
+            s.id AS entry_id,
+            s.stage_key,
+            s.stage_title,
+            s.run_id,
+            r.run_number,
+            r.batch_number,
+            r.blend_number,
+            r.split_batch_number
+        FROM sheet_entries s
+        JOIN production_runs r ON r.id = s.run_id
+        WHERE s.completion_status = 'Draft'
+          AND r.status = 'Open'
+        ORDER BY s.id DESC
+        LIMIT {safe_limit}
+    """)
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
 
 
 def insert_extraction(employee: str, data: dict) -> int:
@@ -1590,6 +1629,175 @@ def list_all_clarifier_entries(search: str = "", limit: int = 300) -> list[dict]
             row["clarification_sequential_no"] = payload.get("clarification_sequential_no", "")
         except (TypeError, ValueError):
             row["clarification_sequential_no"] = ""
+    return rows
+
+
+def list_admin_media_entries(search: str = "", limit: int = 500) -> list[dict]:
+    """Return entries with saved comments or image references for the admin media view."""
+    conn = get_conn()
+    cur = conn.cursor()
+    pattern = f"%{search}%"
+    cur.execute(
+        """
+        SELECT *
+        FROM (
+            SELECT
+                e.id AS record_id,
+                'extraction_entries' AS entry_table,
+                'Extraction' AS section,
+                '' AS stage_key,
+                e.created_at,
+                e.entry_date,
+                e.entry_time,
+                e.employee,
+                e.operator_initials,
+                u.full_name AS employee_name,
+                u.initials AS user_initials,
+                r.id AS run_id,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                CASE
+                    WHEN TRIM(COALESCE(e.location, '')) != '' THEN 'Extraction - ' || e.location
+                    ELSE 'Extraction'
+                END AS machine_label,
+                e.comments,
+                e.photo_path,
+                '' AS payload_json
+            FROM extraction_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            LEFT JOIN users u ON u.employee_number = e.employee
+            WHERE TRIM(COALESCE(e.comments, '')) != '' OR TRIM(COALESCE(e.photo_path, '')) != ''
+
+            UNION ALL
+
+            SELECT
+                f.id AS record_id,
+                'filtration_entries' AS entry_table,
+                'Filtration' AS section,
+                '' AS stage_key,
+                f.created_at,
+                f.entry_date,
+                '' AS entry_time,
+                f.employee,
+                f.operator_initials,
+                u.full_name AS employee_name,
+                u.initials AS user_initials,
+                r.id AS run_id,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                CASE
+                    WHEN TRIM(COALESCE(f.clarification_sequential_no, '')) != '' THEN 'Filtration - Seq ' || f.clarification_sequential_no
+                    ELSE 'Filtration'
+                END AS machine_label,
+                f.comments,
+                f.photo_path,
+                f.payload_json
+            FROM filtration_entries f
+            LEFT JOIN production_runs r ON r.id = f.run_id
+            LEFT JOIN users u ON u.employee_number = f.employee
+            WHERE TRIM(COALESCE(f.comments, '')) != '' OR TRIM(COALESCE(f.photo_path, '')) != ''
+
+            UNION ALL
+
+            SELECT
+                v.id AS record_id,
+                'evaporation_entries' AS entry_table,
+                'Evaporation' AS section,
+                '' AS stage_key,
+                v.created_at,
+                v.entry_date,
+                '' AS entry_time,
+                v.employee,
+                v.operator_initials,
+                u.full_name AS employee_name,
+                u.initials AS user_initials,
+                r.id AS run_id,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                CASE
+                    WHEN TRIM(COALESCE(v.evaporator_no, '')) != '' THEN 'Evaporator ' || v.evaporator_no
+                    ELSE 'Evaporation'
+                END AS machine_label,
+                v.comments,
+                v.photo_path,
+                '' AS payload_json
+            FROM evaporation_entries v
+            LEFT JOIN production_runs r ON r.id = v.run_id
+            LEFT JOIN users u ON u.employee_number = v.employee
+            WHERE TRIM(COALESCE(v.comments, '')) != '' OR TRIM(COALESCE(v.photo_path, '')) != ''
+
+            UNION ALL
+
+            SELECT
+                s.id AS record_id,
+                'sheet_entries' AS entry_table,
+                s.stage_title AS section,
+                s.stage_key,
+                s.created_at,
+                s.entry_date,
+                '' AS entry_time,
+                s.employee,
+                s.operator_initials,
+                u.full_name AS employee_name,
+                u.initials AS user_initials,
+                r.id AS run_id,
+                r.run_number,
+                r.batch_number,
+                r.blend_number,
+                s.stage_title AS machine_label,
+                s.comments,
+                '' AS photo_path,
+                s.payload_json
+            FROM sheet_entries s
+            LEFT JOIN production_runs r ON r.id = s.run_id
+            LEFT JOIN users u ON u.employee_number = s.employee
+            WHERE TRIM(COALESCE(s.comments, '')) != ''
+               OR TRIM(COALESCE(json_extract(
+                    CASE WHEN json_valid(s.payload_json) THEN s.payload_json ELSE '{}' END,
+                    '$.photo_path'
+               ), '')) != ''
+               OR EXISTS (
+                    SELECT 1
+                    FROM json_each(CASE WHEN json_valid(s.payload_json) THEN s.payload_json ELSE '{}' END) payload_field
+                    WHERE lower(payload_field.key) LIKE '%comment%'
+                      AND TRIM(COALESCE(payload_field.value, '')) != ''
+               )
+        ) media
+        WHERE ? = ''
+           OR COALESCE(run_number, '') LIKE ?
+           OR COALESCE(batch_number, '') LIKE ?
+           OR COALESCE(blend_number, '') LIKE ?
+           OR COALESCE(employee, '') LIKE ?
+           OR COALESCE(operator_initials, '') LIKE ?
+           OR COALESCE(employee_name, '') LIKE ?
+           OR COALESCE(section, '') LIKE ?
+           OR COALESCE(machine_label, '') LIKE ?
+           OR COALESCE(comments, '') LIKE ?
+           OR COALESCE(payload_json, '') LIKE ?
+        ORDER BY datetime(replace(created_at, 'T', ' ')) DESC
+        LIMIT ?
+        """,
+        (
+            search,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            pattern,
+            max(1, int(limit)),
+        ),
+    )
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
     return rows
 
 
