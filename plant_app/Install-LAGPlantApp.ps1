@@ -249,9 +249,10 @@ Write-Step "Creating Windows shortcuts"
 $shortcutInstaller = Join-Path $installRoot "install_windows_app.ps1"
 $setStartup = -not $NoStartupShortcut
 $tryPinTaskbar = -not $NoTaskbarPin
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $shortcutInstaller -SetStartup:$setStartup -TryPinTaskbar:$tryPinTaskbar
-if ($LASTEXITCODE -ne 0) {
-  throw "Shortcut installation failed."
+try {
+  & $shortcutInstaller -SetStartup:$setStartup -TryPinTaskbar:$tryPinTaskbar
+} catch {
+  throw "Shortcut installation failed. $($_.Exception.Message)"
 }
 
 if ($EnableLanAccess) {
