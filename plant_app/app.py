@@ -41,6 +41,8 @@ from db import (
     get_all_users,
     get_active_users,
     list_recent_group_labels,
+    list_runs_by_group_label,
+    list_open_draft_sheets,
     approve_user,
     reject_user,
     deactivate_user,
@@ -85,6 +87,7 @@ from db import (
     list_all_extraction_entries,
     list_all_filtration_entries,
     list_all_clarifier_entries,
+    list_machine_performance_entries,
     list_admin_media_entries,
 )
 
@@ -1067,6 +1070,203 @@ def parse_payload_json(entry) -> dict:
         return json.loads(entry.get("payload_json") or "{}")
     except (TypeError, ValueError):
         return {}
+
+
+PERFORMANCE_MACHINES = (
+    {"key": "extraction", "label": "Extraction"},
+    {"key": "filtration", "label": "Filtration"},
+    {"key": "evaporation", "label": "Evaporation"},
+    {"key": "clarifier", "label": "Clarifier"},
+    {"key": "concentration", "label": "Concentration"},
+    {"key": "reconcentration", "label": "Reconcentration"},
+    {"key": "h2o2_koh_decolorizing", "label": "H2O2 - KOH Decolorizing"},
+    {"key": "h2o2_calcium_decolorizing", "label": "H2O2 - Calcium Decolorizing"},
+    {"key": "centrifuge", "label": "Centrifuge"},
+    {"key": "anion_exchange", "label": "Anion Exchange"},
+    {"key": "resistaid_anion_exchange", "label": "ResistAid Anion Exchange"},
+    {"key": "carbon_treatment", "label": "Carbon Treatment"},
+)
+
+EXTRACTION_PERFORMANCE_FIELDS = (
+    ("psf1_speed", "PSF 1 Speed (rpm)"),
+    ("psf1_load", "PSF 1 Load (%)"),
+    ("psf1_blowback", "PSF 1 Blowback Pressure (psi)"),
+    ("psf2_speed", "PSF 2 Speed (rpm)"),
+    ("psf2_load", "PSF 2 Load (%)"),
+    ("psf2_blowback", "PSF 2 Blowback Pressure (psi)"),
+    ("press_speed", "Press Speed (rpm)"),
+    ("press_load", "Press Load (%)"),
+    ("press_blowback", "Press Blowback Pressure (psi)"),
+    ("pressate_ri", "Pressate RI @ P303 (%)"),
+    ("chip_bin_steam", "Chip Bin Steam FT201 (lb/hr)"),
+    ("chip_chute_temp", "Chip Chute Temp (F)"),
+)
+
+FILTRATION_PERFORMANCE_FIELDS = (
+    ("fic1_gpm", "FIC1 (gpm)"),
+    ("tit1", "TIT1"),
+    ("tit2", "TIT2"),
+    ("dpt", "DPT"),
+    ("dpm", "DPM"),
+    ("perm_total", "Perm Total"),
+    ("f12_gpm", "F12 (gpm)"),
+    ("feed_ri", "Feed RI (%)"),
+    ("retentate_ri", "Retentate RI (%)"),
+    ("permeate_ri", "Permeate RI (%)"),
+    ("perm_flow_c", "Perm C (gpm)"),
+    ("perm_flow_d", "Perm D (gpm)"),
+    ("qic1_ntu_turbidity", "QIC1 NTU Turbidity"),
+    ("pressure_pt1", "Pressure pt1"),
+    ("pressure_pt2", "Pressure pt2"),
+    ("pressure_pt3", "Pressure pt3"),
+)
+
+EVAPORATION_PERFORMANCE_FIELDS = (
+    ("feed_rate", "Feed Rate"),
+    ("evap_temp", "Evap Temp (°F)"),
+    ("row_vacuum", "Vacuum"),
+    ("row_concentrate_ri", "Concentrate RI (%)"),
+)
+
+
+def performance_machine_key(machine: str) -> str:
+    """Return a supported performance-chart machine key."""
+    normalized = clean_value(machine).lower()
+    valid_keys = {item["key"] for item in PERFORMANCE_MACHINES}
+    return normalized if normalized in valid_keys else "extraction"
+
+
+def parse_numeric_reading(value):
+    """Return a float for operator-entered numeric readings, or None for blanks/text."""
+    text = clean_value(value).replace(",", "")
+    if not text:
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def performance_point_time(entry_date: str, entry_time: str, created_at: str) -> str:
+    """Build an ISO-like timestamp for chart ordering from saved date/time pieces."""
+    date_text = clean_value(entry_date) or clean_value(created_at)[:10]
+    time_text = clean_value(entry_time)
+    if len(time_text) == 5:
+        time_text = f"{time_text}:00"
+    if date_text and time_text:
+        return f"{date_text}T{time_text}"
+    return clean_value(created_at) or date_text
+
+
+def generic_performance_fields(stage_key: str) -> tuple[tuple[str, str], ...]:
+    """Collect numeric-capable generic sheet table columns for a stage."""
+    stage = GENERIC_STAGE_DEFS.get(stage_key, {})
+    fields = []
+    seen = set()
+    for table_def in stage.get("tables", []):
+        prefix = table_def["title"]
+        for column_def in table_def.get("columns", []):
+            field_key = column_def[0]
+            if field_key in {"time", "initials", "operator_initials", "comments"}:
+                continue
+            chart_key = f"{table_def['prefix']}::{field_key}"
+            if chart_key in seen:
+                continue
+            seen.add(chart_key)
+            fields.append((chart_key, f"{prefix} - {column_def[1]}"))
+    return tuple(fields)
+
+
+def prepare_machine_performance(machine: str, start_date: str = "", end_date: str = "") -> dict:
+    """Shape saved machine readings into chart labels, series, and toggle metadata."""
+    machine_key = performance_machine_key(machine)
+    rows = list_machine_performance_entries(machine_key, clean_value(start_date), clean_value(end_date))
+    if machine_key == "filtration":
+        field_defs = FILTRATION_PERFORMANCE_FIELDS
+    elif machine_key == "evaporation":
+        field_defs = EVAPORATION_PERFORMANCE_FIELDS
+    elif machine_key in GENERIC_STAGE_DEFS:
+        field_defs = generic_performance_fields(machine_key)
+    else:
+        field_defs = EXTRACTION_PERFORMANCE_FIELDS
+
+    series = {key: [] for key, _label in field_defs}
+    points_by_time: dict[str, dict] = {}
+
+    for row in rows:
+        if machine_key in GENERIC_STAGE_DEFS:
+            payload = parse_payload_json(row)
+            entry_date = payload.get("entry_date") or row.get("entry_date", "")
+            created_at = row.get("created_at", "")
+            for table_def in GENERIC_STAGE_DEFS[machine_key]["tables"]:
+                prefix = table_def["prefix"]
+                for row_no in range(1, int(table_def.get("rows", 0)) + 1):
+                    row_time = payload.get(f"{prefix}_{row_no}_time", "")
+                    timestamp = performance_point_time(entry_date, row_time, created_at)
+                    if not timestamp:
+                        continue
+                    label = f"{timestamp.replace('T', ' ')} | {table_def['title']} {row_no}"
+                    point = points_by_time.setdefault(timestamp + f"::{prefix}_{row_no}", {"x": timestamp, "label": label})
+                    for field_key, _field_label in field_defs:
+                        table_prefix, column_key = field_key.split("::", 1)
+                        if table_prefix != prefix:
+                            continue
+                        value = parse_numeric_reading(payload.get(f"{prefix}_{row_no}_{column_key}", ""))
+                        if value is not None:
+                            point[field_key] = value
+        elif machine_key == "filtration":
+            timestamp = performance_point_time(row.get("entry_date", ""), row.get("row_time", ""), row.get("created_at", ""))
+            if not timestamp:
+                continue
+            label = f"{timestamp.replace('T', ' ')} | {clean_value(row.get('row_group', '')).title()} row {row.get('row_no') or ''}".strip()
+            point = points_by_time.setdefault(timestamp + f"::{row.get('entry_id')}::{row.get('row_group')}::{row.get('row_no')}", {"x": timestamp, "label": label})
+            for field_key, _field_label in field_defs:
+                value = parse_numeric_reading(row.get(field_key, ""))
+                if value is not None:
+                    point[field_key] = value
+        elif machine_key == "evaporation":
+            timestamp = performance_point_time(row.get("entry_date", ""), row.get("row_time", ""), row.get("created_at", ""))
+            if not timestamp:
+                continue
+            run_label_text = clean_value(row.get("run_number", "")) or f"Entry {row.get('entry_id')}"
+            point = points_by_time.setdefault(timestamp + f"::{row.get('entry_id')}::{row.get('row_no')}", {"x": timestamp, "label": f"{timestamp.replace('T', ' ')} | {run_label_text} row {row.get('row_no') or ''}"})
+            for field_key, _field_label in field_defs:
+                value = parse_numeric_reading(row.get(field_key, ""))
+                if value is not None:
+                    point[field_key] = value
+        else:
+            timestamp = performance_point_time(row.get("entry_date", ""), row.get("entry_time", ""), row.get("created_at", ""))
+            if not timestamp:
+                continue
+            run_label_text = clean_value(row.get("run_number", "")) or f"Entry {row.get('entry_id')}"
+            point = points_by_time.setdefault(timestamp + f"::{row.get('entry_id')}", {"x": timestamp, "label": f"{timestamp.replace('T', ' ')} | {run_label_text}"})
+            for field_key, _field_label in field_defs:
+                value = parse_numeric_reading(row.get(field_key, ""))
+                if value is not None:
+                    point[field_key] = value
+
+    points = sorted(points_by_time.values(), key=lambda item: item["x"])
+    labels = [point["label"] for point in points]
+    for field_key, _field_label in field_defs:
+        series[field_key] = [point.get(field_key) for point in points]
+
+    metrics = [
+        {"key": key, "label": label, "count": sum(1 for value in series[key] if value is not None)}
+        for key, label in field_defs
+    ]
+    metrics = [metric for metric in metrics if metric["count"] > 0]
+    series = {metric["key"]: series[metric["key"]] for metric in metrics}
+
+    return {
+        "machine": machine_key,
+        "labels": labels,
+        "metrics": metrics,
+        "series": series,
+        "point_count": len(labels),
+    }
 
 
 def admin_media_photo_urls(photo_text: str) -> list[str]:
@@ -2371,6 +2571,31 @@ def admin_dashboard(request: Request):
     return render_page(request, "admin_dashboard.html", stats=stats, recent_runs=recent)
 
 
+@app.get("/admin/performance", response_class=HTMLResponse)
+def admin_performance_page(request: Request, machine: str = "extraction", start_date: str = "", end_date: str = ""):
+    redirect = require_admin(request)
+    if redirect:
+        return redirect
+
+    selected_machine = performance_machine_key(machine)
+    date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    clean_start = clean_value(start_date) if date_pattern.match(clean_value(start_date)) else ""
+    clean_end = clean_value(end_date) if date_pattern.match(clean_value(end_date)) else ""
+    if clean_start and clean_end and clean_start > clean_end:
+        clean_start, clean_end = clean_end, clean_start
+
+    chart_data = prepare_machine_performance(selected_machine, clean_start, clean_end)
+    return render_page(
+        request,
+        "admin_performance.html",
+        machines=PERFORMANCE_MACHINES,
+        selected_machine=selected_machine,
+        start_date=clean_start,
+        end_date=clean_end,
+        chart_data=chart_data,
+    )
+
+
 @app.get("/admin/export", response_class=HTMLResponse)
 def admin_export_page(request: Request):
     """Render the run-file export builder for admin users."""
@@ -3095,6 +3320,7 @@ def home(request: Request):
         open_runs=list_open_runs(limit=80),
         machine_cards=machine_status_cards(activity_rows, current_run),
         in_use_items=in_use_items(activity_rows),
+        draft_sheets=list_open_draft_sheets(limit=20),
         create_product_name="",
         finish_message=finish_message,
     )
@@ -3222,7 +3448,30 @@ def batch_edit_page(request: Request):
     result_message = ""
     if derived_action in {"blend", "split"} and derived_number:
         result_message = f"{derived_action.title()} run {derived_number} is now open. The original source runs stayed in place and remain tied to it."
-    return render_page(request, "batch_edit.html", result_message=result_message, error_message="")
+    current_run_data = active_run(request)
+    blend_num = clean_value((current_run_data or {}).get("blend_number", ""))
+    split_num = clean_value((current_run_data or {}).get("split_batch_number", ""))
+    batch_type = clean_value((current_run_data or {}).get("batch_type", "standard"))
+    group_runs: list[dict] = []
+    group_action = ""
+    if blend_num:
+        group_runs = list_runs_by_group_label("blend", blend_num)
+        group_action = "blend"
+    elif split_num:
+        group_runs = list_runs_by_group_label("split", split_num)
+        group_action = "split"
+    source_runs = [r for r in group_runs if r.get("batch_type") != group_action]
+    derived_run = next((r for r in group_runs if r.get("batch_type") == group_action), None)
+    return render_page(
+        request,
+        "batch_edit.html",
+        result_message=result_message,
+        error_message="",
+        group_action=group_action,
+        source_runs=source_runs,
+        derived_run=derived_run,
+        batch_type=batch_type,
+    )
 
 
 @app.post("/run/edit")
@@ -3719,7 +3968,7 @@ async def submit_filtration(request: Request):
 
     if form.get("save_mode") == COMPLETE_STATUS:
         return RedirectResponse("/process-dashboard", status_code=303)
-    return RedirectResponse("/stage/filtration?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------
@@ -3915,7 +4164,7 @@ async def submit_generic_stage(request: Request, stage_key: str):
         return RedirectResponse("/process-dashboard", status_code=303)
     if save_mode == COMPLETE_STATUS:
         return RedirectResponse(f"/stage/generic/{stage_key}?saved=complete", status_code=303)
-    return RedirectResponse(f"/stage/generic/{stage_key}?saved=draft", status_code=303)
+    return RedirectResponse("/home", status_code=303)
 
 
 # ------------------------

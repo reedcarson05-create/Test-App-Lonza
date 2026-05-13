@@ -1046,6 +1046,34 @@ def touch_run(run_id: int):
     conn.close()
 
 
+def list_open_draft_sheets(limit: int = 20) -> list[dict]:
+    """Return draft-status run-linked sheets for open runs — used as home-screen quick links."""
+    conn = get_conn()
+    cur = conn.cursor()
+    safe_limit = max(1, int(limit))
+    cur.execute(f"""
+        SELECT
+            s.id AS entry_id,
+            s.stage_key,
+            s.stage_title,
+            s.run_id,
+            r.run_number,
+            r.batch_number,
+            r.blend_number,
+            r.split_batch_number
+        FROM sheet_entries s
+        JOIN production_runs r ON r.id = s.run_id
+        WHERE s.completion_status = 'Draft'
+          AND r.status = 'Open'
+        ORDER BY s.id DESC
+        LIMIT {safe_limit}
+    """)
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
+    return rows
+
+
 def insert_extraction(employee: str, data: dict) -> int:
     """Insert a new extraction entry and return its id."""
     conn = get_conn()
@@ -1601,6 +1629,132 @@ def list_all_clarifier_entries(search: str = "", limit: int = 300) -> list[dict]
             row["clarification_sequential_no"] = payload.get("clarification_sequential_no", "")
         except (TypeError, ValueError):
             row["clarification_sequential_no"] = ""
+    return rows
+
+
+def list_machine_performance_entries(machine: str, start_date: str = "", end_date: str = "", limit: int = 5000) -> list[dict]:
+    """Return raw saved readings for the admin machine performance chart."""
+    normalized = (machine or "").strip().lower()
+    safe_limit = max(1, min(int(limit or 5000), 20000))
+    conn = get_conn()
+    cur = conn.cursor()
+
+    if normalized == "filtration":
+        cur.execute(
+            """
+            SELECT
+                f.id AS entry_id,
+                f.run_id,
+                f.entry_date,
+                f.created_at,
+                r.run_number,
+                fr.row_group,
+                fr.row_no,
+                fr.row_time,
+                fr.fic1_gpm,
+                fr.tit1,
+                fr.tit2,
+                fr.dpt,
+                fr.dpm,
+                fr.perm_total,
+                fr.f12_gpm,
+                fr.feed_ri,
+                fr.retentate_ri,
+                fr.permeate_ri,
+                fr.perm_flow_c,
+                fr.perm_flow_d,
+                fr.qic1_ntu_turbidity,
+                fr.pressure_pt1,
+                fr.pressure_pt2,
+                fr.pressure_pt3
+            FROM filtration_entries f
+            JOIN filtration_rows fr ON fr.filtration_entry_id = f.id
+            LEFT JOIN production_runs r ON r.id = f.run_id
+            WHERE (? = '' OR COALESCE(f.entry_date, substr(f.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(f.entry_date, substr(f.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(f.entry_date, substr(f.created_at, 1, 10)), fr.row_time, f.created_at, fr.row_group, fr.row_no
+            LIMIT ?
+            """,
+            (start_date, start_date, end_date, end_date, safe_limit),
+        )
+    elif normalized == "evaporation":
+        cur.execute(
+            """
+            SELECT
+                v.id AS entry_id,
+                v.run_id,
+                v.entry_date,
+                v.created_at,
+                r.run_number,
+                vr.row_no,
+                vr.row_time,
+                vr.feed_rate,
+                vr.evap_temp,
+                vr.row_vacuum,
+                vr.row_concentrate_ri
+            FROM evaporation_entries v
+            JOIN evaporation_rows vr ON vr.evaporation_entry_id = v.id
+            LEFT JOIN production_runs r ON r.id = v.run_id
+            WHERE (? = '' OR COALESCE(v.entry_date, substr(v.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(v.entry_date, substr(v.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(v.entry_date, substr(v.created_at, 1, 10)), vr.row_time, v.created_at, vr.row_no
+            LIMIT ?
+            """,
+            (start_date, start_date, end_date, end_date, safe_limit),
+        )
+    elif normalized == "extraction":
+        cur.execute(
+            """
+            SELECT
+                e.id AS entry_id,
+                e.run_id,
+                e.entry_date,
+                e.entry_time,
+                e.created_at,
+                r.run_number,
+                e.psf1_speed,
+                e.psf1_load,
+                e.psf1_blowback,
+                e.psf2_speed,
+                e.psf2_load,
+                e.psf2_blowback,
+                e.press_speed,
+                e.press_load,
+                e.press_blowback,
+                e.pressate_ri,
+                e.chip_bin_steam,
+                e.chip_chute_temp
+            FROM extraction_entries e
+            LEFT JOIN production_runs r ON r.id = e.run_id
+            WHERE (? = '' OR COALESCE(e.entry_date, substr(e.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(e.entry_date, substr(e.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(e.entry_date, substr(e.created_at, 1, 10)), e.entry_time, e.created_at
+            LIMIT ?
+            """,
+            (start_date, start_date, end_date, end_date, safe_limit),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT
+                s.id AS entry_id,
+                s.entry_date,
+                s.created_at,
+                s.operator_initials,
+                s.payload_json
+            FROM sheet_entries s
+            WHERE s.stage_key = ?
+              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(s.entry_date, substr(s.created_at, 1, 10)), s.created_at
+            LIMIT ?
+            """,
+            (normalized, start_date, start_date, end_date, end_date, safe_limit),
+        )
+
+    columns = [col[0] for col in cur.description]
+    rows = rows_to_dicts(columns, cur.fetchall())
+    conn.close()
     return rows
 
 

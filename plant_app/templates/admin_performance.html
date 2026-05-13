@@ -1,0 +1,354 @@
+<!doctype html>
+<html data-theme="{{ settings_theme }}" style="--font-scale: {{ settings_font_scale }};">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Machine Performance</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="icon" type="image/png" href="/static/logo.png?v={{ asset_version }}">
+</head>
+<body data-settings-theme="{{ settings_theme }}" data-settings-font-scale="{{ settings_font_scale }}" data-settings-persist="{{ 'true' if settings_persist else 'false' }}" data-settings-endpoint="/settings" data-app-status-endpoint="/app-status" data-app-version="{{ app_loaded_version }}" data-app-build-label="{{ app_loaded_build_label }}" data-app-changed-file="{{ app_loaded_changed_file }}" data-check-update-endpoint="/check-update" data-update-endpoint="/admin/update" data-user-is-admin="{{ 'true' if user_is_admin else 'false' }}">
+<div class="settings-root">
+  <button class="settings-toggle" type="button" data-settings-toggle aria-expanded="false" aria-controls="settings-panel">Settings</button>
+  <div class="settings-panel" id="settings-panel" data-settings-panel hidden>
+    <p class="settings-title">Display Settings</p>
+    <p class="settings-copy muted">Choose a theme and text size that feels comfortable.</p>
+    <div class="settings-group">
+      <span class="settings-label">Theme</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-theme-choice="light">Light</button>
+        <button class="settings-option" type="button" data-theme-choice="dark">Dark</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <span class="settings-label">Text Size</span>
+      <div class="settings-options">
+        <button class="settings-option" type="button" data-font-choice="1">Standard</button>
+        <button class="settings-option" type="button" data-font-choice="1.15">Large</button>
+        <button class="settings-option" type="button" data-font-choice="1.3">Largest</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <img src="/static/logo.png?v={{ asset_version }}" class="logo" alt="LAG">
+      <div>
+        <div class="admin-sidebar-title">LAG Admin</div>
+        <div class="admin-sidebar-subtitle">{{ user }}</div>
+      </div>
+    </div>
+    <nav>
+      <div class="admin-nav-section">Overview</div>
+      <a class="admin-nav-link" href="/admin/dashboard">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a class="admin-nav-link is-active" href="/admin/performance">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-4 6"/></svg>
+        Performance
+      </a>
+      <div class="admin-nav-section">Data</div>
+      <a class="admin-nav-link" href="/admin/data/runs">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Runs
+      </a>
+      <a class="admin-nav-link" href="/admin/data/blends">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+        Blends
+      </a>
+      <a class="admin-nav-link" href="/admin/data/splits">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+        Splits
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/extraction">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Extraction Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/filtration">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Filtration Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/entries/clarifier">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+        Clarifier Entries
+      </a>
+      <a class="admin-nav-link" href="/admin/data/media">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        Comments &amp; Pictures
+      </a>
+      <div class="admin-nav-section">Tools</div>
+      <a class="admin-nav-link" href="/admin/export">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Export
+      </a>
+      <a class="admin-nav-link" href="/admin/users">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </a>
+    </nav>
+    <div class="admin-sidebar-footer">
+      <a class="admin-nav-link" href="/home">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Operator View
+      </a>
+      <a class="admin-nav-link" href="/logout">
+        <svg class="admin-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        Logout
+      </a>
+    </div>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <span class="admin-topbar-title">Machine Performance</span>
+      <div class="admin-topbar-right">
+        <span class="info-chip">{{ chart_data.point_count }} point{{ 's' if chart_data.point_count != 1 else '' }}</span>
+      </div>
+    </div>
+    <div class="admin-page">
+      <div class="card">
+        <form method="get" action="/admin/performance">
+          <div class="section-title">
+            <h2>Filters</h2>
+            <span class="info-chip">{{ chart_data.metrics|length }} line{{ 's' if chart_data.metrics|length != 1 else '' }}</span>
+          </div>
+          <div class="performance-filters">
+            <div>
+              <label>Machine</label>
+              <select name="machine" data-auto-submit>
+                {% for machine in machines %}
+                <option value="{{ machine.key }}" {% if machine.key == selected_machine %}selected{% endif %}>{{ machine.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label>Start Date</label>
+              <input type="date" name="start_date" value="{{ start_date }}">
+            </div>
+            <div>
+              <label>Stop Date</label>
+              <input type="date" name="end_date" value="{{ end_date }}">
+            </div>
+            <div class="performance-filter-actions">
+              <button class="btn" type="submit">Update Graph</button>
+              <a class="btn ghost" href="/admin/performance">Clear</a>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>Performance Over Time</h2>
+          <span class="info-chip" data-performance-visible-count></span>
+        </div>
+        <div class="performance-chart-wrap">
+          <canvas id="performance-chart" width="1200" height="520"></canvas>
+          <div class="performance-empty" id="performance-empty" hidden>No numeric readings match the selected filters.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>Graph Lines</h2>
+          <div class="actions compact-actions">
+            <button class="btn ghost" type="button" data-performance-select-all>Select All</button>
+            <button class="btn ghost" type="button" data-performance-clear-all>Clear All</button>
+          </div>
+        </div>
+        <div class="performance-metric-grid" data-performance-metrics></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/static/settings.js?v={{ asset_version }}"></script>
+<script>
+(function () {
+  var chartData = {{ chart_data|tojson }};
+  var palette = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#c2410c', '#0891b2', '#be123c', '#4f46e5', '#0f766e', '#a16207', '#7c3aed', '#15803d', '#ea580c', '#0284c7', '#65a30d', '#db2777', '#4338ca', '#0d9488', '#b91c1c', '#ca8a04', '#6d28d9', '#047857', '#0369a1', '#9f1239'];
+  var canvas = document.getElementById('performance-chart');
+  var empty = document.getElementById('performance-empty');
+  var metricRoot = document.querySelector('[data-performance-metrics]');
+  var countEl = document.querySelector('[data-performance-visible-count]');
+  var active = {};
+
+  function colorFor(index) {
+    return palette[index % palette.length];
+  }
+
+  function metricValues(metricKey) {
+    return chartData.series[metricKey] || [];
+  }
+
+  function selectedMetrics() {
+    return chartData.metrics.filter(function (metric) { return active[metric.key]; });
+  }
+
+  function buildToggles() {
+    metricRoot.innerHTML = '';
+    chartData.metrics.forEach(function (metric, index) {
+      active[metric.key] = true;
+      var label = document.createElement('label');
+      label.className = 'performance-metric-toggle';
+      var input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = true;
+      input.dataset.metricKey = metric.key;
+      var swatch = document.createElement('span');
+      swatch.className = 'performance-swatch';
+      swatch.style.backgroundColor = colorFor(index);
+      var text = document.createElement('span');
+      text.textContent = metric.label + ' (' + metric.count + ')';
+      label.appendChild(input);
+      label.appendChild(swatch);
+      label.appendChild(text);
+      metricRoot.appendChild(label);
+    });
+  }
+
+  function draw() {
+    var ctx = canvas.getContext('2d');
+    var ratio = window.devicePixelRatio || 1;
+    var box = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(box.width * ratio));
+    canvas.height = Math.max(1, Math.floor(box.height * ratio));
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    var width = box.width;
+    var height = box.height;
+    ctx.clearRect(0, 0, width, height);
+
+    var metrics = selectedMetrics();
+    var pointCount = chartData.labels.length;
+    if (countEl) {
+      countEl.textContent = metrics.length + ' visible';
+    }
+    if (!metrics.length || !pointCount) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    var values = [];
+    metrics.forEach(function (metric) {
+      metricValues(metric.key).forEach(function (value) {
+        if (typeof value === 'number' && isFinite(value)) values.push(value);
+      });
+    });
+    if (!values.length) {
+      empty.hidden = false;
+      return;
+    }
+
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    if (min === max) {
+      min -= 1;
+      max += 1;
+    }
+    var pad = { left: 58, right: 18, top: 24, bottom: 62 };
+    var plotW = Math.max(10, width - pad.left - pad.right);
+    var plotH = Math.max(10, height - pad.top - pad.bottom);
+    var gridColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#d7dee8';
+    var textColor = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#6b7280';
+
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var i = 0; i <= 4; i += 1) {
+      var y = pad.top + (plotH * i / 4);
+      var value = max - ((max - min) * i / 4);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(width - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(value.toFixed(1), pad.left - 8, y);
+    }
+
+    function xAt(index) {
+      return pad.left + (pointCount === 1 ? plotW / 2 : (plotW * index / (pointCount - 1)));
+    }
+    function yAt(value) {
+      return pad.top + plotH - ((value - min) / (max - min) * plotH);
+    }
+
+    metrics.forEach(function (metric) {
+      var originalIndex = chartData.metrics.findIndex(function (item) { return item.key === metric.key; });
+      ctx.strokeStyle = colorFor(originalIndex);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      var started = false;
+      metricValues(metric.key).forEach(function (value, index) {
+        if (typeof value !== 'number' || !isFinite(value)) {
+          started = false;
+          return;
+        }
+        var x = xAt(index);
+        var y = yAt(value);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      ctx.fillStyle = colorFor(originalIndex);
+      metricValues(metric.key).forEach(function (value, index) {
+        if (typeof value !== 'number' || !isFinite(value)) return;
+        ctx.beginPath();
+        ctx.arc(xAt(index), yAt(value), 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var labelEvery = Math.max(1, Math.ceil(pointCount / 6));
+    chartData.labels.forEach(function (label, index) {
+      if (index % labelEvery !== 0 && index !== pointCount - 1) return;
+      var shortLabel = label.split('|')[0].trim();
+      ctx.save();
+      ctx.translate(xAt(index), height - pad.bottom + 20);
+      ctx.rotate(-Math.PI / 6);
+      ctx.fillText(shortLabel, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  buildToggles();
+  metricRoot.addEventListener('change', function (event) {
+    if (!event.target.dataset.metricKey) return;
+    active[event.target.dataset.metricKey] = event.target.checked;
+    draw();
+  });
+  document.querySelector('[data-performance-select-all]').addEventListener('click', function () {
+    metricRoot.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
+      input.checked = true;
+      active[input.dataset.metricKey] = true;
+    });
+    draw();
+  });
+  document.querySelector('[data-performance-clear-all]').addEventListener('click', function () {
+    metricRoot.querySelectorAll('input[type="checkbox"]').forEach(function (input) {
+      input.checked = false;
+      active[input.dataset.metricKey] = false;
+    });
+    draw();
+  });
+  window.addEventListener('resize', draw);
+  draw();
+
+  document.querySelectorAll('[data-auto-submit]').forEach(function (el) {
+    el.addEventListener('change', function () { this.closest('form').submit(); });
+  });
+}());
+</script>
+</body>
+</html>

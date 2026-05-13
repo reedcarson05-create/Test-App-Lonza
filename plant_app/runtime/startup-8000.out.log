@@ -1,0 +1,53 @@
+INFO:     127.0.0.1:53455 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53455 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53455 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53455 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53455 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57425 - "GET /boot?launch=1778692475443 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57425 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59291 - "GET /static/logo.png?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52873 - "GET /static/boot_loader.js?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52873 - "GET /static/settings.js?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57425 - "GET /static/signature_session.js?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59291 - "GET /static/form_corrections.js?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58853 - "GET /static/image_upload.js?v=1778692448049352100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58190 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /boot/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59612 - "GET /logout HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:59612 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59612 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54281 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:54281 - "GET /admin/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54281 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54281 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54281 - "GET /admin/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54281 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63648 - "GET /admin/performance?machine=extraction&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63648 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63648 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /admin/performance?machine=filtration&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:58076 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /admin/performance?machine=clarifier&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58076 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57154 - "GET /admin/performance?machine=extraction&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57154 - "GET /static/style.css?v=1778692448049352100 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:57154 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51562 - "GET /admin/performance?machine=filtration&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51562 - "GET /static/style.css?v=1778692929114201600 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51724 - "GET /static/logo.png?v=1778692929114201600 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /static/settings.js?v=1778692929114201600 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /admin/performance?machine=clarifier&start_date=2026-03-01&end_date=2026-05-30 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /static/style.css?v=1778692929114201600 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63097 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "POST /admin/update HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "GET /admin/performance?machine=clarifier&start_date=2026-03-01&end_date=2026-05-30&refresh=1778693155951 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "GET /static/style.css?v=1778692954467311800 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63609 - "GET /static/logo.png?v=1778692954467311800 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64774 - "GET /static/settings.js?v=1778692954467311800 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57602 - "GET /settings HTTP/1.1" 200 OK
