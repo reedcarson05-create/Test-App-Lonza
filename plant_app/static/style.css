@@ -1012,6 +1012,18 @@ textarea {
     inset 0 -1px 0 rgba(16, 34, 51, 0.04);
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-height: auto;
+  padding: 0;
+  border: revert;
+  border-radius: revert;
+  background: revert;
+  box-shadow: none;
+  font-size: revert;
+}
+
 input:hover,
 select:hover,
 textarea:hover {
@@ -3614,6 +3626,12 @@ html[data-theme="dark"] .admin-sidebar {
 .compact-actions {
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.compact-actions .btn {
+  min-height: auto;
+  padding: 6px 14px;
+  font-size: 13px;
 }
 
 @media (max-width: 860px) {

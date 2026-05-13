@@ -116,7 +116,7 @@
           <div class="performance-filters">
             <div>
               <label>Machine</label>
-              <select name="machine">
+              <select name="machine" data-auto-submit>
                 {% for machine in machines %}
                 <option value="{{ machine.key }}" {% if machine.key == selected_machine %}selected{% endif %}>{{ machine.label }}</option>
                 {% endfor %}
@@ -344,6 +344,10 @@
   });
   window.addEventListener('resize', draw);
   draw();
+
+  document.querySelectorAll('[data-auto-submit]').forEach(function (el) {
+    el.addEventListener('change', function () { this.closest('form').submit(); });
+  });
 }());
 </script>
 </body>

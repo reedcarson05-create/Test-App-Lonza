@@ -1677,25 +1677,32 @@ def list_machine_performance_entries(machine: str, start_date: str = "", end_dat
             """,
             (start_date, start_date, end_date, end_date, safe_limit),
         )
-    elif normalized == "clarifier":
+    elif normalized == "evaporation":
         cur.execute(
             """
             SELECT
-                s.id AS entry_id,
-                s.entry_date,
-                s.created_at,
-                s.operator_initials,
-                s.payload_json
-            FROM sheet_entries s
-            WHERE s.stage_key = 'clarifier'
-              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) >= ?)
-              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) <= ?)
-            ORDER BY COALESCE(s.entry_date, substr(s.created_at, 1, 10)), s.created_at
+                v.id AS entry_id,
+                v.run_id,
+                v.entry_date,
+                v.created_at,
+                r.run_number,
+                vr.row_no,
+                vr.row_time,
+                vr.feed_rate,
+                vr.evap_temp,
+                vr.row_vacuum,
+                vr.row_concentrate_ri
+            FROM evaporation_entries v
+            JOIN evaporation_rows vr ON vr.evaporation_entry_id = v.id
+            LEFT JOIN production_runs r ON r.id = v.run_id
+            WHERE (? = '' OR COALESCE(v.entry_date, substr(v.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(v.entry_date, substr(v.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(v.entry_date, substr(v.created_at, 1, 10)), vr.row_time, v.created_at, vr.row_no
             LIMIT ?
             """,
             (start_date, start_date, end_date, end_date, safe_limit),
         )
-    else:
+    elif normalized == "extraction":
         cur.execute(
             """
             SELECT
@@ -1725,6 +1732,24 @@ def list_machine_performance_entries(machine: str, start_date: str = "", end_dat
             LIMIT ?
             """,
             (start_date, start_date, end_date, end_date, safe_limit),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT
+                s.id AS entry_id,
+                s.entry_date,
+                s.created_at,
+                s.operator_initials,
+                s.payload_json
+            FROM sheet_entries s
+            WHERE s.stage_key = ?
+              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) >= ?)
+              AND (? = '' OR COALESCE(s.entry_date, substr(s.created_at, 1, 10)) <= ?)
+            ORDER BY COALESCE(s.entry_date, substr(s.created_at, 1, 10)), s.created_at
+            LIMIT ?
+            """,
+            (normalized, start_date, start_date, end_date, end_date, safe_limit),
         )
 
     columns = [col[0] for col in cur.description]

@@ -1075,7 +1075,16 @@ def parse_payload_json(entry) -> dict:
 PERFORMANCE_MACHINES = (
     {"key": "extraction", "label": "Extraction"},
     {"key": "filtration", "label": "Filtration"},
+    {"key": "evaporation", "label": "Evaporation"},
     {"key": "clarifier", "label": "Clarifier"},
+    {"key": "concentration", "label": "Concentration"},
+    {"key": "reconcentration", "label": "Reconcentration"},
+    {"key": "h2o2_koh_decolorizing", "label": "H2O2 - KOH Decolorizing"},
+    {"key": "h2o2_calcium_decolorizing", "label": "H2O2 - Calcium Decolorizing"},
+    {"key": "centrifuge", "label": "Centrifuge"},
+    {"key": "anion_exchange", "label": "Anion Exchange"},
+    {"key": "resistaid_anion_exchange", "label": "ResistAid Anion Exchange"},
+    {"key": "carbon_treatment", "label": "Carbon Treatment"},
 )
 
 EXTRACTION_PERFORMANCE_FIELDS = (
@@ -1110,6 +1119,13 @@ FILTRATION_PERFORMANCE_FIELDS = (
     ("pressure_pt1", "Pressure pt1"),
     ("pressure_pt2", "Pressure pt2"),
     ("pressure_pt3", "Pressure pt3"),
+)
+
+EVAPORATION_PERFORMANCE_FIELDS = (
+    ("feed_rate", "Feed Rate"),
+    ("evap_temp", "Evap Temp (°F)"),
+    ("row_vacuum", "Vacuum"),
+    ("row_concentrate_ri", "Concentrate RI (%)"),
 )
 
 
@@ -1170,8 +1186,10 @@ def prepare_machine_performance(machine: str, start_date: str = "", end_date: st
     rows = list_machine_performance_entries(machine_key, clean_value(start_date), clean_value(end_date))
     if machine_key == "filtration":
         field_defs = FILTRATION_PERFORMANCE_FIELDS
-    elif machine_key == "clarifier":
-        field_defs = generic_performance_fields("clarifier")
+    elif machine_key == "evaporation":
+        field_defs = EVAPORATION_PERFORMANCE_FIELDS
+    elif machine_key in GENERIC_STAGE_DEFS:
+        field_defs = generic_performance_fields(machine_key)
     else:
         field_defs = EXTRACTION_PERFORMANCE_FIELDS
 
@@ -1179,11 +1197,11 @@ def prepare_machine_performance(machine: str, start_date: str = "", end_date: st
     points_by_time: dict[str, dict] = {}
 
     for row in rows:
-        if machine_key == "clarifier":
+        if machine_key in GENERIC_STAGE_DEFS:
             payload = parse_payload_json(row)
             entry_date = payload.get("entry_date") or row.get("entry_date", "")
             created_at = row.get("created_at", "")
-            for table_def in GENERIC_STAGE_DEFS["clarifier"]["tables"]:
+            for table_def in GENERIC_STAGE_DEFS[machine_key]["tables"]:
                 prefix = table_def["prefix"]
                 for row_no in range(1, int(table_def.get("rows", 0)) + 1):
                     row_time = payload.get(f"{prefix}_{row_no}_time", "")
@@ -1205,6 +1223,16 @@ def prepare_machine_performance(machine: str, start_date: str = "", end_date: st
                 continue
             label = f"{timestamp.replace('T', ' ')} | {clean_value(row.get('row_group', '')).title()} row {row.get('row_no') or ''}".strip()
             point = points_by_time.setdefault(timestamp + f"::{row.get('entry_id')}::{row.get('row_group')}::{row.get('row_no')}", {"x": timestamp, "label": label})
+            for field_key, _field_label in field_defs:
+                value = parse_numeric_reading(row.get(field_key, ""))
+                if value is not None:
+                    point[field_key] = value
+        elif machine_key == "evaporation":
+            timestamp = performance_point_time(row.get("entry_date", ""), row.get("row_time", ""), row.get("created_at", ""))
+            if not timestamp:
+                continue
+            run_label_text = clean_value(row.get("run_number", "")) or f"Entry {row.get('entry_id')}"
+            point = points_by_time.setdefault(timestamp + f"::{row.get('entry_id')}::{row.get('row_no')}", {"x": timestamp, "label": f"{timestamp.replace('T', ' ')} | {run_label_text} row {row.get('row_no') or ''}"})
             for field_key, _field_label in field_defs:
                 value = parse_numeric_reading(row.get(field_key, ""))
                 if value is not None:
