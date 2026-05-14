@@ -1,0 +1,88 @@
+INFO:     127.0.0.1:53957 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53957 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53957 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53957 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53957 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50238 - "GET /boot?launch=1777946026742 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50238 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58146 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52443 - "GET /static/boot_loader.js?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52443 - "GET /static/form_corrections.js?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50238 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58146 - "GET /static/signature_session.js?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55297 - "GET /static/image_upload.js?v=1777946011131075700 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62529 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52208 - "GET /boot/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52208 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52208 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:58146 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50238 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56943 - "POST /unlock HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:56943 - "GET /admin/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56943 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:61457 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:64074 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:64074 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64074 - "GET /logout HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64074 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64074 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56943 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:61457 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60984 - "POST /login HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50113 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60984 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63606 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:49709 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:49709 - "GET /admin/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49709 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:52210 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:61037 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:61037 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53822 - "GET /admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53822 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53999 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53852 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53852 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /boot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63218 - "GET /app-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51290 - "GET /boot?launch=1777946080522 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51290 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:64672 - "GET /static/boot_loader.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51054 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:64672 - "GET /static/signature_session.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51054 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51290 - "GET /static/image_upload.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:60462 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63654 - "GET /boot/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63654 - "GET /unlock HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63654 - "GET /logout HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:63654 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63654 - "GET /register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59940 - "POST /register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59940 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53510 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50405 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50405 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:50405 - "GET /admin/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "GET /admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "POST /admin/users/2654/approve HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:50405 - "GET /admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "GET /settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50405 - "GET /logout HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:50405 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54058 - "GET /static/logo.png?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50405 - "GET /static/style.css?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53021 - "GET /static/settings.js?v=1777946011131075700 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53021 - "POST /login HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:53021 - "GET /home HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53021 - "GET /settings HTTP/1.1" 200 OK
