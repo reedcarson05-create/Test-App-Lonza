@@ -138,6 +138,8 @@ RUN_STAGE_KEYS = tuple(stage_key for stage_key in GENERIC_STAGE_DEFS if stage_ke
 STANDALONE_GENERIC_STAGE_KEYS = {"clarifier"}
 EXPORT_SCOPE_LABELS = {
     "all": "All Runs",
+    "today": "Today",
+    "last_week": "Last 7 Days",
     "current_month": "Current Month",
     "since_last": "Since Last Export",
     "extraction": "Runs With Extraction",
@@ -1729,6 +1731,26 @@ def record_successful_export(export_result: dict, scope: str) -> None:
     EXPORT_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
+def run_is_today(run: dict) -> bool:
+    """Return True when the run was created or updated today."""
+    today_prefix = datetime.now().strftime("%Y-%m-%d")
+    for field_name in ("created_at", "updated_at"):
+        if clean_value(run.get(field_name, "")).startswith(today_prefix):
+            return True
+    return False
+
+
+def run_is_in_last_week(run: dict) -> bool:
+    """Return True when the run was created or updated within the last 7 days."""
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    for field_name in ("created_at", "updated_at"):
+        value = clean_value(run.get(field_name, ""))
+        if value and value[:10] >= cutoff:
+            return True
+    return False
+
+
 def run_is_in_current_month(run: dict) -> bool:
     """Return True when the run was created or updated during the current month."""
     month_prefix = datetime.now().strftime("%Y-%m")
@@ -1754,6 +1776,10 @@ def export_runs_for_scope(scope: str) -> list[dict]:
     """Load the run rows included in an export scope."""
     runs = list_runs(limit=50000)
     scope_key = clean_value(scope)
+    if scope_key == "today":
+        return [run for run in runs if run_is_today(run)]
+    if scope_key == "last_week":
+        return [run for run in runs if run_is_in_last_week(run)]
     if scope_key == "current_month":
         return [run for run in runs if run_is_in_current_month(run)]
     if scope_key == "since_last":
