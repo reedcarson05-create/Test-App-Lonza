@@ -92,6 +92,7 @@
             <h3>Run {{ group['run_key'] }}</h3>
             <p class="muted">
               {% if group['blend_numbers'] %}Blend: {{ group['blend_numbers'] }} | {% endif %}
+              {% if group['split_numbers'] %}Split: {{ group['split_numbers'] }} | {% endif %}
               Status: {{ group['statuses'] or 'Open' }}
             </p>
           </div>

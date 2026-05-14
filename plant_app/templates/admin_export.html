@@ -156,7 +156,15 @@
           <div class="section-title">
             <h2>Build Data Sheets</h2>
           </div>
-          <p class="muted">Select the run scope below and optionally enter a flash drive path to copy the export directly.</p>
+          <p class="muted">Select all runs, current-month runs, runs changed since the last successful export, or runs with saved Extraction, Filtration, or Clarifier sheets. Each export builds print-ready PDF data sheets and an export manifest.</p>
+          <p class="muted small">
+            Last successful export:
+            {% if last_export_at %}
+            {{ last_export_at }}
+            {% else %}
+            none yet; "Since Last Export" will include all runs the first time.
+            {% endif %}
+          </p>
           <div class="grid two-up" style="margin-top:1rem;">
             <div>
               <label>Run Scope</label>
