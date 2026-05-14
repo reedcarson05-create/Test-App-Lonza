@@ -41,7 +41,6 @@
         <a class="pill" href="/runs/split">Split</a>
         {% endif %}
         <a class="pill" href="/change-history">Change Log</a>
-        <a class="pill" href="/runs/print">Print</a>
         <a class="pill" href="/team">Team</a>
         <a class="pill" href="/logout">Logout</a>
       </div>
@@ -65,8 +64,7 @@
     {% if not next_path %}
     {% set action_links = [
       {"label": "Open Blend Run Setup", "href": "/runs/blend"},
-      {"label": "Open Split Run Setup", "href": "/runs/split"},
-      {"label": "Print Runs", "href": "/runs/print", "ghost": True}
+      {"label": "Open Split Run Setup", "href": "/runs/split"}
     ] %}
     <div class="card">
       <div class="section-title">

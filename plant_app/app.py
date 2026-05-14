@@ -3937,7 +3937,7 @@ async def split_runs_submit(request: Request):
 @app.get("/runs/print", response_class=HTMLResponse)
 def run_print_page(request: Request):
     """Render the audit print selection page for single or multi-run printing."""
-    redirect = require_login(request)
+    redirect = require_admin(request)
     if redirect:
         return redirect
 
@@ -3955,7 +3955,7 @@ def run_print_page(request: Request):
 @app.post("/runs/print")
 async def run_print_submit(request: Request):
     """Build the audit print preview for the selected runs."""
-    redirect = require_login(request)
+    redirect = require_admin(request)
     if redirect:
         return redirect
 
