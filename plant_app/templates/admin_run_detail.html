@@ -110,12 +110,27 @@
     </div>
     <div class="admin-page">
       <div class="card">
-        <p class="muted">This admin viewer uses the same layout as the print preview. Use the Print button above to print or save as PDF.</p>
+        <div class="section-title">
+          <h2>Run Preview</h2>
+          {% if packet %}
+          <span class="info-chip">{{ packet['run']['status'] or 'Open' }}</span>
+          {% endif %}
+        </div>
+        <p class="muted">Review the saved run packet below. Use the Print button above to print or save as PDF.</p>
       </div>
+      {% if packet %}
+      <div class="admin-run-preview print-hidden">
+        {% include "partials/print_packet.html" %}
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
-{% include "partials/print_packet.html" %}
+{% if packet %}
+<div class="print-only">
+  {% include "partials/print_packet.html" %}
+</div>
+{% endif %}
 <script src="/static/settings.js?v={{ asset_version }}"></script>
 </body>
 </html>

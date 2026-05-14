@@ -4,9 +4,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let cameraVideo = null;
   let cameraStatus = null;
   let captureButton = null;
+  let switchButton = null;
   let closeButton = null;
   let activeStream = null;
   let activeUpload = null;
+  let activeFacingMode = "environment";
+  let activeDeviceId = "";
+  let cameraDevices = [];
 
   const stopCamera = () => {
     if (!activeStream) return;
@@ -35,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <p class="muted small image-status" data-camera-status>Starting camera...</p>
         <div class="actions camera-actions">
           <button class="btn" type="button" data-camera-capture>Capture Photo</button>
+          <button class="btn ghost" type="button" data-camera-switch>Switch Camera</button>
           <button class="btn ghost" type="button" data-camera-close>Cancel</button>
         </div>
       </div>
@@ -44,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     cameraVideo = cameraModal.querySelector(".camera-video");
     cameraStatus = cameraModal.querySelector("[data-camera-status]");
     captureButton = cameraModal.querySelector("[data-camera-capture]");
+    switchButton = cameraModal.querySelector("[data-camera-switch]");
     closeButton = cameraModal.querySelector("[data-camera-close]");
 
     closeButton.addEventListener("click", closeCameraModal);
@@ -70,6 +76,148 @@ document.addEventListener("DOMContentLoaded", () => {
         closeCameraModal();
       }, "image/jpeg", 0.92);
     });
+
+    switchButton.addEventListener("click", async () => {
+      await switchCameraStream();
+    });
+  };
+
+  const facingModeLabel = (facingMode) => (facingMode === "environment" ? "back" : "front");
+
+  const refreshCameraDevices = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    cameraDevices = devices.filter((device) => device.kind === "videoinput");
+    return cameraDevices;
+  };
+
+  const describeCameraStream = (stream) => {
+    const track = stream?.getVideoTracks?.()[0];
+    const settings = track?.getSettings?.() || {};
+    const label = (track?.label || "").toLowerCase();
+    const mode = settings.facingMode || activeFacingMode;
+
+    if (mode === "environment" || /back|rear|environment/.test(label)) return "Back camera ready.";
+    if (mode === "user" || /front|user|face/.test(label)) return "Front camera ready.";
+    return "Camera ready.";
+  };
+
+  const inferFacingMode = (track, fallbackMode) => {
+    const settings = track?.getSettings?.() || {};
+    const label = (track?.label || "").toLowerCase();
+    if (settings.facingMode) return settings.facingMode;
+    if (/back|rear|environment/.test(label)) return "environment";
+    if (/front|user|face/.test(label)) return "user";
+    return fallbackMode;
+  };
+
+  const applyCameraStream = async (stream, requestedFacingMode = activeFacingMode) => {
+    activeStream = stream;
+    cameraVideo.srcObject = activeStream;
+
+    const track = activeStream.getVideoTracks()[0];
+    const settings = track?.getSettings?.() || {};
+    activeFacingMode = inferFacingMode(track, requestedFacingMode);
+    activeDeviceId = settings.deviceId || "";
+    await refreshCameraDevices();
+
+    cameraStatus.textContent = describeCameraStream(activeStream);
+  };
+
+  const getStreamForFacingMode = async (facingMode) => {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: facingMode } },
+        audio: false,
+      });
+    } catch (exactError) {
+      console.warn("Exact camera facing mode unavailable", exactError);
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode } },
+        audio: false,
+      });
+    }
+  };
+
+  const startCameraStream = async (facingMode) => {
+    if (!cameraVideo || !cameraStatus) return false;
+
+    const previousFacingMode = activeFacingMode;
+    const previousDeviceId = activeDeviceId;
+    stopCamera();
+    cameraStatus.textContent = `Switching to ${facingModeLabel(facingMode)} camera...`;
+
+    try {
+      const stream = await getStreamForFacingMode(facingMode);
+      await applyCameraStream(stream, facingMode);
+      return true;
+    } catch (error) {
+      console.error("Camera access failed", error);
+      cameraStatus.textContent = "Could not switch cameras.";
+      if (previousFacingMode !== facingMode) {
+        try {
+          const restoreStream = previousDeviceId
+            ? await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: previousDeviceId } },
+                audio: false,
+              })
+            : await getStreamForFacingMode(previousFacingMode);
+          await applyCameraStream(restoreStream, previousFacingMode);
+        } catch (restoreError) {
+          console.error("Camera restore failed", restoreError);
+        }
+      }
+      return false;
+    }
+  };
+
+  const switchCameraStream = async () => {
+    if (!cameraVideo || !cameraStatus) return false;
+
+    await refreshCameraDevices();
+    const previousFacingMode = activeFacingMode;
+    const previousDeviceId = activeDeviceId;
+
+    if (cameraDevices.length > 1) {
+      const targetFacingMode = activeFacingMode === "environment" ? "user" : "environment";
+      const targetPattern = targetFacingMode === "environment" ? /back|rear|environment/ : /front|user|face/;
+      const labeledTarget = cameraDevices.find((device) => {
+        const label = (device.label || "").toLowerCase();
+        return device.deviceId !== activeDeviceId && targetPattern.test(label);
+      });
+      const currentIndex = cameraDevices.findIndex((device) => device.deviceId === activeDeviceId);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % cameraDevices.length : 0;
+      const nextDevice = labeledTarget || cameraDevices[nextIndex];
+
+      try {
+        stopCamera();
+        cameraStatus.textContent = "Switching camera...";
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: nextDevice.deviceId } },
+          audio: false,
+        });
+        await applyCameraStream(stream, targetFacingMode);
+        return true;
+      } catch (error) {
+        console.error("Camera device switch failed", error);
+        cameraStatus.textContent = "Could not switch cameras.";
+        if (previousDeviceId) {
+          try {
+            const restoreStream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: { exact: previousDeviceId } },
+              audio: false,
+            });
+            await applyCameraStream(restoreStream, previousFacingMode);
+          } catch (restoreError) {
+            console.error("Camera restore failed", restoreError);
+          }
+        }
+        return false;
+      }
+    }
+
+    const nextFacingMode = activeFacingMode === "environment" ? "user" : "environment";
+    return await startCameraStream(nextFacingMode);
   };
 
   document.querySelectorAll("[data-image-field-container]").forEach((container) => {
@@ -135,15 +283,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       try {
         activeUpload = uploadFiles;
+        activeFacingMode = "environment";
         cameraStatus.textContent = "Starting camera...";
         cameraModal.hidden = false;
-        activeStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false,
-        });
-        cameraVideo.srcObject = activeStream;
-        cameraStatus.textContent = "Camera ready.";
-        return true;
+        const opened = await startCameraStream(activeFacingMode);
+        if (!opened) {
+          closeCameraModal();
+        }
+        return opened;
       } catch (error) {
         console.error("Camera access failed", error);
         closeCameraModal();
