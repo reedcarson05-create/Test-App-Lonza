@@ -821,8 +821,10 @@ def list_runs_paginated(
         params_data.append(batch_type)
 
     stage_subquery = (
-        "(SELECT COUNT(DISTINCT stage_key) FROM sheet_entries "
-        "WHERE run_id = pr.id AND COALESCE(completion_status, 'Complete') = 'Complete')"
+        "((SELECT COUNT(DISTINCT stage_key) FROM sheet_entries "
+        "WHERE run_id = pr.id AND COALESCE(completion_status, 'Complete') = 'Complete') "
+        "+ CASE WHEN EXISTS (SELECT 1 FROM extraction_entries WHERE run_id = pr.id) THEN 1 ELSE 0 END "
+        "+ CASE WHEN EXISTS (SELECT 1 FROM filtration_entries WHERE run_id = pr.id) THEN 1 ELSE 0 END)"
     )
 
     cur.execute(f"""

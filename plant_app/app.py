@@ -110,6 +110,7 @@ SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
 SIGNATURE_DEBUG_LOG = RUNTIME_DIR / "signature_debug.log"
 EXPORT_DIR = RUNTIME_DIR / "exports"
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+EXPORT_STATE_PATH = RUNTIME_DIR / "export_state.json"
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 BOOT_TEMPLATE_NAMES = tuple(
@@ -137,7 +138,13 @@ RUN_STAGE_KEYS = tuple(stage_key for stage_key in GENERIC_STAGE_DEFS if stage_ke
 STANDALONE_GENERIC_STAGE_KEYS = {"clarifier"}
 EXPORT_SCOPE_LABELS = {
     "all": "All Runs",
+    "today": "Today",
+    "last_week": "Last 7 Days",
     "current_month": "Current Month",
+    "since_last": "Since Last Export",
+    "extraction": "Runs With Extraction",
+    "filtration": "Runs With Filtration",
+    "clarifier": "Runs With Clarifier",
 }
 EXPORT_JOBS: dict[str, dict] = {}
 EXPORT_JOBS_LOCK = threading.Lock()
@@ -1018,6 +1025,7 @@ def run_record_groups(rows=None):
                 "entries": [],
                 "latest_time": row["activity_time"],
                 "blend_numbers": set(),
+                "split_numbers": set(),
                 "statuses": set(),
             },
         )
@@ -1032,12 +1040,15 @@ def run_record_groups(rows=None):
             group["latest_time"] = row["activity_time"]
         if row.get("blend_number"):
             group["blend_numbers"].add(row["blend_number"])
+        if row.get("split_batch_number"):
+            group["split_numbers"].add(row["split_batch_number"])
         if row.get("status"):
             group["statuses"].add(row["status"])
 
     results = sorted(groups.values(), key=lambda group: group["latest_time"], reverse=True)
     for group in results:
         group["blend_numbers"] = ", ".join(sorted(group["blend_numbers"]))
+        group["split_numbers"] = ", ".join(sorted(group["split_numbers"]))
         group["statuses"] = ", ".join(sorted(group["statuses"]))
         group["entry_count"] = len(group["entries"])
     return results
@@ -1595,6 +1606,8 @@ def build_batch_review(run_id: int):
     """Gather the latest saved run-linked sheets so the review page can summarize them."""
     run = get_run(run_id)
     voided_stages = get_voided_stages_for_run(run_id)
+    extraction_entry = get_latest_extraction_for_run(run_id)
+    filtration_entry, filtration_rows = get_latest_filtration_for_run(run_id)
 
     # Generic stage entries are discovered from configuration instead of hard-coded one by one.
     generic_entries = []
@@ -1638,11 +1651,16 @@ def build_batch_review(run_id: int):
 
     return {
         "run": run,
+        "extraction_entry": extraction_entry,
+        "filtration_entry": filtration_entry,
+        "filtration_rows": filtration_rows,
+        "filtration_payload": parse_payload_json(filtration_entry),
+        "filtration_cycles": filtration_cycle_context(build_filtration_row_map(filtration_rows)),
         "evaporation_entry": None,
         "evaporation_rows": [],
         "generic_entries": generic_entries,
         "voided_entries": voided_entries,
-        "has_entries": bool(generic_entries or voided_entries),
+        "has_entries": bool(extraction_entry or filtration_entry or generic_entries or voided_entries),
         "has_complete_entries": any(item["completion_status"] == COMPLETE_STATUS for item in generic_entries),
     }
 
@@ -1668,6 +1686,11 @@ def build_print_packets(selected_runs):
             {
                 "run": review["run"],
                 "run_label": run_display_number(review["run"]),
+                "extraction_entry": review["extraction_entry"],
+                "filtration_entry": review["filtration_entry"],
+                "filtration_rows": review["filtration_rows"],
+                "filtration_payload": review["filtration_payload"],
+                "filtration_cycles": review["filtration_cycles"],
                 "evaporation_entry": review["evaporation_entry"],
                 "evaporation_rows": review["evaporation_rows"],
                 "generic_entries": review["generic_entries"],
@@ -1683,6 +1706,51 @@ def export_scope_label(scope: str) -> str:
     return EXPORT_SCOPE_LABELS.get(clean_value(scope), EXPORT_SCOPE_LABELS["all"])
 
 
+def read_export_state() -> dict:
+    """Load export metadata such as the last successful export timestamp."""
+    try:
+        return json.loads(EXPORT_STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def last_successful_export_at() -> str:
+    """Return the timestamp of the last completed export, if one has been recorded."""
+    return clean_value(read_export_state().get("last_successful_export_at", ""))
+
+
+def record_successful_export(export_result: dict, scope: str) -> None:
+    """Remember when a PDF export last completed successfully."""
+    state = {
+        "last_successful_export_at": clean_value(export_result.get("generated_at", "")) or datetime.now().isoformat(timespec="seconds"),
+        "last_scope": clean_value(scope),
+        "last_scope_label": export_scope_label(scope),
+        "last_export_name": clean_value(export_result.get("export_name", "")),
+        "last_run_count": int(export_result.get("run_count") or 0),
+    }
+    EXPORT_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
+def run_is_today(run: dict) -> bool:
+    """Return True when the run was created or updated today."""
+    today_prefix = datetime.now().strftime("%Y-%m-%d")
+    for field_name in ("created_at", "updated_at"):
+        if clean_value(run.get(field_name, "")).startswith(today_prefix):
+            return True
+    return False
+
+
+def run_is_in_last_week(run: dict) -> bool:
+    """Return True when the run was created or updated within the last 7 days."""
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    for field_name in ("created_at", "updated_at"):
+        value = clean_value(run.get(field_name, ""))
+        if value and value[:10] >= cutoff:
+            return True
+    return False
+
+
 def run_is_in_current_month(run: dict) -> bool:
     """Return True when the run was created or updated during the current month."""
     month_prefix = datetime.now().strftime("%Y-%m")
@@ -1692,12 +1760,48 @@ def run_is_in_current_month(run: dict) -> bool:
     return False
 
 
+def run_changed_after(run: dict, timestamp: str) -> bool:
+    """Return True when a run was created or updated after a saved export timestamp."""
+    cutoff = clean_value(timestamp)
+    if not cutoff:
+        return True
+    for field_name in ("updated_at", "created_at"):
+        value = clean_value(run.get(field_name, ""))
+        if value and value > cutoff:
+            return True
+    return False
+
+
 def export_runs_for_scope(scope: str) -> list[dict]:
     """Load the run rows included in an export scope."""
     runs = list_runs(limit=50000)
-    if clean_value(scope) == "current_month":
+    scope_key = clean_value(scope)
+    if scope_key == "today":
+        return [run for run in runs if run_is_today(run)]
+    if scope_key == "last_week":
+        return [run for run in runs if run_is_in_last_week(run)]
+    if scope_key == "current_month":
         return [run for run in runs if run_is_in_current_month(run)]
+    if scope_key == "since_last":
+        return [run for run in runs if run_changed_after(run, last_successful_export_at())]
+    if scope_key in {"extraction", "filtration", "clarifier"}:
+        return [run for run in runs if run_has_export_stage(run, scope_key)]
     return runs
+
+
+def run_has_export_stage(run: dict, scope_key: str) -> bool:
+    """Return True when a run has a saved sheet for the requested process export."""
+    run_id = int(run.get("id") or 0)
+    if not run_id:
+        return False
+    if scope_key == "extraction":
+        return get_latest_extraction_for_run(run_id) is not None
+    if scope_key == "filtration":
+        entry, _rows = get_latest_filtration_for_run(run_id)
+        return entry is not None
+    if scope_key == "clarifier":
+        return get_latest_sheet_entry_for_run_stage(run_id, "clarifier") is not None
+    return True
 
 
 def safe_export_filename(value: str, fallback: str = "item") -> str:
@@ -2086,6 +2190,10 @@ def run_export_job(job_id: str, runs: list[dict], scope: str, destination_path: 
             )
         except Exception:
             pass
+        try:
+            record_successful_export(export_result, scope)
+        except Exception:
+            pass
         update_export_job(
             job_id,
             status="complete",
@@ -2139,6 +2247,30 @@ def run_group_field_name(action_type: str) -> str:
     if action_type == "split":
         return "split_batch_number"
     raise ValueError(f"Unsupported run action: {action_type}")
+
+
+def run_relationship_summary(run: dict) -> str:
+    """Describe the split/blend source and derived run relationship for listings."""
+    blend_num = clean_value((run or {}).get("blend_number", ""))
+    split_num = clean_value((run or {}).get("split_batch_number", ""))
+    action_name = "blend" if blend_num else "split" if split_num else ""
+    action_label = blend_num or split_num
+    if not action_name or not action_label:
+        return ""
+
+    group_runs = list_runs_by_group_label(action_name, action_label)
+    derived_run = next((r for r in group_runs if clean_value(r.get("batch_type", "")) == action_name), None)
+    source_runs = [r for r in group_runs if clean_value(r.get("batch_type", "")) != action_name]
+    source_labels = [run_display_number(r) for r in source_runs if r.get("id") != (run or {}).get("id")]
+    if clean_value(run.get("batch_type", "")) == action_name:
+        labels = [run_display_number(r) for r in source_runs]
+        return f"Sources: {', '.join(labels)}" if labels else "No source runs linked"
+    if derived_run:
+        related = f"{action_name.title()} run: {run_display_number(derived_run)}"
+        if source_labels:
+            related += f" | Other sources: {', '.join(source_labels)}"
+        return related
+    return f"{action_name.title()} label: {action_label}"
 
 
 def copy_generic_payload_for_run(payload_json: str, target_run: dict) -> str:
@@ -2257,6 +2389,15 @@ def create_or_open_group_run(
 
     set_run_batch_type(selected_run_ids, "standard")
     apply_run_group_action(sorted({*selected_run_ids, target_run_id}), action_name, action_label, update_batch_type=False)
+    source_labels = ", ".join(run_display_number(run) for run in get_runs_by_ids(selected_run_ids))
+    insert_audit(
+        table_name="production_runs",
+        record_id=target_run_id,
+        action_type=action_name,
+        changed_by=current_user(request),
+        old_data="",
+        new_data=f"{action_name} run {action_label} linked to source run(s): {source_labels}",
+    )
     return target_run_id, ""
 
 
@@ -2607,6 +2748,7 @@ def admin_export_page(request: Request):
         "admin_export.html",
         export_scopes=EXPORT_SCOPE_LABELS,
         selected_scope="all",
+        last_export_at=last_successful_export_at(),
         destination_path="",
         export_result=None,
         export_job=None,
@@ -2628,15 +2770,19 @@ async def admin_export_submit(request: Request):
     destination_path = clean_value(form.get("destination_path", ""))
     runs = export_runs_for_scope(selected_scope)
     if not runs:
+        empty_message = f"No runs were found for {export_scope_label(selected_scope).lower()}."
+        if selected_scope == "since_last" and last_successful_export_at():
+            empty_message = f"No runs have changed since the last export at {last_successful_export_at()}."
         return render_page(
             request,
             "admin_export.html",
             export_scopes=EXPORT_SCOPE_LABELS,
             selected_scope=selected_scope,
+            last_export_at=last_successful_export_at(),
             destination_path=destination_path,
             export_result=None,
             export_job=None,
-            export_error=f"No runs were found for {export_scope_label(selected_scope).lower()}.",
+            export_error=empty_message,
         )
 
     job_id = start_export_job(runs, selected_scope, destination_path, current_user(request))
@@ -2657,6 +2803,7 @@ def admin_export_job_page(request: Request, job_id: str):
             "admin_export.html",
             export_scopes=EXPORT_SCOPE_LABELS,
             selected_scope="all",
+            last_export_at=last_successful_export_at(),
             destination_path="",
             export_result=None,
             export_job=None,
@@ -2668,6 +2815,7 @@ def admin_export_job_page(request: Request, job_id: str):
         "admin_export.html",
         export_scopes=EXPORT_SCOPE_LABELS,
         selected_scope=export_job.get("scope", "all"),
+        last_export_at=last_successful_export_at(),
         destination_path=export_job.get("destination_path", ""),
         export_result=export_job.get("result") if export_job.get("status") == "complete" else None,
         export_job=export_job,
@@ -2723,6 +2871,8 @@ def render_admin_data_page(request: Request, section: str, page: int = 1, search
         status=status,
         batch_type=section_meta["batch_type"],
     )
+    for run in runs:
+        run["relationship_summary"] = run_relationship_summary(run)
     import math
     total_pages = max(1, math.ceil(total / per_page))
     return render_page(
@@ -3044,12 +3194,15 @@ GIT_ROOT = BASE_DIR.parent
 def _run_git(*args: str, timeout: int = 30) -> tuple[bool, str]:
     """Run a git command in the repo root and return (success, combined_output)."""
     try:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
         result = subprocess.run(
             ["git"] + list(args),
             cwd=str(GIT_ROOT),
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=env,
         )
         output = (result.stdout + result.stderr).strip()
         return result.returncode == 0, output
@@ -3066,6 +3219,34 @@ def _current_branch() -> str:
     ok, out = _run_git("rev-parse", "--abbrev-ref", "HEAD")
     branch = out.strip() if ok else ""
     return branch if branch and branch != "HEAD" else "main"
+
+
+def _worktree_status() -> list[str]:
+    """Return porcelain status lines for local changes that could block an update."""
+    ok, out = _run_git("status", "--porcelain", timeout=20)
+    if not ok:
+        return []
+    return [line for line in out.splitlines() if line.strip()]
+
+
+def _stash_local_update_changes() -> tuple[bool, str]:
+    """Move local file changes aside so every device can pull the published app build."""
+    status_lines = _worktree_status()
+    if not status_lines:
+        return True, "No local changes needed to be stashed."
+
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    stash_message = f"Plant App auto-stash before update {stamp}"
+    stash_ok, stash_out = _run_git("stash", "push", "-u", "-m", stash_message, timeout=60)
+    if not stash_ok:
+        return False, f"Could not stash local changes before update: {stash_out}"
+
+    changed_files = []
+    for line in status_lines[:12]:
+        changed_files.append(line[3:].strip() if len(line) > 3 else line.strip())
+    if len(status_lines) > 12:
+        changed_files.append(f"...and {len(status_lines) - 12} more")
+    return True, f"Local changes were saved as git stash '{stash_message}' before pulling. Files: {', '.join(changed_files)}"
 
 
 def _spawn_restart() -> None:
@@ -3085,6 +3266,100 @@ def _spawn_restart() -> None:
     subprocess.Popen([sys.executable, str(BASE_DIR / "app.py")], **kwargs)
     time.sleep(0.5)
     os._exit(0)
+
+
+def _exit_current_process(delay_seconds: float = 0.5) -> None:
+    """Let the HTTP response leave, then stop this server so update files unlock."""
+    import time
+    time.sleep(delay_seconds)
+    os._exit(0)
+
+
+def _spawn_update_and_restart(branch: str) -> tuple[bool, str]:
+    """Launch an external updater that can pull after this server exits."""
+    update_log = RUNTIME_DIR / "update.log"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    updater_code = f"""
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+repo = Path({str(GIT_ROOT)!r})
+app_dir = Path({str(BASE_DIR)!r})
+branch = {branch!r}
+stamp = {stamp!r}
+log_path = Path({str(update_log)!r})
+env = os.environ.copy()
+env["GIT_TERMINAL_PROMPT"] = "0"
+
+def log(message):
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(message.rstrip() + "\\n")
+
+def run(*args, timeout=120, allow_fail=False):
+    command = ["git", *args]
+    result = subprocess.run(command, cwd=str(repo), capture_output=True, text=True, timeout=timeout, env=env)
+    output = (result.stdout + result.stderr).strip()
+    log("$ " + " ".join(command))
+    if output:
+        log(output)
+    if result.returncode != 0 and not allow_fail:
+        raise RuntimeError(output or f"git exited with {{result.returncode}}")
+    return result.returncode == 0, output
+
+def start_app():
+    kwargs = {{
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "cwd": str(app_dir),
+        "env": env,
+    }}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        kwargs["close_fds"] = True
+    subprocess.Popen([sys.executable, str(app_dir / "app.py")], **kwargs)
+
+try:
+    time.sleep(2.0)
+    log(f"=== Plant App update {{stamp}} on branch {{branch}} ===")
+    run("rm", "--cached", "-r", "--ignore-unmatch", "plant_app/runtime", "plant_app/__pycache__", "plant_app/static/uploads", allow_fail=True)
+    ok, status = run("status", "--porcelain", timeout=30, allow_fail=True)
+    if status.strip():
+        run("stash", "push", "-u", "-m", f"Plant App auto-stash before update {{stamp}}", timeout=120)
+    run("fetch", "origin", branch, timeout=120)
+    ok, output = run("merge", "--ff-only", f"origin/{{branch}}", timeout=120, allow_fail=True)
+    if not ok:
+        backup_branch = f"plant-app-local-backup-{{stamp}}"
+        run("branch", backup_branch, "HEAD", timeout=30, allow_fail=True)
+        log(f"Fast-forward failed; saved current HEAD as {{backup_branch}} and syncing to origin/{{branch}}.")
+        run("reset", "--hard", f"origin/{{branch}}", timeout=120)
+    log("Update complete; starting app.")
+except Exception as exc:
+    log("Update failed: " + repr(exc))
+finally:
+    start_app()
+"""
+    try:
+        update_log.parent.mkdir(parents=True, exist_ok=True)
+        with update_log.open("a", encoding="utf-8") as log_handle:
+            kwargs: dict = {
+                "stdin": subprocess.DEVNULL,
+                "stdout": log_handle,
+                "stderr": log_handle,
+                "cwd": str(GIT_ROOT),
+                "env": os.environ.copy(),
+            }
+            if os.name == "nt":
+                kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                kwargs["close_fds"] = True
+            subprocess.Popen([sys.executable, "-c", updater_code], **kwargs)
+        return True, f"Update scheduled. Progress is written to {update_log}."
+    except Exception as exc:
+        return False, f"Could not start updater: {exc}"
 
 
 @app.get("/check-update")
@@ -3114,18 +3389,18 @@ def check_update(request: Request):
 
 @app.post("/admin/update")
 def admin_update(request: Request):
-    """Pull the latest code from GitHub and restart the server."""
+    """Sync the app with GitHub and restart the server."""
     redirect = require_admin(request)
     if redirect:
         return JSONResponse({"error": "Not authorized"}, status_code=403)
 
     branch = _current_branch()
-    pull_ok, pull_out = _run_git("pull", "origin", branch, timeout=60)
-    if not pull_ok:
-        return JSONResponse({"success": False, "output": pull_out}, status_code=500)
+    spawn_ok, spawn_out = _spawn_update_and_restart(branch)
+    if not spawn_ok:
+        return JSONResponse({"success": False, "output": spawn_out}, status_code=500)
 
-    threading.Thread(target=_spawn_restart, daemon=True).start()
-    return JSONResponse({"success": True, "output": pull_out, "branch": branch, "restarting": True})
+    threading.Thread(target=_exit_current_process, daemon=True).start()
+    return JSONResponse({"success": True, "output": spawn_out, "branch": branch, "restarting": True})
 
 
 @app.post("/signature-session")
